@@ -1,0 +1,20 @@
+name: ai-job-hunter-test
+
+services:
+  postgres-test:
+    image: postgres:17.11-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8ec2133ccaf80d27
+    environment:
+      POSTGRES_DB: ai_job_hunter_test
+      POSTGRES_USER: ai_job_hunter_test
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env.test}
+    ports:
+      - '127.0.0.1:5433:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ai_job_hunter_test -d ai_job_hunter_test']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 10s

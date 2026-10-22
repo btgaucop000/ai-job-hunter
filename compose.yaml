@@ -1,0 +1,23 @@
+name: ai-job-hunter-dev
+
+services:
+  postgres:
+    image: postgres:17.11-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8ec2133ccaf80d27
+    environment:
+      POSTGRES_DB: ai_job_hunter_dev
+      POSTGRES_USER: ai_job_hunter_dev
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    ports:
+      - '127.0.0.1:${DB_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ai_job_hunter_dev -d ai_job_hunter_dev']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+
+volumes:
+  postgres-data:
