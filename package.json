@@ -1,0 +1,49 @@
+{
+  "name": "ai-job-hunter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": "24.22.1",
+    "pnpm": "12.14.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" run dev",
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:up": "docker compose --env-file .env up -d --wait",
+    "db:down": "docker compose --env-file .env down",
+    "db:test:up": "docker compose --env-file .env.test -f compose.test.yaml up -d --wait",
+    "db:test:down": "docker compose --env-file .env.test -f compose.test.yaml down",
+    "db:migrate": "node scripts/migrate.mjs development source run",
+    "db:status": "node scripts/migrate.mjs development source show",
+    "db:revert": "node scripts/migrate.mjs development source revert",
+    "db:migrate:compiled": "node scripts/migrate.mjs development compiled run",
+    "db:status:compiled": "node scripts/migrate.mjs development compiled show",
+    "db:revert:compiled": "node scripts/migrate.mjs development compiled revert",
+    "db:test:migrate": "node scripts/migrate.mjs test source run",
+    "db:test:status": "node scripts/migrate.mjs test source show",
+    "db:test:revert": "node scripts/migrate.mjs test source revert",
+    "db:test:migrate:compiled": "node scripts/migrate.mjs test compiled run",
+    "db:test:status:compiled": "node scripts/migrate.mjs test compiled show",
+    "db:test:revert:compiled": "node scripts/migrate.mjs test compiled revert",
+    "test": "pnpm -r run test",
+    "test:integration": "pnpm --filter @ai-job-hunter/api test:integration"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "24.19.2",
+    "eslint": "10.13.0",
+    "@eslint/js": "10.0.1",
+    "typescript-eslint": "8.72.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.7",
+    "globals": "17.13.0",
+    "prettier": "3.9.10"
+  }
+}
