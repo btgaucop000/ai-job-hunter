@@ -10,13 +10,15 @@
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "test:compile": "node ../../scripts/clean-test-output.mjs && tsc -p tsconfig.test.json",
     "test": "pnpm test:compile && node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js --runInBand",
-    "test:integration": "pnpm test:compile && node --env-file-if-exists=../../.env.test --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.integration.config.js --runInBand"
+    "test:integration": "pnpm test:compile && node --env-file-if-exists=../../.env.test --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.integration.config.js --runInBand",
+    "smoke:ollama": "pnpm test:compile && node .test-dist/test/manual/ollama.smoke.js"
   },
   "dependencies": {
     "@nestjs/common": "12.2.0",
     "@nestjs/core": "12.2.0",
     "@nestjs/platform-express": "12.2.0",
     "@nestjs/typeorm": "12.0.2",
+    "ajv": "8.20.0",
     "class-transformer": "0.5.1",
     "class-validator": "0.15.1",
     "pg": "8.23.1",

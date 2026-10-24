@@ -2,7 +2,7 @@
 
 AI-powered job matching platform that analyzes resumes and job descriptions using LLMs, with explainable scoring and local/cloud AI support.
 
-That description is the product direction. Checkpoints 1–4 provide the workspace, PostgreSQL migrations, API health endpoints, a responsive dashboard shell, automated tests, and Ubuntu CI configuration. Candidate/job management and AI functionality are not implemented.
+That description is the product direction. Checkpoints 1–4 provide the workspace, PostgreSQL migrations, API health endpoints, a responsive dashboard shell, automated tests, and Ubuntu CI configuration. Task 02 Checkpoint 3.2 adds an internal AI provider layer; candidate/job management and public AI functionality are not implemented.
 
 ## Local setup (Ubuntu WSL2)
 
@@ -139,3 +139,19 @@ Create `.env.test` from its example and set a local password first. Run commands
 The single Ubuntu workflow in `.github/workflows/ci.yml` runs on pushes and pull requests. It pins Node 24.22.1, pnpm 12.14.0, and action commit revisions; installs from the lockfile; runs format/lint/type checks, unit/component tests, and builds; then starts the digest-pinned test PostgreSQL container and runs compiled migrations plus integration tests. It generates an ephemeral masked password and removes the disposable container in an always-run cleanup step. Workflow permissions are read-only; there is no deployment.
 
 Known limits: component tests do not replace real-browser layout checks; GitHub Actions must actually run on GitHub before its status can be called passing. Jest ESM currently emits Node's experimental VM modules warning. The pnpm install policy explicitly skips optional native build scripts for `@parcel/watcher` and `unrs-resolver`; the verified Linux tests use packaged binaries and do not need those scripts.
+
+## Internal AI provider (Task 02 / Checkpoint 3.2)
+
+The API includes an internal `AiModule` for schema-validated Ollama generation. It exposes no HTTP endpoint. Optional server environment settings are listed in `.env.example`: `AI_PROVIDER=ollama`, `OLLAMA_BASE_URL=http://127.0.0.1:11434`, `OLLAMA_MODEL=qwen3:4b`, and `AI_REQUEST_TIMEOUT_MS=120000` (allowed range 1000–300000 ms). Settings are validated at startup without contacting Ollama. Actual generation requires the configured Ollama service and model; there is no automatic cloud fallback. The default is local loopback. The server-owned base URL accepts other HTTP(S) origins, so local-only inference depends on retaining a local destination; the manual smoke script pins loopback explicitly.
+
+Run `pnpm --filter @ai-job-hunter/api test` for backend unit tests, including mocked AI HTTP tests, or `pnpm test` for all unit/component tests. Neither command requires Ollama, GPU or PostgreSQL. The separate `pnpm test:integration` command still requires isolated PostgreSQL. See the architecture document for schema support, limits and error categories. Live Nest/Ollama smoke testing is available through the explicit Checkpoint 3.3 command below.
+
+### Explicit local Ollama smoke test
+
+With Ollama already running at `http://127.0.0.1:11434` and `qwen3:4b` already installed, run:
+
+```bash
+pnpm --filter @ai-job-hunter/api smoke:ollama
+```
+
+This compiles the existing TypeScript test tree and invokes a separate manual script using real Nest `AiModule` dependency injection. It pins the provider, URL, model and 120-second timeout for this process, without loading environment files. It sends only a synthetic fixture and verifies the name, exactly three skills, React's five years, and null durations for NestJS and PostgreSQL. Output contains only sanitized status and elapsed milliseconds. Failures exit nonzero. It neither starts Ollama nor downloads models. It opens no API listener and needs no PostgreSQL. It is excluded from Jest discovery and regular tests, is not invoked by CI, and refuses execution when `CI` is set.
