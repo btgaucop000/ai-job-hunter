@@ -60,3 +60,12 @@ test('reserves test port from development', () => {
     }),
   ).toThrow('reserved');
 });
+
+test('application startup validation rejects invalid AI settings', () => {
+  expect(() => validateEnvironment({ ...env, AI_PROVIDER: 'gemini' })).toThrow(
+    'AI_PROVIDER',
+  );
+  expect(() =>
+    validateEnvironment({ ...env, AI_REQUEST_TIMEOUT_MS: '0' }),
+  ).toThrow('AI_REQUEST_TIMEOUT_MS');
+});

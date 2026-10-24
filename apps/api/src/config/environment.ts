@@ -1,3 +1,4 @@
+import { aiConfig } from '../ai/ai.config.js';
 import { databaseOptions } from '../database/database.config.js';
 
 export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
@@ -9,5 +10,5 @@ export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
     throw new Error('API_PORT must be an integer between 1 and 65535');
   }
   databaseOptions(env.NODE_ENV === 'test' ? 'test' : 'development', env);
-  return { port: Number(port) };
+  return { port: Number(port), ai: aiConfig(env) };
 }
