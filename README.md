@@ -227,12 +227,131 @@ This command is outside regular tests and refuses CI. It uses real ExtractionSer
 
 A nonzero exit means review is needed, including valid-looking but incomplete/semantically incorrect results. A rejection reports unknown fact-presence booleans, because the public API exposes no rejected model output. Gold checks apply only to these synthetic fixtures and are not production semantic heuristics or a general quality benchmark. The first 4.5A run found one incomplete result and three semantically incorrect but textually grounded results; see `docs/architecture.md` for sanitized observations. Structural/evidence checks do not establish resistance to prompt injection or semantic correctness.
 
-The final fixed CV prompt enumerates explicitly supported skills, maps each stated duration verbatim into that skill’s `experienceText.value` with evidence, and keeps unstated duration null with empty evidence. Checkpoint 4.5E applies exactly the Candidate C wording selected after the controlled 4.5D comparison; historical failures and final live results are recorded in `docs/architecture.md`. Exact quotes establish textual grounding, not semantic correctness or completeness. Negation and prompt-injection susceptibility remain known limitations. Task 05 will evaluate broader extraction quality across documents and adversarial cases.
+The final fixed CV prompt enumerates explicitly supported skills, maps each stated duration verbatim into that skill’s `experienceText.value` with evidence, and keeps unstated duration null with empty evidence. Checkpoint 4.5E applies exactly the Candidate C wording selected after the controlled 4.5D comparison; historical failures and final live results are recorded in `docs/architecture.md`. Exact quotes establish textual grounding, not semantic correctness or completeness. Negation and prompt-injection susceptibility remain known limitations. Task 05 records the synthetic extraction baseline and adversarial limitations below.
 
 ## Internal deterministic matching (Task 04 / Checkpoints 4.2–4.3)
 
-`apps/api/src/matching/matching.ts` exports the pure synchronous `matchExtractions({ cv, jd })` function for existing version-1 extraction envelopes. It returns documented-support scores, per-requirement decisions, evidence, uncertainty and mandatory coverage explanations. `MatchingModule` exports `MatchingService.match({ cv, jd })`, a synchronous delegate returning the same `MatchingResult`. `AppModule` registers it internally; no public matching endpoint is added. High scores with low coverage are not full-suitability assessments; missing evidence never implies automatic rejection. Exact evidence does not establish semantic correctness, and missing evidence does not establish missing ability. Complex natural language remains unsupported; Task 05 will evaluate broader quality and calibration. See `docs/architecture.md` for the finite vocabulary, accepted phrase forms and limitations.
+`apps/api/src/matching/matching.ts` exports the pure synchronous `matchExtractions({ cv, jd })` function for existing version-1 extraction envelopes. It returns documented-support scores, per-requirement decisions, evidence, uncertainty and mandatory coverage explanations. `MatchingModule` exports `MatchingService.match({ cv, jd })`, a synchronous delegate returning the same `MatchingResult`. `AppModule` registers it internally; no public matching endpoint is added. High scores with low coverage are not full-suitability assessments; missing evidence never implies automatic rejection. Exact evidence does not establish semantic correctness, and missing evidence does not establish missing ability. Complex natural language remains unsupported; Task 05 records finite synthetic quality measurements below; it does not establish general calibration. See `docs/architecture.md` for the finite vocabulary, accepted phrase forms and limitations.
 
 Run the synthetic matching suite with `pnpm --filter @ai-job-hunter/api test --testPathPatterns=matching`. It requires neither Ollama nor PostgreSQL. Repository checks remain `pnpm format`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`.
 
 After `pnpm build` and `pnpm --filter @ai-job-hunter/api test:compile`, run `node scripts/check-matching.mjs` to verify production-compiled matching in a real Nest application context. This check uses only synthetic envelopes and does not start an HTTP listener, connect to PostgreSQL or invoke AI/extraction. The focused suite also compiles `AppModule` with offline database and extraction replacements to verify registration.
+
+### Offline evaluation (Task 05 / Checkpoint 5.2)
+
+Run `pnpm --filter @ai-job-hunter/api eval:offline` for the versioned
+`synthetic-v1` evaluator. It compiles the existing API test target, parses ten
+synthetic source documents, assesses twenty human-authored observations, and
+runs twelve fixed scenarios through the real deterministic matcher. It does not
+invoke Ollama, start HTTP, or connect to PostgreSQL. This offline command never invokes the separate opt-in live runner.
+
+The command prints canonical JSON to stdout and exits nonzero on a harness or
+matching expectation failure. To capture only JSON after compilation:
+
+```bash
+pnpm --filter @ai-job-hunter/api test:compile
+node --permission --allow-fs-read='*' --allow-worker \
+  --import ./apps/api/.test-dist/test/evaluation/no-network.js \
+  ./apps/api/.test-dist/test/evaluation/offline.js > /tmp/ai-job-hunter-offline.json
+```
+
+The preload rejects network entry points and HTTP listeners. Node permissions
+also deny subprocesses, native addons and filesystem writes; parser workers
+require `--allow-worker`. This is a regression tripwire, not a security boundary
+for arbitrary untrusted code. Node may print a worker-permission warning to
+stderr; it is not part of the JSON report.
+
+Intentionally incorrect observations, two rejections, and one not-run example
+are **synthetic evaluator test cases**, not observed model failures. `passed`
+means the evaluator recognized their authored expectations and matching agreed
+with policy expectations. It does not mean extraction quality is perfect or
+that a live model was evaluated. No timestamps or measured latency enter the
+report. Repeated unchanged runs produce identical bytes.
+
+Focused tests: `pnpm --filter @ai-job-hunter/api test --testPathPatterns=offline-evaluation`.
+The CLI tests launch child Node processes; an execution sandbox that prohibits
+subprocesses must permit those tests to run. Dataset and metric details are in
+[the architecture document](docs/architecture.md#task-05--checkpoint-52-offline-evaluation).
+
+### Local evaluation runner (Task 05 / Checkpoint 5.3A)
+
+The opt-in command for an explicitly authorized local live run is:
+
+```bash
+pnpm --filter @ai-job-hunter/api eval -- --allow-local-ollama
+```
+
+Checkpoint 5.3A implemented the runner without inference. The single approved
+Checkpoint 5.3B live run is summarized below.
+The CLI refuses missing opt-in, unknown arguments and any set `CI` variable.
+It pins the existing loopback Ollama configuration and verified `qwen3:4b`
+profile. It never starts Ollama, downloads models, changes daemon configuration,
+retries a failed call or selects a cloud provider.
+
+The fixed schedule makes at most 18 sequential extraction calls: ten source
+cases, two extra attempts for each ordinary PDF/DOCX, then fresh CV/JD extraction
+for the duration/mixed-JD and sparse/mixed-JD pairs. The existing 120-second
+provider timeout remains unchanged. A supervising parent enforces a 45-minute
+execution deadline, retains completed measurements, marks the active interrupted
+attempt rejected and remaining attempts not run, and terminates its extraction
+child when needed. Normal cleanup has a five-second grace period. The existing
+Ollama daemon is never stopped.
+
+JSON on stdout separates `extraction`, `fixedMatching` and `endToEnd`. It includes
+version/hash provenance, configured model identity and successful production
+verification, completion counts, delivered quality, latency statistics, repeat
+variance and sanitized failures. Raw documents, model responses and evidence
+quotes are omitted. Exit 1 means quality, infrastructure or cleanup review is
+needed; it does not imply a production security defect. Offline synthetic scores
+remain evaluator regression results, never live measurements.
+
+Deterministic runner tests use fake boundaries and an inert cleanup subprocess:
+`pnpm --filter @ai-job-hunter/api test --testPathPatterns=live-evaluation`.
+
+### Reviewed baseline and follow-up (Task 05 / Checkpoints 5.3B–5.4)
+
+Task 05 is accepted as an evaluation and measurement deliverable, not proof of
+production-ready AI quality. One local run on 2026-10-26 used `synthetic-v1`
+(ten source documents), `evaluation-v1` and `matching-v1`, with Ollama 0.40.10,
+`qwen3:4b`, pinned digest
+`359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7`.
+Temperature was zero; no retry, tuning or second benchmark run occurred.
+
+| Baseline measure                                      | Result              |
+| ----------------------------------------------------- | ------------------- |
+| Planned / attempted extractions                       | 18 / 18             |
+| Returned / rejected / not run                         | 11 / 7 / 0          |
+| Passed all quality checks                             | 6/18                |
+| Returned-output TP / FP / FN                          | 35 / 5 / 0          |
+| Returned precision                                    | 87.50% (35/40)      |
+| Returned recall, conditional on successful extraction | 100% (35/35)        |
+| Delivered recall, including rejected attempts         | 50.00% (35/70)      |
+| Delivered important completeness                      | 42.86% (24/56)      |
+| Unsupported-positive rate on returned outputs         | 12.50% (5/40)       |
+| Fixed matching                                        | 14 scenarios passed |
+| Live end-to-end pairs completed                       | 0/2                 |
+| Delivered matching status / decision accuracy         | 0/10 for each       |
+
+The run exited 1 for quality failures; no infrastructure, timeout or cleanup
+failure occurred. Returned results are not automatically quality passes. The
+ordinary PDF/DOCX cases passed three attempts each; all other attempts either
+failed quality checks or were rejected. Both live pairs lacked complete validated
+extraction inputs, so their matching metrics were unavailable, not successful.
+
+Offline synthetic tests verify evaluator behavior, not live model accuracy.
+Rejected model contents cannot be inferred from error codes. Structural evidence
+validity does not establish semantic correctness. Unsupported-positive rate uses
+exact authored alignment, not independent hallucination verification. Evidence
+support anchors may be annotation-sensitive, including punctuation and repeated
+passages. These small synthetic measurements establish neither hiring suitability
+nor production readiness. See the [detailed baseline and analysis](docs/architecture.md#task-05--checkpoints-53b54-reviewed-live-baseline-and-follow-up).
+
+| Priority | Follow-up                                                                                                                                                                                                               |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0       | Add sanitized rejection diagnostics; investigate INVALID_EVIDENCE and restore both predefined end-to-end pairs without weakening validation. Address before presenting Task 06 as a working model-backed matching flow. |
+| P1       | Address negation, uncertainty, injection and sparse-document contamination; audit evidence-support annotations; preserve explicit incomplete/unknown/unsupported states during Task 06 UI integration.                  |
+| P2       | Broaden independent fixture coverage after MVP.                                                                                                                                                                         |
+
+The original baseline remains unchanged. Future improvements must preserve it;
+any evaluation-policy or ground-truth changes require separate review and
+versioning. Temporary reports and raw inference payloads are not committed.

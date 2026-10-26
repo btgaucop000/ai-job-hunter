@@ -367,3 +367,344 @@ The Nest tests resolve the service from its standalone module, compare service a
 `node scripts/check-matching.mjs`, after the normal production build and API test compilation, creates a real Nest application context from the production-compiled MatchingModule. It checks synchronous result parity, repeat determinism, frozen inputs, duplicate weighting, unsupported-requirement visibility, coverage/explanation, exact evidence offsets and sanitized failures. Only synthetic fixture construction comes from test output. No HTTP listener, database, AI provider or extraction service is needed; the script prints a fixed pass/fail summary without document payloads. Compiled output remains ignored build artifacts rather than source changes.
 
 The documented-support interpretation is unchanged: exact evidence does not establish semantic correctness; missing evidence does not establish missing ability; low evaluability can yield a high score; complex natural language remains unsupported. Scores must retain coverage and the scope explanation. Task 05 will evaluate broader quality and calibration. This checkpoint adds no suitability ranking, confidence score or rejection threshold.
+
+## Task 05 / Checkpoint 5.2: offline evaluation
+
+The evaluation-only implementation lives in `apps/api/test/evaluation`. There
+are no production changes or new dependencies. TypeScript fixture modules under
+`datasets/v1` keep annotations and contract-shaped observed fixtures type checked
+without introducing a second JSON schema loader. Dataset, extraction contract,
+matching policy and evaluation policy versions are reported separately. A
+SHA-256 fingerprint covers authored source text/gold, observations and matching
+inputs/expectations; inventory entries record generated artifact and expected
+and actual parsed-text hashes. Changes require review and a dataset or policy
+version change when semantics change. Hashes detect drift; they are not signed
+approval records.
+
+The ten source cases reuse all six Task 03 cases and the PDF/DOCX builders:
+ordinary equivalent PDF/DOCX, negated/uncertain CV, explicit JD priorities,
+CV/JD injection, a CV with skill-specific duration and negative experience,
+sparse CV, mixed JD (unknown priority, duration and complex architecture), and
+negated JD requirement. Source facts carry polarity, uncertainty or instruction
+annotations. Extraction gold separately specifies field, subject, permitted
+values, supporting anchor and importance. Forbidden positives are explicit
+probes. Expected non-null facts form a closed world: any extra non-null claim is
+incorrect; omitted optional scalars remain null and absent collections empty.
+Gold is human-authored independently of observed outputs. Source and extraction
+annotations may share anchors, but a negative source statement is not a positive
+skill. The contract has no negative-skill field. Identity/history/education
+breadth remains limited: this initial inventory covers synthetic identity but
+not employment/education records, although the contract adapter includes them.
+
+Twenty observations include ten correct baselines plus omitted skill, wrong
+skill-duration relationship, missing evidence, invalid offsets, grounded
+negated/uncertain positives, grounded injection contamination, wrong priority,
+two rejections and one not-run case. Expected TP/FP/FN counts and failure-code
+sets are authored literals. The harness checks these expectations rather than
+requiring deliberately bad observations to achieve perfect quality. Additional
+unit tests independently assert metric denominators and values. No model output
+is used, and no model-quality claim follows from passing tests.
+
+Twelve matching cases reuse Task 04 policy examples: alias/weighting, missing
+versus explicit negative experience, partial duration, unknown duration, zero,
+sufficient/insufficient lower bounds, conflicting evidence, duplicate priorities
+and unsupported language, unknown priority, and all-unsupported requirements.
+Fixed envelopes pass the existing validators. Expected statuses, decisions,
+credits, priorities, uncertainty, category/overall scores and complete coverage
+are authored independently of matcher output. Source observations and matching
+inputs are intentionally separate: an extraction-correct ordinary sentence need
+not belong to the narrow matching grammar. This checkpoint does not measure the
+combined live pipeline.
+
+Metric policy `evaluation-v1` uses exact field/subject/value alignment with
+one-to-one consumption of gold facts; array order never supplies a relationship.
+Skill name and skill duration are separate atoms. Wrong duration attribution is
+FP plus FN. History subjects use employer/title/start date; education subjects
+use institution/qualification/date. These composite keys are deliberately small
+and do not resolve repeated identical records by source anchor yet. No fuzzy
+matching, generated ground truth, semantic judge or automatic tuning is used.
+
+| Metric                       | Numerator / denominator                                                                                  |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Precision                    | Aligned emitted facts / all emitted non-null facts                                                       |
+| Recall                       | Aligned facts / expected non-null facts                                                                  |
+| Important completeness       | Aligned important facts / expected important facts                                                       |
+| Complete important fixtures  | Returned observations with every important fact / returned observations with at least one important fact |
+| Unsupported positive claims  | Unmatched emitted facts / emitted affirmative claims                                                     |
+| Negation handling            | Negation probes with no forbidden positive / annotated negation probes                                   |
+| Priority accuracy            | Recovered gold requirements with correct required/preferred/null priority / all gold requirements        |
+| Matching status accuracy     | Correct aligned canonical statuses / all expected canonical groups                                       |
+| Matching decision accuracy   | Correct status, evaluability and inclusion together / all expected canonical groups                      |
+| Score availability           | Correct numeric/null state / overall plus five category slots                                            |
+| Evidence structural validity | Structurally valid references / emitted references                                                       |
+| Evidence support             | Correct emitted facts with supporting evidence / correct emitted facts                                   |
+| Completion                   | Returned results / attempted observations                                                                |
+
+All ratios include numerator, denominator and value; a zero denominator yields
+null. Unmatched assertions are conservatively treated as affirmative because the
+production contract has no polarity flag; exact gold negative facts are excluded
+from the affirmative denominator. Forbidden-probe counts separately identify
+negation, uncertainty and injection; a claim can trigger a probe without gaining
+credit. Correct null priority requires a recovered requirement with no non-null
+priority, so omission cannot pass as unknown.
+
+Evidence validity checks segment existence/bounds, integer global UTF-16 offsets,
+surrogate boundaries, exact source slice and unique occurrence within the
+segment. Evidence support requires at least one reference and every reference
+to enclose the authored supporting anchor. This deliberately conservative anchor
+rule is a fixture-specific semantic check, not general entailment. Correct facts
+without evidence fail support even though they emit zero references. Matching
+links additionally require a resolvable fact path and either an original
+reference or a containing single-line context reference; priority links must
+point to priority fields. Evidence structure does not itself establish truth.
+
+Matching requirements align by their complete original JD index groups, not
+just output order. Missing groups lose accuracy; extras fail exact-case
+acceptance. Unsupported requirements remain in status/decision denominators,
+though production excludes them from numerical scoring. Overall and category
+score deviation is absolute percentage-point error, with mean and maximum over
+numeric pairs only. Numeric/null mismatch separately fails availability and is
+never converted to zero. Empty numeric-pair sets produce null deviation. Exact
+existing two-decimal scores are required; no tolerance hides regressions.
+
+Rejected observations have null output-quality metrics and no inferred
+hallucination count. Delivered recall/completeness and delivered negation
+handling retain attempted rejection denominators with zero delivered facts/safe
+outcomes. Not-run cases contribute no attempted denominator and remain visible
+in counts. Aggregate ratios sum counts rather than averaging fixture ratios.
+The synthetic not-run case is expected and can pass the harness assessment; an
+unexpected parser/run failure produces a failed report and nonzero exit.
+
+The CLI imports a network-denial preload before evaluation. It rejects fetch,
+WebSocket, TCP connect, HTTP(S) requests, HTTP/2 connect, TLS connect, datagram
+creation, common DNS lookups and listener creation. Node's permission mode
+restricts writes, subprocesses and addons; worker access is needed for the
+existing parser. Existing parser workers retain their production isolation.
+Tests probe denied network entry points and run the entire CLI twice. These
+controls establish the harness's offline behavior, not a general malicious-code
+sandbox. No provider, Nest application, database, HTTP server or live runner is
+instantiated. Report serialization sorts object keys and fixture IDs, and omits
+clock/environment data. Latency/variance remain explicitly unavailable.
+
+Run `pnpm --filter @ai-job-hunter/api eval:offline`; focused tests use
+`pnpm --filter @ai-job-hunter/api test --testPathPatterns=offline-evaluation`.
+Reports contain IDs, counts, hashes and sanitized codes, not source text or
+quotes. The first dataset is English synthetic regression coverage, including
+cases previously used for prompt work, not an independent generalization or
+hiring-suitability benchmark. Local live evaluation remains Checkpoint 5.3.
+
+## Task 05 / Checkpoint 5.3A: opt-in local evaluation runner
+
+This checkpoint adds evaluation-only orchestration, without changing Task 03/04
+production code or dependencies. The API `eval` script compiles the existing test
+target and invokes `test/evaluation/live.ts`. Both parent and child require
+`--allow-local-ollama`; any set `CI` variable (including empty or `false`) refuses
+execution. No model or daemon is invoked by the deterministic tests. The offline
+runner and its synthetic regression scores remain separate.
+
+`live-plan.ts` fixes `live-schedule-v1` at 18 sequential extraction invocations:
+ten synthetic-v1 documents once, two extra attempts each for `cv-simple-pdf` and
+`cv-simple-docx`, then fresh extraction for two pairs. The pairs are
+`cv-duration-docx`/`jd-mixed` and `cv-sparse-docx`/`jd-mixed`. Repeats are predefined
+observations, never retries. A child-side 18-call ceiling provides a second guard.
+
+The pair annotations are an evaluation-only addition versioned `live-pairs-v1`;
+they do not change synthetic-v1 source facts or production policy. Their gold
+envelopes and expected outcomes are human-authored. The duration CV's gold skill
+name uses the unique duration clause as its reference; this is not a repair of
+live output. The first mixed-JD skill requirement has ambiguous broad evidence
+because its short phrase repeats. Both pairs retain that exclusion and the
+complex unsupported requirement. The duration pair has a partial-duration
+credit of 0.6, active category weight 60 and overall score 25; the sparse pair
+has score 0 at the same scope. Five expected canonical requirements remain
+visible in each case. The twelve approved offline matching cases plus these two
+pair gold cases are reported in `fixedMatching`, distinctly labeled human gold.
+
+For live matching, actual JD requirement indexes are aligned back to gold by
+exact requirement text with one-to-one consumption. Unknown/extra indexes get
+separate non-gold IDs; omitted requirements remain missing. Only evaluation IDs
+are remapped; production results and evidence paths retain their live origins.
+The expected five-group denominator is never reconstructed from model output.
+Matching-input rejection leaves quality metrics unavailable but contributes zero
+to delivered status/decision accuracy for an attempted pair. A wholly not-run
+pair contributes no attempted denominator and remains explicit in counts.
+Exact alignment can penalize semantically equivalent wording; no fuzzy semantic
+judge or new production normalization was introduced.
+
+The parent owns one forked child, started only after opt-in/CI checks. The child
+creates `ExtractionModule` via `NestFactory.createApplicationContext`, with
+logging disabled; it never boots AppModule, HTTP or a database. PDF, DOCX and JD
+all use the existing `ExtractionService`. Provider, model, literal loopback URL
+and 120000 ms request timeout are pinned in the child's environment. Inherited
+Node preload options are removed. Existing Ollama digest/version/allocation
+verification, temperature zero, no-thinking/no-truncation/no-shifting and token
+budgets are unchanged. There is no cloud adapter, pull, daemon-start command or
+configuration mutation.
+
+A parent timer enforces 45 minutes; SIGINT/SIGTERM use the same interruption
+path. At interruption, the active attempt is rejected with a sanitized code;
+all scheduled unstarted attempts remain NOT_RUN, including unfinished pair work.
+The supervisor kills its child immediately on deadline/interruption and waits
+for exit. Graceful shutdown invokes Nest close; after five seconds without exit
+it sends SIGKILL and reports cleanup failure. Failed-spawn error/close events are
+handled even when no exit event occurs. Child disconnection from an unexpectedly
+lost parent exits the child, removing its parser threads and client sockets.
+This controls local evaluation resources, not the existing Ollama daemon: it does
+not guarantee when daemon-side computation stops after client disconnection.
+
+Connection, profile, request-timeout, unavailable-service and unexpected errors
+stop the schedule. Isolated schema/evidence/JSON/output-budget and supported
+content rejections continue to the next scheduled case without retry. A returned
+but semantically incorrect extraction also continues. Output rejections expose
+no inferred hallucination/precision values; delivered recall and completeness
+include their attempted gold denominators. Cleanup errors remain distinct from
+quality and infrastructure outcomes. Opt-in refusal emits a compact NOT_RUN
+report before child creation.
+
+The parent receives extraction envelopes over IPC only for evaluation in memory.
+Child stdout/stderr are ignored to prevent accidental payload diagnostics. The
+public report has mode `local-live` and separates actual local extraction/pair
+measurements from `HUMAN_AUTHORED_GOLD` matching. Tests explicitly identify
+`FAKE_BOUNDARY` provenance; they cannot claim verified live model identity.
+Public fields contain only fixed IDs, aggregate metrics, sanitized allowlisted
+codes, hashes, configuration and timings—never source text, fact values, model
+responses or quotes. The CLI exits nonzero for incomplete execution, measured
+quality failures, fixed-policy disagreement or cleanup failure.
+
+Provenance includes source dataset-definition/artifact hashes, schedule and pair
+policy versions, Git commit/dirty state (null if unavailable), Node/platform/CPU
+architecture and compiled prompt/schema/provider module hashes. Its source-only
+dataset-definition fingerprint is deliberately distinct from the offline hash
+that also includes intentionally incorrect observations. Expected model identity
+is always recorded; verified identity is populated only after a successful real
+extraction, relying on the production provider's per-request digest/version
+checks, not an additional metadata request. A rejection can therefore leave
+verified identity conservatively unavailable even if some provider checks ran.
+
+Extraction latency measures boundary invocation through completion/rejection,
+including production parsing and the provider's measurement/generation calls.
+The first attempt also includes child initialization; no warm-up is hidden.
+Pair latency covers fresh CV extraction, fresh JD extraction and matching, and
+excludes later cleanup. Successful and failed latencies are separate. Statistics
+include n, mean, median, nearest-rank p95, min/max and sample variance/stddev.
+Cleanup and total elapsed time are separate. Ordinary PDF/DOCX repeat groups
+report attempted/rejected counts, quality/latency variation and semantic fact-set
+disagreement over successful run pairs. Fact signatures remain internal; only
+counts/rates are public. Zero observations yield null statistics; fewer than two
+yield null sample variance. Three repeats provide descriptive evidence only, and
+the first attempt is not labeled a cold start without proof.
+
+Deterministic tests cover refusal, local-only settings, schedule/budget,
+serialization, quality versus infrastructure rejection, cancellation, cleanup,
+gold pair correctness, missing/reordered JD alignment, report sanitization and
+statistical arithmetic. A network-denied inert subprocess tests forced cleanup;
+refusal-only CLI subprocess tests cannot reach inference. No live evaluation was
+run in this checkpoint. The proposed first live command is
+`pnpm --filter @ai-job-hunter/api eval -- --allow-local-ollama`, pending review.
+
+## Task 05 / Checkpoints 5.3B–5.4: reviewed live baseline and follow-up
+
+Task 05 is accepted as an evaluation and measurement deliverable, not proof of
+production-ready AI quality. Checkpoint 5.3B ran exactly one authorized local
+benchmark after read-only preflight; Checkpoint 5.4 analyzed its saved artifacts
+without inference or changes to prompts, validators, matching rules, ground truth
+or evaluation policy. The historical checkpoint sections above describe what was
+implemented and verified at those times; the reviewed baseline is recorded here.
+
+The command was `pnpm --filter @ai-job-hunter/api eval -- --allow-local-ollama`.
+The run started 2026-10-26 at 15:32:41 UTC and finished at 15:34:08 UTC, with
+85.30 seconds measured inside the runner. It used ten `synthetic-v1` source cases,
+`evaluation-v1`, `live-schedule-v1`, `live-pairs-v1`, extraction schema 1 and
+`matching-v1`. The provider was local Ollama 0.40.10 at
+`http://127.0.0.1:11434`, model `qwen3:4b`, pinned digest
+`359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7`.
+Temperature was zero, context/output limits were 8192/2048 tokens, and the
+existing production profile checks succeeded. No retry or second run occurred.
+
+| Measure                                               | Reviewed result |
+| ----------------------------------------------------- | --------------- |
+| Planned / attempted                                   | 18 / 18         |
+| Returned / rejected / not run                         | 11 / 7 / 0      |
+| Passed every quality check                            | 6/18            |
+| Returned but failed quality checks                    | 5               |
+| Returned-output TP / FP / FN                          | 35 / 5 / 0      |
+| Returned precision                                    | 35/40 = 87.50%  |
+| Returned recall, conditional on successful extraction | 35/35 = 100%    |
+| Returned important completeness                       | 24/24 = 100%    |
+| Unsupported-positive rate on returned outputs         | 5/40 = 12.50%   |
+| Delivered recall                                      | 35/70 = 50.00%  |
+| Delivered important completeness                      | 24/56 = 42.86%  |
+| Extraction completion                                 | 11/18 = 61.11%  |
+| Fixed gold matching scenarios                         | 14 passed       |
+| Fixed status / decision accuracy                      | 30/30 for each  |
+| Fixed score availability / maximum score deviation    | 84/84 / 0       |
+| Live end-to-end pairs completed                       | 0/2             |
+| Delivered matching status / decision accuracy         | 0/10 for each   |
+
+The seven rejected attempts account for 35 expected facts not delivered. Their
+output-quality metrics are null: these are not 35 observed model false negatives.
+The live returned-output FN count is zero. The earlier offline synthetic report
+had 56 TP, 5 FP and 3 FN; its intentionally incorrect observations must not be
+mixed into live counts. Category counts overlap and must not be added as if they
+were disjoint attempts. Six ordinary PDF/DOCX attempts passed all checks; five
+returned results failed quality checks; seven attempts rejected. Exit 1 reflects
+quality failure, with no infrastructure, timeout or cleanup failure.
+
+| Failure category              | Confirmed observations and limits                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| INVALID_EVIDENCE              | Six attempts: jd-injection, cv-duration-docx standalone and paired, and jd-mixed standalone and in both pairs. The code does not identify whether the cause was missing/ambiguous quotes, segment references, value support, null/evidence inconsistency or priority linkage. Repeated TypeScript/required passages make short-quote ambiguity plausible, not proven. |
+| INVALID_OUTPUT                | jd-negation rejected. Nullable collection entries are one plausible cause because schema-nullable fields have stricter post-validation collection rules; the rejected structure is unavailable. Do not label this confirmed malformed JSON or confirmed negation handling.                                                                                            |
+| Negation and uncertainty      | cv-negated-docx returned one forbidden negated-skill claim and one uncertain-skill claim. Negation handling was 0/1 among returned probes and delivered handling 0/4 including rejected probes.                                                                                                                                                                       |
+| Injection contamination       | cv-injection-docx returned one injection-derived positive claim; jd-injection rejected. Rejection does not demonstrate attack resistance.                                                                                                                                                                                                                             |
+| Sparse-document contamination | cv-sparse-docx standalone and paired each returned one extra fact. The sanitized report does not identify its field/value.                                                                                                                                                                                                                                            |
+| Evidence-support anchors      | jd-priority recovered all five facts and both priorities (2/2), but only 3/5 facts passed anchor support. Overall structural evidence validity was 40/40 and anchor support 33/35. Exact anchors may reject adequate shorter quotes, including quotes without terminal punctuation; this is a code-level possibility, not a reconstruction of the saved response.     |
+| End-to-end failure            | pair-duration-mixed and pair-sparse-mixed both reported EXTRACTION_INCOMPLETE. Matching metrics were null, with original five-requirement denominators retained per pair. No individual live JD omission or incorrect matcher decision can be established from these rejected pairs.                                                                                  |
+
+The prompt already prohibits negated/uncertain qualifications and document
+instructions becoming facts. Lexical evidence validation establishes occurrence,
+not affirmative meaning. Structural evidence validity therefore does not
+establish semantic correctness. The evaluator's unsupported-positive rate counts
+unmatched affirmative facts under exact authored field/subject/value alignment;
+it is not independent hallucination verification. Evidence-support evaluation
+requires every quote to enclose the full authored anchor and uses its first
+source occurrence. Punctuation, repeated passages and alternative valid spans
+can make that check annotation-sensitive. Neither observation justifies weakening
+production evidence validation or retrospectively changing baseline results.
+
+| Latency group (seconds)                          | n   | Mean  | Median | p95    | Sample SD |
+| ------------------------------------------------ | --- | ----- | ------ | ------ | --------- |
+| Returned extractions, including quality failures | 11  | 4.485 | 4.295  | 7.955  | 1.305     |
+| Rejected extractions                             | 7   | 5.135 | 4.305  | 6.441  | 1.227     |
+| Failed end-to-end pairs                          | 2   | 9.992 | 9.992  | 10.394 | 0.569     |
+
+Each ordinary PDF/DOCX fixture returned identical fact sets across three attempts:
+zero observed disagreement and zero precision/recall variance. Latency sample SD
+was 2.077 seconds for PDF and 0.0265 seconds for DOCX. First-attempt initialization
+is included. Three repeats and a small English synthetic dataset provide limited
+coverage, not generalization, hiring-suitability or production-readiness evidence.
+Offline synthetic tests establish evaluator regression behavior, not live model
+accuracy; fixed matching correctness and live end-to-end quality remain separate.
+
+The original sanitized JSON remains at the run-local path
+`/tmp/ai-job-hunter-53b.bgLvHl/report.json`; summary and preflight artifacts are in
+the same directory. These temporary files are not repository assets and may not
+persist across environments. Report SHA-256:
+`4ef9b5bbf10baea3f1acfeac2270c7a80257a3f505091478f3858925a58a4e06`.
+Source dataset-definition SHA-256:
+`45a2d84f1cdcb72d950f10ba6492753cf254ca7dd607178ff662ca7de8c4d383`.
+The run recorded base commit `29062072f8616e9d87d8bb7c259f7d1fa074bb66` with the
+approved uncommitted Task 05 implementation; 89 source-file fingerprints remained
+unchanged through execution and analysis. Only sanitized findings are committed,
+not real personal documents, raw model responses or captured evidence quotes.
+
+| Priority / timing                                                      | Follow-up and acceptance evidence                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0 — before a working model-backed Task 06 flow                        | Add sanitized rejection-stage/rule/field diagnostics without payload logging or changed rejection behavior. Investigate INVALID_EVIDENCE and restore both predefined pairs with complete validated inputs and reviewed matching outcomes, retaining five expected requirements per pair and strict evidence validation. Any later live verification needs separate authorization. |
+| P1 — semantic correctness before presenting qualifications as reliable | Address negation, uncertainty, injection and sparse-document contamination. Retain positive controls and verify that improvement does not merely replace contamination with indiscriminate rejection or lost facts.                                                                                                                                                               |
+| P1 — before using evidence-support metrics as release gates            | Audit punctuation, repeated anchors and alternative supporting references. Any approved annotation/evaluation change receives separate review and versioning; preserve the original baseline.                                                                                                                                                                                     |
+| P1 — during Task 06 UI integration                                     | Show incomplete, unknown and unsupported states explicitly. Failed extraction must not become a zero-suitability score; preserve null versus zero, requirement coverage and visible exclusions.                                                                                                                                                                                   |
+| P2 — after MVP                                                         | Add broader independent fixtures for employment/education, repeated entities, layouts and alternate valid wording, with larger repeat samples and reviewed holdouts separate from prompt-development cases.                                                                                                                                                                       |
+
+No Task 06 implementation is included. The evaluation deliverable is accepted
+with this backlog; neither rejected extraction nor unavailable matching is a
+successful AI evaluation.
