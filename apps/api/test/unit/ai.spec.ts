@@ -20,17 +20,47 @@ const schema = {
 const input = { prompt: 'Synthetic fixture', schema };
 const config = aiConfig({});
 const provider = () => new OllamaProvider(config);
+const metadata = {
+  model: 'qwen3:4b',
+  done: true,
+  done_reason: 'stop',
+  prompt_eval_count: 20,
+  prompt_eval_cached_count: 0,
+  eval_count: 1,
+};
 const envelope = (value: unknown) =>
-  new Response(JSON.stringify({ response: JSON.stringify(value), done: true }));
+  new Response(
+    JSON.stringify({ ...metadata, response: JSON.stringify(value) }),
+  );
+// Existing transport/schema tests exercise the final request. Dedicated context tests
+// exercise the complete sequence without this fixture routing.
+function mockTransport() {
+  const final = jest.fn<typeof globalThis.fetch>();
+  jest.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+    const path = new URL(String(url)).pathname;
+    if (path === '/api/version') return Response.json({ version: '0.40.10' });
+    const model = {
+      name: 'qwen3:4b',
+      digest:
+        '359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7',
+      context_length: 8192,
+      runner: 'llamacpp',
+    };
+    if (path === '/api/tags' || path === '/api/ps')
+      return Response.json({ models: [model] });
+    if (JSON.parse(init!.body as string).options.num_predict === 1)
+      return envelope(null);
+    return final(url, init);
+  });
+  return final;
+}
 afterEach(() => {
   jest.restoreAllMocks();
   jest.useRealTimers();
 });
 
 test('sends exact Ollama fields and validates nullable output', async () => {
-  const fetch = jest
-    .spyOn(globalThis, 'fetch')
-    .mockResolvedValue(envelope({ name: null }));
+  const fetch = mockTransport().mockResolvedValue(envelope({ name: null }));
   expect(await new AiService(provider()).generateStructured(input)).toEqual({
     name: null,
   });
@@ -47,13 +77,16 @@ test('sends exact Ollama fields and validates nullable output', async () => {
     format: schema,
     stream: false,
     think: false,
+    truncate: false,
+    shift: false,
+    options: { num_ctx: 8192, num_predict: 2048, temperature: 0 },
   });
 });
 
 test.each([{ name: 'example' }, { name: null }])(
   'accepts matching output %j',
   async (value) => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(envelope(value));
+    mockTransport().mockResolvedValue(envelope(value));
     expect(await new AiService(provider()).generateStructured(input)).toEqual(
       value,
     );
@@ -62,7 +95,7 @@ test.each([{ name: 'example' }, { name: null }])(
 test.each([{ name: 42 }, {}, { name: 'example', extra: true }])(
   'rejects without coercion/defaulting/removal %j',
   async (value) => {
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(envelope(value));
+    mockTransport().mockResolvedValue(envelope(value));
     await expect(
       new AiService(provider()).generateStructured(input),
     ).rejects.toMatchObject({ code: 'SCHEMA_VALIDATION_FAILURE' });
@@ -100,8 +133,7 @@ test('supports nested arrays, numeric constraints and nullable properties', asyn
     },
     maxItems: 2,
   };
-  const fetch = jest
-    .spyOn(globalThis, 'fetch')
+  const fetch = mockTransport()
     .mockResolvedValueOnce(envelope([{ score: 0.5 }, { score: null }]))
     .mockResolvedValueOnce(envelope([{ score: 2 }]));
   const service = new AiService(provider());
@@ -116,11 +148,9 @@ test('supports nested arrays, numeric constraints and nullable properties', asyn
 test.each(['not json', '```json\n{}\n```'])(
   'rejects generated invalid JSON',
   async (text) => {
-    jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response(JSON.stringify({ response: text, done: true })),
-      );
+    mockTransport().mockResolvedValue(
+      new Response(JSON.stringify({ ...metadata, response: text })),
+    );
     await expect(
       new AiService(provider()).generateStructured(input),
     ).rejects.toMatchObject({ code: 'INVALID_JSON' });
@@ -135,7 +165,7 @@ test.each([
   '{"response":"{}","done":true,"done_reason":"length"}',
   '{"response":"{}","done":true,"error":"private"}',
 ])('rejects malformed envelope', async (body) => {
-  jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(body));
+  mockTransport().mockResolvedValue(new Response(body));
   await expect(provider().generate(input)).rejects.toMatchObject({
     code: 'MALFORMED_RESPONSE',
   });
@@ -143,18 +173,16 @@ test.each([
 test.each([400, 404, 429, 500, 503])(
   'sanitizes HTTP %s without reading error payload',
   async (status) => {
-    jest
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response('private upstream payload', { status }));
+    mockTransport().mockResolvedValue(
+      new Response('private upstream payload', { status }),
+    );
     await expect(provider().generate(input)).rejects.toEqual(
       new AiError('UPSTREAM_HTTP_FAILURE'),
     );
   },
 );
 test('sanitizes connection failures', async () => {
-  jest
-    .spyOn(globalThis, 'fetch')
-    .mockRejectedValue(new Error('private URL and payload'));
+  mockTransport().mockRejectedValue(new Error('private URL and payload'));
   await expect(provider().generate(input)).rejects.toEqual(
     new AiError('CONNECTION_FAILURE'),
   );
@@ -162,7 +190,7 @@ test('sanitizes connection failures', async () => {
 test('aborts a pending fetch at deadline', async () => {
   jest.useFakeTimers();
   let signal: AbortSignal | undefined;
-  jest.spyOn(globalThis, 'fetch').mockImplementation(
+  mockTransport().mockImplementation(
     (_url, init) =>
       new Promise((_resolve, reject) => {
         signal = init!.signal!;
@@ -182,8 +210,7 @@ test('aborts a pending fetch at deadline', async () => {
 test('deadline cancels stalled body reading and permits subsequent recovery', async () => {
   jest.useFakeTimers();
   const cancel = jest.fn<() => void>();
-  const fetch = jest
-    .spyOn(globalThis, 'fetch')
+  const fetch = mockTransport()
     .mockResolvedValueOnce(new Response(new ReadableStream({ cancel })))
     .mockResolvedValueOnce(envelope({ name: 'recovered' }));
   const service = new AiService(provider());
@@ -201,7 +228,7 @@ test('deadline cancels stalled body reading and permits subsequent recovery', as
 });
 test('enforces cumulative byte limit without trusting Content-Length', async () => {
   const cancel = jest.fn<() => void>();
-  jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+  mockTransport().mockResolvedValue(
     new Response(
       new ReadableStream({
         start(controller) {
@@ -220,9 +247,9 @@ test('enforces cumulative byte limit without trusting Content-Length', async () 
 });
 test('handles multibyte UTF-8 split across chunks', async () => {
   const bytes = new TextEncoder().encode(
-    JSON.stringify({ response: JSON.stringify({ name: 'é' }), done: true }),
+    JSON.stringify({ ...metadata, response: JSON.stringify({ name: 'é' }) }),
   );
-  jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+  mockTransport().mockResolvedValue(
     new Response(
       new ReadableStream({
         start(controller) {
@@ -237,7 +264,7 @@ test('handles multibyte UTF-8 split across chunks', async () => {
   });
 });
 test('sanitizes body connection errors', async () => {
-  jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+  mockTransport().mockResolvedValue(
     new Response(
       new ReadableStream({
         start(controller) {
@@ -275,12 +302,12 @@ test('configuration defaults and explicit values', () => {
   });
   expect(
     aiConfig({
-      OLLAMA_BASE_URL: 'https://example.com/',
+      OLLAMA_BASE_URL: 'https://[::1]:11434/',
       OLLAMA_MODEL: 'custom:tag',
       AI_REQUEST_TIMEOUT_MS: '1000',
     }),
   ).toMatchObject({
-    baseUrl: 'https://example.com',
+    baseUrl: 'https://[::1]:11434',
     model: 'custom:tag',
     timeoutMs: 1000,
   });
@@ -306,15 +333,14 @@ test.each([
 });
 
 test('accepts a response exactly at the byte limit', async () => {
-  const base = JSON.stringify({ response: '{}', done: true });
+  const base = JSON.stringify({ ...metadata, response: '{}' });
   const body = base + ' '.repeat(MAX_RESPONSE_BYTES - Buffer.byteLength(base));
-  jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(body));
+  mockTransport().mockResolvedValue(new Response(body));
   expect(await provider().generate(input)).toBe('{}');
 });
 
 test('rejects malformed UTF-8 and absent bodies', async () => {
-  jest
-    .spyOn(globalThis, 'fetch')
+  mockTransport()
     .mockResolvedValueOnce(new Response(new Uint8Array([0xff])))
     .mockResolvedValueOnce(new Response(null));
   await expect(provider().generate(input)).rejects.toEqual(
@@ -330,9 +356,7 @@ test('clears successful request deadline without logging payloads', async () => 
   const error = jest.spyOn(console, 'error');
   const warn = jest.spyOn(console, 'warn');
   const log = jest.spyOn(console, 'log');
-  jest
-    .spyOn(globalThis, 'fetch')
-    .mockResolvedValue(envelope({ name: 'synthetic' }));
+  mockTransport().mockResolvedValue(envelope({ name: 'synthetic' }));
   await new AiService(provider()).generateStructured(input);
   expect(jest.getTimerCount()).toBe(0);
   expect(error).not.toHaveBeenCalled();
@@ -409,7 +433,7 @@ test.each(['reject', 'pending'] as const)(
         : new Promise<void>(() => {}),
     );
     const body = new ReadableStream<Uint8Array>({ cancel });
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(body));
+    mockTransport().mockResolvedValue(new Response(body));
     const assertion = expect(provider().generate(input)).rejects.toEqual(
       new AiError('TIMEOUT'),
     );
@@ -430,7 +454,7 @@ test('size-limit cleanup preserves error when cancellation rejects', async () =>
       return Promise.reject(new Error('private cancellation diagnostic'));
     },
   });
-  jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(body));
+  mockTransport().mockResolvedValue(new Response(body));
   await expect(provider().generate(input)).rejects.toEqual(
     new AiError('RESPONSE_TOO_LARGE'),
   );

@@ -1,4 +1,7 @@
 const messages = {
+  CONTEXT_UNVERIFIED: 'AI context profile could not be verified',
+  CONTEXT_LIMIT_EXCEEDED: 'AI prompt exceeds the context budget',
+  OUTPUT_LIMIT_EXCEEDED: 'AI generation exceeded the output token limit',
   INVALID_SCHEMA: 'Invalid or unsupported AI output schema',
   TIMEOUT: 'AI request timed out',
   CONNECTION_FAILURE: 'AI provider connection failed',

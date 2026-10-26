@@ -12,9 +12,14 @@ export function aiConfig(env: NodeJS.ProcessEnv = process.env): AiConfig {
   }
   let url: URL;
   try {
-    url = new URL(env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434');
+    const origin = env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434';
+    // Check the literal authority before URL normalizes IPv4 shorthand, hex or IPv6.
+    if (!/^https?:\/\/(?:127\.0\.0\.1|\[::1\])(?::[0-9]+)?\/?$/.test(origin))
+      throw new Error();
+    url = new URL(origin);
     if (
       !['http:', 'https:'].includes(url.protocol) ||
+      !['127.0.0.1', '[::1]'].includes(url.hostname) ||
       url.username ||
       url.password ||
       url.pathname !== '/' ||
@@ -24,7 +29,7 @@ export function aiConfig(env: NodeJS.ProcessEnv = process.env): AiConfig {
       throw new Error();
   } catch {
     throw new Error(
-      'OLLAMA_BASE_URL must be an HTTP(S) origin without credentials, path, query or fragment',
+      'OLLAMA_BASE_URL must be an HTTP(S) origin at literal 127.0.0.1 or [::1] without credentials, path, query or fragment',
     );
   }
   const model = env.OLLAMA_MODEL ?? 'qwen3:4b';

@@ -142,7 +142,7 @@ Known limits: component tests do not replace real-browser layout checks; GitHub 
 
 ## Internal AI provider (Task 02 / Checkpoint 3.2)
 
-The API includes an internal `AiModule` for schema-validated Ollama generation. It exposes no HTTP endpoint. Optional server environment settings are listed in `.env.example`: `AI_PROVIDER=ollama`, `OLLAMA_BASE_URL=http://127.0.0.1:11434`, `OLLAMA_MODEL=qwen3:4b`, and `AI_REQUEST_TIMEOUT_MS=120000` (allowed range 1000–300000 ms). Settings are validated at startup without contacting Ollama. Actual generation requires the configured Ollama service and model; there is no automatic cloud fallback. The default is local loopback. The server-owned base URL accepts other HTTP(S) origins, so local-only inference depends on retaining a local destination; the manual smoke script pins loopback explicitly.
+The API includes an internal `AiModule` for schema-validated Ollama generation. It exposes no HTTP endpoint. Optional server environment settings are listed in `.env.example`: `AI_PROVIDER=ollama`, `OLLAMA_BASE_URL=http://127.0.0.1:11434`, `OLLAMA_MODEL=qwen3:4b`, and `AI_REQUEST_TIMEOUT_MS=120000` (allowed range 1000–300000 ms). Settings are validated at startup without contacting Ollama. Actual generation requires the configured Ollama service and model; there is no automatic cloud fallback. The server-owned base URL accepts only HTTP(S) origins using literal `127.0.0.1` or `[::1]`, with an optional port and trailing slash. Remote hosts, `localhost`, alternate numeric spellings, credentials, paths, queries, and fragments are rejected. The default local Ollama URL remains unchanged; redirects remain disabled.
 
 Run `pnpm --filter @ai-job-hunter/api test` for backend unit tests, including mocked AI HTTP tests, or `pnpm test` for all unit/component tests. Neither command requires Ollama, GPU or PostgreSQL. The separate `pnpm test:integration` command still requires isolated PostgreSQL. See the architecture document for schema support, limits and error categories. Live Nest/Ollama smoke testing is available through the explicit Checkpoint 3.3 command below.
 
@@ -155,3 +155,76 @@ pnpm --filter @ai-job-hunter/api smoke:ollama
 ```
 
 This compiles the existing TypeScript test tree and invokes a separate manual script using real Nest `AiModule` dependency injection. It pins the provider, URL, model and 120-second timeout for this process, without loading environment files. It sends only a synthetic fixture and verifies the name, exactly three skills, React's five years, and null durations for NestJS and PostgreSQL. Output contains only sanitized status and elapsed milliseconds. Failures exit nonzero. It neither starts Ollama nor downloads models. It opens no API listener and needs no PostgreSQL. It is excluded from Jest discovery and regular tests, is not invoked by CI, and refuses execution when `CI` is set.
+
+## Extraction contracts (Task 03 / Checkpoint 4.2)
+
+`apps/api/src/extraction` defines internal CV/JD contracts, application-owned JSON Schemas, immutable text sources, deterministic evidence validation, input limits and sanitized errors. Model references contain only a segment ID and exact quote; validated results add global UTF-16 offsets. Unknown facts require null with empty evidence. Dates and experience durations remain source strings.
+
+Run `pnpm test` for synthetic extraction/AI tests and the existing unit/component suites. `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, and `pnpm build` remain the static/build checks. These tests need neither Ollama nor PostgreSQL. Checkpoints 4.3B–4.3C add internal PDF/DOCX parsing through short-lived workers; Checkpoint 4.4D adds internal extraction orchestration as described below. Upload UI and public extraction endpoints are not implemented. Metadata validation remains separate from actual PDF parsing. See `docs/architecture.md` for exact guarantees and limitations.
+
+## Internal PDF parser (Task 03 / Checkpoint 4.3B)
+
+`apps/api/src/extraction/document-parser.ts` exports the process's `documentParser` owner. It accepts in-memory PDF bytes and returns an immutable source, page count and fixed coverage warnings. No endpoint or Nest application wiring is added. Call `close()` (or the lifecycle-compatible `onModuleDestroy()`) when its owner shuts down. Admission is limited to one active parse on that owner; later Nest wiring must reuse the exported instance.
+
+The pinned PDF.js 6.4.299 legacy ESM build runs under Node 24 with native addons disabled in the worker. Only manifest-listed font/CMap files from that installed package may be read; document URLs and resource paths are never used as filesystem paths. PDF JavaScript, rendering and OCR are not invoked. Documents exceeding limits are rejected; blank/image-only PDFs return `NO_EXTRACTABLE_TEXT`. Mixed PDFs return available page text with warnings rather than claiming full visual coverage.
+
+Run the production-worker check after building and compiling synthetic fixtures:
+
+```bash
+pnpm build
+pnpm --filter @ai-job-hunter/api test:compile
+node scripts/check-pdf-parser.mjs
+```
+
+This check now covers both PDF and DOCX through `apps/api/dist/extraction/parser.worker.js`, without Jest, Ollama or PostgreSQL. Regular `pnpm test` also covers real workers, bounded parsing, malformed/password-protected documents, resource access and termination recovery. Local listener permission is needed by the existing HTTP tests and the synthetic network canary.
+
+## Internal DOCX parser (Task 03 / Checkpoint 4.3C)
+
+The same `documentParser` accepts `.docx` bytes with the OOXML Word MIME type. It validates ZIP structure and expanded-byte limits, OOXML content types and relationships, then calls Mammoth with the same in-memory archive. Results retain Mammoth's text exactly, with paragraph spans, global UTF-16 offsets and null page provenance. DOCX has `pageCount: null`; fixed warnings identify ignored image content and conversion warnings without exposing library diagnostics.
+
+Main-document relationships must identify one existing canonical part. Main targets containing dot components are rejected, including safe-looking `word/../custom/main.xml`; missing parts cannot fall back to `word/document.xml`. Canonical custom main parts are supported even when a conflicting default part exists. Internal image/header references can use safe parent components; Mammoth-consumed styles/numbering/notes/comments require spellings that agree with Mammoth's resolver.
+
+HTTP(S)/mailto hyperlink relationships are permitted as inert document data. External images, templates, imports and other external relationships are rejected. Nothing is fetched or followed. DTDs/entities, macros, embedded executable/OLE/nested archives, unsafe or duplicate ZIP names, encryption and corrupt archives are rejected. No archive content is extracted to disk.
+
+The initial compatibility profile is intentionally strict: UTF-8 transitional OOXML, ASCII canonical ZIP names, STORE/DEFLATE, no ZIP64, data descriptors, archive comments or ambiguous name metadata. Some valid DOCX files outside this profile are rejected. Limits are 1,000 ZIP entries, 5 MiB expanded per entry, 20 MiB expanded overall, 100:1 expansion ratio, 12,000 UTF-16 text units and 1,000 paragraph segments. Rejection never silently truncates text. Run the same tests and production-worker verification commands above; no database or live inference is needed.
+
+## Fixed local AI context profile (Task 03 / Checkpoint 4.4C)
+
+AI generation now requires Ollama 0.40.10 and the verified qwen3:4b digest recorded in `apps/api/src/ai/ollama.context.ts`. Every call measures the prompt with one generated token before actual generation: 8192 context tokens, maximum 6080 measured prompt tokens, 2048 output tokens and 64 safety tokens. Unsupported profiles, missing metadata, allocation mismatches and incomplete generation fail closed. One timeout covers the entire operation. No model downloads or service startup occur automatically.
+
+The existing `pnpm --filter @ai-job-hunter/api smoke:ollama` remains an explicit synthetic-only live check; it now exercises this two-pass policy through AiService. Normal tests mock Ollama and do not require it. Model/server upgrades need profile review; `/api/ps` checks are snapshots and assume no concurrent external model/context changes. See `docs/architecture.md` for the guarantees and limitations.
+
+## Internal CV/JD extraction (Task 03 / Checkpoint 4.4D)
+
+ExtractionModule exports ExtractionService with `extractCv({ bytes, fileName, mediaType })` for PDF/DOCX and `extractJd({ text })` for plain text. AppModule registers it internally; there are no extraction endpoints. Calls use fixed prompts/schemas through AiService and return a deeply immutable version-1 envelope containing source text, resolved data and warnings. Every non-null fact needs exact source evidence. Missing scalars remain null; invalid evidence, duplicate facts, budget overflow and incomplete generation reject the whole call without repair or retry.
+
+One process-local slot covers parsing, inference, validation and confirmed cleanup. Busy calls reject immediately. Shutdown closes admission and drains existing work; unconfirmed worker cleanup permanently disables extraction. Exact grounding does not prove semantic truth or completeness: every result includes `EXTRACTION_COMPLETENESS_NOT_VERIFIED` alongside parser warnings. No document persistence is introduced.
+
+Run deterministic verification without Ollama or PostgreSQL:
+
+```bash
+pnpm format
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+node scripts/check-pdf-parser.mjs
+node scripts/check-extraction.mjs
+git diff --check
+```
+
+The production checks use synthetic fixtures compiled by the API test command and production JavaScript/worker entry points. The extraction check substitutes only the AI provider. See `docs/architecture.md` for duplicate identity, privacy, prompt-injection and context-profile limitations.
+
+## Adversarial and live extraction verification (Task 03 / Checkpoints 4.5A–4.5C)
+
+Run the explicit synthetic-only evaluation against an already-running local Ollama with the pinned model:
+
+```bash
+pnpm --filter @ai-job-hunter/api smoke:extraction
+```
+
+This command is outside regular tests and refuses CI. It uses real ExtractionService, PDF/DOCX workers and AiService; it neither starts services nor downloads models. Ten predefined attempts cover three straightforward PDF CV runs, three equivalent DOCX CV runs, a negated/uncertain CV, required/preferred JD cues, and CV/JD role-spoofing text. Repetition is scheduled before outcomes are known, not an automatic retry. Logs contain only fixed case identifiers, attempt numbers, success/rejection codes, latency, gold-expectation booleans and per-field categories/counts—no source text, prompts, names, quotes or raw model output. Categories distinguish missing skills, incorrect experience assignment, unsupported positive skills, unsupported responsibilities/requirements, incorrect priorities, valid extraction and rejection.
+
+A nonzero exit means review is needed, including valid-looking but incomplete/semantically incorrect results. A rejection reports unknown fact-presence booleans, because the public API exposes no rejected model output. Gold checks apply only to these synthetic fixtures and are not production semantic heuristics or a general quality benchmark. The first 4.5A run found one incomplete result and three semantically incorrect but textually grounded results; see `docs/architecture.md` for sanitized observations. Structural/evidence checks do not establish resistance to prompt injection or semantic correctness.
+
+The final fixed CV prompt enumerates explicitly supported skills, maps each stated duration verbatim into that skill’s `experienceText.value` with evidence, and keeps unstated duration null with empty evidence. Checkpoint 4.5E applies exactly the Candidate C wording selected after the controlled 4.5D comparison; historical failures and final live results are recorded in `docs/architecture.md`. Exact quotes establish textual grounding, not semantic correctness or completeness. Negation and prompt-injection susceptibility remain known limitations. Task 05 will evaluate broader extraction quality across documents and adversarial cases.
