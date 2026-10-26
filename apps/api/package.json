@@ -12,7 +12,9 @@
     "test": "pnpm test:compile && node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js --runInBand",
     "test:integration": "pnpm test:compile && node --env-file-if-exists=../../.env.test --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.integration.config.js --runInBand",
     "smoke:ollama": "pnpm test:compile && node .test-dist/test/manual/ollama.smoke.js",
-    "smoke:extraction": "pnpm test:compile && node .test-dist/test/manual/extraction.smoke.js"
+    "smoke:extraction": "pnpm test:compile && node .test-dist/test/manual/extraction.smoke.js",
+    "eval": "pnpm test:compile && node .test-dist/test/evaluation/live.js",
+    "eval:offline": "pnpm test:compile && node --permission --allow-fs-read=* --allow-worker --import ./.test-dist/test/evaluation/no-network.js .test-dist/test/evaluation/offline.js"
   },
   "dependencies": {
     "@nestjs/common": "12.2.0",
