@@ -1,0 +1,25 @@
+export const EXTRACTION_LIMITS = Object.freeze({
+  fileBytes: 5 * 1024 * 1024,
+  textUnits: 12_000,
+  textBytes: 48 * 1024,
+  outputBytes: 64 * 1024,
+  factUnits: 1_000,
+  quoteUnits: 1_000,
+  evidencePerFact: 2,
+  listItems: 50,
+  historyItems: 20,
+  segments: 1_000,
+  pdfPages: 20,
+  // DOCX ZIP limits.
+  archiveEntries: 1_000,
+  archiveExpandedBytes: 20 * 1024 * 1024,
+  archiveEntryBytes: 5 * 1024 * 1024,
+  archiveExpansionRatio: 100,
+  parserTimeoutMs: 10_000,
+  parserTerminationMs: 1_000,
+  parserHeapMb: 128,
+  resourceBytes: 5 * 1024 * 1024,
+  // Whole-extraction admission and assembled prompt limits.
+  promptBytes: 64 * 1024,
+  concurrency: 1,
+});
