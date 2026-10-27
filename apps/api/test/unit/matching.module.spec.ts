@@ -118,6 +118,7 @@ test('MatchingService preserves synchronous sanitized input failures', async () 
 });
 
 test('AppModule compiles with matching registered and no AI or extraction invocation', async () => {
+  const coordinateShutdown = jest.fn<(_barrier: () => Promise<void>) => void>();
   const generate = jest
     .fn<() => Promise<never>>()
     .mockRejectedValue(new Error('Unexpected AI call'));
@@ -139,7 +140,7 @@ test('AppModule compiles with matching registered and no AI or extraction invoca
     .overrideProvider(AI_PROVIDER)
     .useValue({ generate })
     .overrideProvider(ExtractionService)
-    .useValue({ extractCv, extractJd })
+    .useValue({ extractCv, extractJd, coordinateShutdown })
     .compile();
   try {
     await app.init();
@@ -148,6 +149,7 @@ test('AppModule compiles with matching registered and no AI or extraction invoca
       matchExtractions(input),
     );
     expect(generate).not.toHaveBeenCalled();
+    expect(coordinateShutdown).toHaveBeenCalledTimes(1);
     expect(extractCv).not.toHaveBeenCalled();
     expect(extractJd).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();

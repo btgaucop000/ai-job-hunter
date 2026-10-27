@@ -30,6 +30,16 @@ function freeze<T>(value: T): T {
 
 @Injectable()
 export class ExtractionService implements OnModuleDestroy {
+  private shutdownBarrier: (() => Promise<void>) | undefined;
+  private coordinatedShutdown: Promise<void> | undefined;
+
+  // Analysis admission must close before extraction shutdown, regardless of Nest
+  // hook ordering. Request cancellation never invokes this process-wide path.
+  coordinateShutdown(barrier: () => Promise<void>): void {
+    if (this.shutdownBarrier)
+      throw new ExtractionError('EXTRACTION_UNAVAILABLE');
+    this.shutdownBarrier = barrier;
+  }
   constructor(
     private readonly ai: AiService,
     @Inject(EXTRACTION_OWNER) private readonly owner: ExtractionOwner,
@@ -113,7 +123,7 @@ export class ExtractionService implements OnModuleDestroy {
           if (!this.owner.closed) this.owner.unavailable = true;
           throw new ExtractionError('EXTRACTION_UNAVAILABLE');
         }
-        throw new ExtractionError(error.code);
+        throw new ExtractionError(error.code, error.diagnostic);
       }
       if (error instanceof AiError) throw new AiError(error.code);
       throw new ExtractionError('EXTRACTION_FAILED');
@@ -136,6 +146,16 @@ export class ExtractionService implements OnModuleDestroy {
   }
 
   onModuleDestroy(): Promise<void> {
+    if (this.shutdownBarrier) {
+      this.coordinatedShutdown ??= this.shutdownBarrier().then(() =>
+        this.closeOwner(),
+      );
+      return this.coordinatedShutdown;
+    }
+    return this.closeOwner();
+  }
+
+  private closeOwner(): Promise<void> {
     if (!this.owner.shutdown) {
       this.owner.closed = true;
       // One owner, one close. Consume cleanup failure immediately, but report it

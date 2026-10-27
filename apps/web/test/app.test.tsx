@@ -18,7 +18,11 @@ function show(path: string) {
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: 'ok' }))),
+    vi.fn((url: string) =>
+      url === '/api/v1/health/ready'
+        ? Promise.resolve(new Response(JSON.stringify({ status: 'ok' })))
+        : Promise.reject(new Error('Unexpected request')),
+    ),
   );
 });
 test('renders the dashboard and honest empty state', async () => {
@@ -26,7 +30,7 @@ test('renders the dashboard and honest empty state', async () => {
   expect(
     screen.getByRole('heading', { name: 'Dashboard' }),
   ).toBeInTheDocument();
-  expect(screen.getByText(/There are no candidates/)).toBeInTheDocument();
+  expect(screen.getByText(/No analysis results yet/)).toBeInTheDocument();
   expect(await screen.findByText('API ready')).toBeInTheDocument();
 });
 test('redirects the root route to dashboard', async () => {

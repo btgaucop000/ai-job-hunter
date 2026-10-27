@@ -708,3 +708,372 @@ not real personal documents, raw model responses or captured evidence quotes.
 No Task 06 implementation is included. The evaluation deliverable is accepted
 with this backlog; neither rejected extraction nor unavailable matching is a
 successful AI evaluation.
+
+## Task 06 / Checkpoint 6.2A: sanitized rejection diagnostics
+
+Diagnostics add metadata to errors only; extraction envelopes, schemas, prompts,
+matching policy, validation order and outer rejection codes remain unchanged.
+The closed diagnostic contract has `stage`, `rule` and `field`. AI owns its
+`AI_DECODE`/`JSON_INVALID` and `AI_SCHEMA`/`SCHEMA_MISMATCH` diagnostics, derived
+solely from existing error codes with the fixed `output` root field. Extraction
+owns `OUTPUT` and `EVIDENCE` diagnostics and fixed CV/JD field templates such as
+`cv.skills[].name`. This keeps AI independent of extraction-specific schemas.
+
+Validation reports the first failure in existing traversal order. Rules distinguish
+serialization/schema failures, null required collection values, empty history
+records, unknown segments, empty/oversized/absent/ambiguous quotes, UTF-16 boundary
+splits, null/evidence inconsistency, empty/oversized values, missing/duplicate
+evidence, unsupported values, and JD priority cue/linkage failures. Existing
+output-size and duplicate-fact codes remain unchanged without new diagnostics.
+
+Error reconstruction copies only allowlisted stage/rule/field tokens, validates
+the stage against the rule and outer error code, freezes the resulting diagnostic,
+and drops extra properties. No document values, quotes, filenames, arbitrary keys,
+array indexes, AJV details, prompts or exception messages enter diagnostics. AI
+errors are reconstructed from their code, so incoming diagnostic properties are
+never propagated. Nothing is logged or persisted by this addition.
+
+Schema failures deliberately identify the output root rather than interpreting
+AJV paths or revalidating model content. Schema checks still precede semantic
+checks: an ASCII quote over the schema limit reports schema mismatch, whereas a
+supplementary-Unicode quote can pass the schema's code-point limit and fail the
+existing UTF-16 quote limit. The latter reports `QUOTE_TOO_LONG`. No earlier
+rejection is bypassed to obtain a more specific diagnostic. An empty string quote
+is likewise rejected by schema; whitespace-only quotes reach `QUOTE_EMPTY`.
+
+These diagnostics cannot retrospectively determine the exact causes of the Task
+05 baseline rejections. Evaluator anchor sensitivity remains distinct from
+production validation and is unchanged. Checkpoint 6.2B needs separate approval
+for live Ollama investigation, followed by an evidence-led remediation proposal;
+this checkpoint includes no inference, repair, retry or reliability claim.
+
+## Task 06 / Checkpoint 6.2B.1: fixed four-case investigation harness
+
+The test-only `investigate` command is separate from `eval`. It requires exactly
+`--allow-local-investigation`, refuses CI, and accepts no fixture selectors.
+The fixed order is `cv-duration-docx`, `jd-mixed`, `jd-injection`, `jd-negation`.
+Independent parent and child admission instances enforce order, one invocation
+per fixture and a maximum of four. Admission is consumed before work and never
+rolled back. Both reject overlapping calls; infrastructure failure stops further
+extraction. Content rejection advances once to the next case without retry.
+
+The new child uses the existing pinned loopback environment. Before constructing
+the extraction context, a five-second, response-size-bounded metadata preflight
+calls only `/api/version` and `/api/tags`, with redirects prohibited, and uses the
+production `verifyProfile` function. It does not generate, pull or start a daemon.
+The production provider still performs its own per-extraction profile/allocation
+checks and existing measurement/generation passes within its 120-second deadline.
+Four extraction invocations therefore do not mean four provider HTTP requests.
+
+The existing supervisor is reused through optional typed result/error decoders;
+its default evaluation behavior is unchanged. Investigation adds a preparation
+step so startup/preflight failure leaves every fixture NOT_RUN. Existing
+10-second child startup, 45-minute overall, parser/request deadlines, five-second
+cleanup grace, forced child termination, signal handling and parent-disconnect
+exit are retained. These bound local child ownership, not daemon-side computation.
+The existing 18-attempt CLI, schedule and report shape remain unchanged.
+
+Successful extraction content is discarded in the child worker; only a fixed
+RETURNED token crosses IPC. Rejections carry only existing allowlisted outer
+codes and sanitized stage/rule/field metadata. Both worker and parent reconstruct
+metadata through explicit allowlists, including fixed AI diagnostic triples.
+The parent rejects a successful payload object instead of forwarding it. Child
+stdout/stderr are ignored and Nest logging is disabled. No source/model content
+is printed or persisted, and historical baseline artifacts are not touched.
+
+JSON output contains `cases` (four rows) and an existing outer `code` for lifecycle
+failure, or null. Each row contains only fixed fixture `id`, RETURNED/REJECTED/
+NOT_RUN `status`, nullable outer `code`, nullable diagnostic and nullable integer
+`elapsedMs`, clamped to the overall deadline. NOT_RUN rows retain null timing.
+Cleanup failure is reported at the top level without overwriting case outcomes.
+Any rejection, unrun case or lifecycle error exits nonzero; RETURNED denotes
+validation acceptance only, not semantic quality. Identity is checked internally;
+raw metadata and model listings are not included in this minimal report.
+
+Tests use fake extraction/transport and simulated child IPC to verify admission,
+preflight, sanitization, bounded timings, cancellation and cleanup. No live
+investigation is authorized by implementing or testing this harness. The first
+live invocation remains pending review.
+
+## Task 06 / Checkpoint 6.2F: required collection schema values
+
+Only three generated-output schema types change from nullable string to string:
+`cv.skills[].name.value`, `jd.requirements[].text.value`, and
+`jd.responsibilities[].value`. Their existing length limits, object/evidence
+structure and list limits remain identical. Optional fields, including unstated
+skill experience and JD priority, retain null; empty collections remain valid.
+The source schema, segmentation, prompts, validators, provider settings, matching
+policy and evaluation gold are unchanged by this checkpoint.
+
+This moves an existing final-acceptance restriction to the schema boundary.
+For fixed payloads, previously accepted results remain accepted and null required
+collection values remain rejected. Through AiService/ExtractionService these
+payloads now fail with `SCHEMA_VALIDATION_FAILURE` and the fixed diagnostic
+`AI_SCHEMA / SCHEMA_MISMATCH / output`, rather than reaching post-validation
+`INVALID_OUTPUT / OUTPUT / REQUIRED_COLLECTION_VALUE_NULL`. Direct output
+validator calls still use `INVALID_OUTPUT`, but report `OUTPUT / SCHEMA_MISMATCH`
+at the CV/JD root. Multiply invalid payloads can report a different first failure
+because schema validation precedes evidence resolution. Existing defensive
+collection checks and their diagnostic allowlist remain intact.
+
+Tests pin the complete prior schema fingerprints and verify that restoring only
+the three nullable types recovers them. The 6.2E test-only comparison now explicitly
+projects those legacy types; its line-segmentation experiment remains test-only.
+All ten authored dataset outputs retain schema and production validation
+acceptance. Fake-provider tests verify sanitized service error propagation, no
+retries and continued rejection of missing, ambiguous and unsupported evidence.
+No output is repaired, populated or silently dropped.
+
+Line segmentation is deferred: the 6.2E experiment changed matching evaluability,
+exclusions and scores, and exposed cross-line semantic-context risks. Narrower
+segments must not be adopted merely to make quotes unique. The schema change does
+not address persistent quote ambiguity. Live generation behavior, completeness,
+semantic quality and any improvement to the null-responsibility failure remain
+unverified; later live verification requires separate authorization. Historical
+baseline reports and evaluation expectations remain unchanged.
+
+## Task 06.3B: bounded analysis HTTP transport
+
+`POST /api/v1/analyses` now accepts exactly one `cv` file and one `jdText`
+field, in either order. This checkpoint stops at transport: a valid upload
+returns HTTP 503 `ANALYSIS_UNAVAILABLE`, with upload `SUCCEEDED` and extraction
+and matching `NOT_RUN`. It does not call extraction, parsing or matching and
+does not fabricate results. File metadata uses the existing document validator;
+actual PDF/DOCX content validation remains the parser's responsibility in 6.3C.
+
+Busboy 1.6.0 is a direct dependency, with development-only TypeScript types.
+The adapter uses memory only and enforces 5,242,880 file bytes, 49,152 field
+bytes, 12,000 JD UTF-16 units, and 5,357,568 total multipart bytes, including
+preamble/epilogue. JD text must be nonblank and is not trimmed or normalized.
+The UTF-16 ceiling makes the UTF-8 byte ceiling redundant for valid UTF-8 text,
+but both limits remain enforced. A bounded wire audit rejects invalid UTF-8
+and alternate text charsets because Busboy otherwise decodes them permissively.
+It retains only header/delimiter lookahead, never a second complete file.
+HTTP and part headers are bounded to 16 KiB and boundaries to 70 ASCII units.
+Busboy's inclusive limit notifications require maximum-plus-one byte thresholds;
+the adapter independently checks actual lengths. Duplicate, missing, unexpected,
+nested and wrongly typed parts reject. All Content-Encoding values reject.
+
+Early middleware precedes Nest body parsers. It validates exact Host and Origin
+allowlists and Content-Length before reading the body. API access remains bound
+to 127.0.0.1; allowed authorities are 127.0.0.1 at the configured API port and
+Vite port 5173, and origins are their exact HTTP origins. Missing/null/foreign
+origins reject, forwarded headers are ignored, and no CORS policy is enabled.
+Requests receive independent server UUIDs. Logs and error responses contain no
+upload names, payloads, quotes, prompts or exception messages.
+
+Every application-generated analysis response uses `Cache-Control: no-store`.
+The version-1 discriminated response distinguishes COMPLETED (existing
+MatchingResult contract, null error) from INCOMPLETE (null result, closed error).
+No score conversion is introduced. The fixed HTTP mapping lives in
+`analysis.errors.ts`: malformed requests 400, local-boundary denial 403, upload
+timeout 408, size limits 413, unsupported media 415, rejected extraction/content
+422, busy 429, unavailable/provider failures 503, execution timeout 504, and
+internal failures 500. In particular SCHEMA_VALIDATION_FAILURE, INVALID_OUTPUT
+and INVALID_EVIDENCE retain their codes at 422. Diagnostics are reconstructed or
+explicitly allowlisted; arbitrary exception properties and AJV paths are omitted.
+
+A 30-second upload watchdog bounds stalled multipart resources; this is not an
+analysis/provider deadline. Rejection pauses input, destroys multipart resources,
+and closes the connection with a 250-ms forced-close fallback rather than draining
+an unbounded body. Parser-level HTTP failures can be rejected directly by Node
+without the application JSON envelope. Client disconnect releases transport
+buffers/listeners/timers. No extraction cancellation or shutdown coordination is
+implemented here. Global admission before buffering, overall analysis deadlines,
+sequential extraction and exactly-once admission release await 6.3C; per-request
+limits alone do not bound aggregate memory under concurrent local requests.
+
+Deterministic tests use a minimal Nest application, Supertest, controlled loopback
+sockets and synthetic bytes without AppModule, database or Ollama. They cover
+inclusive limits, chunking/framing, strict UTF-8, part order, security, sanitized
+errors and resource cleanup. Metadata acceptance is not a claim that file contents
+are valid, nor does this transport checkpoint establish extraction quality.
+
+## Task 06.3C: synchronous analysis ownership and lifecycle
+
+This supersedes the temporary 6.3B `ANALYSIS_UNAVAILABLE` success path. The
+security middleware synchronously acquires the singleton AnalysisService slot
+before multipart consumption. Security/header validation still occurs first.
+There is no queue: a concurrent request receives 429 `ANALYSIS_BUSY` before body
+buffering. The same owner spans upload, CV extraction, JD extraction, synchronous
+matching and extraction cleanup. ExtractionService's own admission remains intact.
+The transport controller delegates to AnalysisService; production imports the
+existing extraction, AI configuration and matching modules. Test applications
+provide fake extraction and real matching without importing production modules.
+
+Only successful, still-active stages can start their successor. Matching receives
+both complete extraction results and its existing public result is returned
+without changing scores (including null versus zero), denominators, evidence,
+coverage, exclusions, statuses or warnings. Extraction envelopes, full source
+strings and model output are never response fields. Exceptions are mapped through
+the existing closed allowlist with the current REQUEST/CV/JD/MATCHING stage.
+No partial score or fabricated missing-skill judgment is produced.
+
+Two deadlines start at admission using a monotonic clock. Upload is limited to
+30,000 ms. The overall budget is twice the validated AI_REQUEST_TIMEOUT_MS plus
+30,000 ms upload, 10,000 ms parser work, 1,000 ms parser termination and 5,000 ms
+bounded processing overhead: 286,000 ms with the default provider configuration.
+AnalysisModule consumes the same validated AI_CONFIG instance as the provider;
+it does not independently read environment settings. Stage boundaries also check
+elapsed time so delayed timer callbacks cannot allow late results. Synchronous
+matching cannot be preempted; a deadline crossed during it suppresses the result.
+These are request/result deadlines, not a guarantee that remote Ollama execution
+or pathological cleanup has stopped at that instant.
+
+Disconnect, timeout and shutdown mark ownership terminal exactly once. Upload
+cancellation aborts only the bounded multipart adapter, clearing its listeners,
+timer and buffers. Active extraction is deliberately not force-cancelled: its
+promise includes parser cleanup, and it has no per-request abort API. A terminal
+request retains admission while that promise settles, discards late results and
+starts no later stage. Timeouts may send a sanitized response before that cleanup
+finishes; abandoned clients receive no later response. No per-request action
+closes the shared parser. The run's finally block is the sole release path after
+work starts; an owner cancelled before controller execution can release directly.
+Release is guarded and clears ownership timers and disconnect listeners.
+
+Shutdown is explicit and idempotent: close admission, terminate active ownership,
+stop upload, then await its completion. AnalysisService invokes this path from
+its Nest destruction hook. More importantly, it registers the same shutdown
+barrier with ExtractionService: extraction's destruction hook awaits it before
+closing its parser/owner. Thus either hook can run first without relying on Nest
+module ordering or allowing a JD stage to race parser shutdown. Existing
+ExtractionService shutdown behavior is retained when no analysis coordinator is
+registered. A nonsettling provider/extraction promise keeps analysis admission
+and shutdown blocked; there is intentionally no unsafe forced slot release.
+Parser watchdog failure is different: after an unconfirmed termination, the
+parser latches unavailable and its promise can settle with failure. Analysis
+ownership can then release while extraction remains unavailable. This is not
+confirmation of worker exit or successful cleanup, and shutdown can report
+extraction unavailability. Neither path guarantees remote inference termination.
+
+Deterministic HTTP tests use controlled promises for in-flight extraction and
+cleanup, real Nest/controller/multipart handling, and real MatchingService.
+They exercise success, null/zero, failures, busy admission before body arrival,
+disconnect, deadlines, shutdown, late-result suppression and resource release.
+A separate real ExtractionService test pins the explicit shutdown-barrier order.
+No live model verification is performed. The historical Task 05 baseline remains
+0/2 completed predefined live pairs; unresolved quote ambiguity, uncertainty,
+negation, injection contamination and evidence annotation sensitivity are not
+fixed by HTTP integration. Successful extraction or HTTP 200 still does not prove
+semantic correctness. Returned matching warnings/review requirements remain intact.
+
+## Task 06.3E: multipart integrity and destruction races
+
+The wire audit previously searched for an opening delimiter anywhere in preamble
+bytes and classified parts by a regex over Content-Disposition. A boundary-like
+preamble could stop auditing early, and parameter-looking text inside a quoted
+extension could misclassify JD text as a file. Busboy would still decode that
+field permissively, replacing invalid UTF-8. The audit now accepts an explicit
+MIME subset: the opening delimiter must start at byte zero; headers cannot be
+duplicated or folded; disposition parameters are parsed as tokens/quoted values,
+with only `name` and `filename` supported. Extended/escaped parameters, unknown
+headers/parameters and preambles reject rather than being interpreted differently
+from Busboy. Ordinary quoted browser fields and filenames remain supported.
+The part name and filename presence must agree with the endpoint's fixed CV/JD
+roles. JD media type is text/plain, optionally with UTF-8 charset; its bytes use a
+fatal streaming decoder. Literal valid U+FFFD remains valid input. Delimiter
+suffixes are compared without ASCII high-bit masking. Existing byte limits,
+epilogue counting and rejection teardown are unchanged.
+
+Analysis stage guards now observe request abortion, incomplete request
+destruction, response destruction and socket destruction directly. A fully
+consumed IncomingMessage can normally be destroyed, so that flag alone must not
+abandon a healthy completed upload. This closes the microtask window between
+response destruction and delivery of its close event. Detection marks ownership
+terminal without sending a late response; existing finally-based release still
+waits for active extraction and cleanup. Real Node HTTP race tests destroy the
+response during CV/JD completion before close-event delivery, and separately
+verify retained admission through delayed cleanup. No inference cancellation,
+extraction semantics or matching policy changes are introduced.
+
+## Task 06.4B: in-memory analysis dashboard
+
+The existing `/dashboard` route now uses the current React/Vite/MUI stack for
+one CV/JD analysis. A native file picker validates count, nonempty size, filename,
+extension and MIME agreement. JD validation checks nonblank text, UTF-16 and
+UTF-8 ceilings and rejects unpaired surrogates. The application does not trim,
+normalize or parse documents. The native textarea exposes its standard LF line
+endings; the API helper preserves exactly the string supplied to it, including
+CRLF if supplied programmatically. Client checks supplement authoritative backend
+validation, including its strict multipart subset and document parser checks.
+
+`useAnalysis` owns the request state and synchronous admission ref. Each request
+has an AbortController and monotonically increasing generation. Cancellation,
+Clear, edits and unmount invalidate the generation before abort; stale success,
+failure and finally paths cannot replace state or unlock a newer request. Form
+inputs are disabled during processing, while Cancel remains available. Cancel
+retains form inputs and explains that local work may continue. Clear discards
+form values, file selection, results and errors. Values remain in component memory
+only; no local/session storage, history, analytics or telemetry is introduced.
+Aborting is not a guarantee of immediate memory erasure inside browser networking
+or termination of backend/Ollama work.
+
+The API helper submits exactly `cv` and `jdText` as FormData, lets the browser set
+the boundary, and uses the relative `/api/v1/analyses` endpoint with no-store and
+no retries. Browser-owned wire types avoid backend runtime imports. The runtime
+decoder checks version/discriminants, consumed nested fields, fixed statuses,
+error codes and diagnostics. Valid non-2xx INCOMPLETE envelopes are shown without
+scores; malformed/network failures use fixed client messages. A test-only type
+comparison checks compatibility with the backend MatchingResult. No scoring,
+predicate, eligibility or weighting logic is duplicated in the browser.
+
+Results are labelled Documented requirement support. Null is Not calculable and
+numeric zero is 0%. Coverage, exclusions, category values, warning codes and review
+requirements remain visible. Requirement cards separately show status and
+evaluability, with evidence/details collapsed by default. Quotes, explanations
+and all other strings render as ordinary escaped React text with whitespace and
+wrapping; no HTML/Markdown renderer, automatic links or invented page navigation
+is used. Missing evidence is explicitly not proof of a missing skill. Live AI
+quality and semantic correctness remain unverified.
+
+Local integration requires `http://127.0.0.1:5173`; localhost and Vite preview
+(port 4173, no API proxy) are not supported analysis entry points. API readiness
+is informational and does not guarantee Ollama availability or extraction quality.
+The readiness component retains its existing polling, but analysis itself never
+polls. There is no short browser analysis timeout: processing is indeterminate,
+the backend owns its deadlines, and the user can cancel waiting. A subsequent
+request can receive ANALYSIS_BUSY while cancelled work settles.
+
+## Task 06.5: ephemeral requirement feedback
+
+Each requirement in a completed analysis has one optional local assessment:
+Correct, Incorrect or Unsure. Selecting the active option again clears it. The
+control is a labelled exclusive toggle group and has no free-text input. A visible
+notice states that feedback is local, is not submitted or saved, and does not
+automatically improve the model.
+
+Feedback lives only in the mounted completed-result component. A new request,
+input edit, Clear, cancellation, incomplete/client-error response or unmount
+removes that component and its feedback state. Feedback does not enter FormData,
+API requests, browser storage, analytics or logs. It is not projected into the
+matching result, so supplied scores, statuses, evidence, exclusions and
+explanations remain unchanged.
+
+A unique nonempty matching requirement ID is the UI state key. Missing, empty or
+duplicated IDs receive an index-based key within that immutable completed-result
+snapshot. The fallback is deterministic and UI-local; it neither repairs nor
+mutates backend data. It provides stable independent controls for the displayed
+snapshot, but does not create an identity that can be carried across analyses.
+
+## Task 06.6: local end-to-end verification
+
+The authorized verification submitted three synthetic analysis requests
+sequentially through the local dashboard/API integration and pinned local Ollama,
+with no retries. One request completed: `cv-simple-pdf + jd-priority`. Matching
+ran only for this completed request and returned two requirements with
+`overallScore: null`. Null remains an explicit not-calculable result under the
+existing matching contract and was not converted to zero.
+
+The two predefined pairs did not complete. `cv-duration-docx + jd-mixed` returned
+INCOMPLETE at the CV stage with the sanitized `QUOTE_AMBIGUOUS` diagnostic.
+`cv-sparse-docx + jd-mixed` returned INCOMPLETE at the JD stage with the same
+diagnostic. Matching did not run for either rejected request, so no partial or
+fabricated score was produced. The predefined mixed-JD result remains 0/2
+completed, separately from the preserved historical Task 05 18-attempt baseline.
+
+The run exercised the local request path, extraction orchestration, matching gate,
+versioned responses and incomplete-result handling. The browser DOM was not
+visually verified. A completed response does not establish extraction completeness
+or semantic correctness, and the two quote-ambiguity failures remain unresolved.
+This verification supports MVP integration and honest failure handling only; it is
+not evidence of model quality, reliability or candidate suitability.

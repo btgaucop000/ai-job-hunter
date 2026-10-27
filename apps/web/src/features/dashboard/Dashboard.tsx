@@ -1,56 +1,84 @@
-import { Box, Paper, Stack, Typography } from '@mui/material';
-
+import { useEffect, useRef } from 'react';
+import { Alert, Box, CircularProgress, Stack, Typography } from '@mui/material';
+import { AnalysisForm } from './AnalysisForm';
+import { AnalysisResult } from './AnalysisResult';
+import { useAnalysis } from './useAnalysis';
 export function Dashboard() {
+  const { state, start, cancel, reset } = useAnalysis();
+  const statusPanel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (
+      ['completed', 'incomplete', 'clientError', 'cancelled'].includes(
+        state.status,
+      )
+    )
+      statusPanel.current?.focus();
+  }, [state.status]);
   return (
-    <Stack spacing={4}>
+    <Stack spacing={3}>
       <Box>
-        <Typography variant="overline" color="primary">
-          Your workspace
-        </Typography>
         <Typography variant="h4" component="h1">
           Dashboard
         </Typography>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
-          A clearer view of your next career move.
+        <Typography>
+          Analyze documented requirement support using a CV and job description.
         </Typography>
       </Box>
-      <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 } }}>
-        <Typography variant="h5" component="h2" gutterBottom>
-          Your workspace is ready to grow
-        </Typography>
-        <Typography color="text.secondary">
-          There are no candidates, saved jobs, or matches yet. These features
-          are coming soon; uploads and AI matching are not available yet.
-        </Typography>
-      </Paper>
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
-          gap: 2,
+      <Typography color="text.secondary">
+        Local processing; inputs and results stay in memory until cleared or you
+        leave this page. API readiness does not guarantee Ollama availability or
+        extraction quality. Quote ambiguity, negation, uncertainty,
+        source-instruction contamination and sensitivity to evidence annotations
+        remain known limitations.
+      </Typography>
+      <AnalysisForm
+        busy={state.status === 'processing'}
+        onStart={(file, text) => {
+          void start(file, text);
         }}
-      >
-        {[
-          ['Candidates', 'Keep professional profiles together.'],
-          ['Jobs', 'Organize opportunities worth exploring.'],
-          ['Matches', 'Understand how a profile fits a role.'],
-        ].map(([title, description]) => (
-          <Paper key={title} variant="outlined" sx={{ p: 3 }}>
-            <Typography variant="h6" component="h2">
-              {title}
+        onEdit={reset}
+        onCancel={cancel}
+        onClear={reset}
+      />
+      <Box ref={statusPanel} tabIndex={-1} sx={{ outlineOffset: 4 }}>
+        <Box role="status" aria-live="polite">
+          {state.status === 'idle' && (
+            <Typography>
+              Choose a CV and enter a JD to start. No analysis results yet.
             </Typography>
-            <Typography color="text.secondary" sx={{ mt: 1 }}>
-              {description}
+          )}
+          {state.status === 'processing' && (
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+              <CircularProgress size={24} aria-label="Analysis in progress" />
+              <Typography>
+                Processing locally… This can take several minutes. Cancel stops
+                waiting, but may not immediately stop local extraction.
+              </Typography>
+            </Stack>
+          )}
+          {state.status === 'completed' && (
+            <Typography>
+              Analysis completed. Review the evidence and limitations below.
             </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: 'block', mt: 3 }}
-            >
-              Coming soon
+          )}
+          {state.status === 'cancelled' && (
+            <Typography>
+              Stopped waiting for this analysis. Local extraction may still be
+              finishing; another request may temporarily return busy. Your
+              inputs were retained.
             </Typography>
-          </Paper>
-        ))}
+          )}
+        </Box>
+        {state.status === 'clientError' && (
+          <Alert severity="error">
+            {state.kind === 'network'
+              ? 'Could not reach the local analysis API. Check the local services and retry manually.'
+              : 'The API returned an invalid or incompatible analysis response. No result can be displayed.'}
+          </Alert>
+        )}
+        {(state.status === 'completed' || state.status === 'incomplete') && (
+          <AnalysisResult response={state.response} />
+        )}
       </Box>
     </Stack>
   );

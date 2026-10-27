@@ -12,9 +12,35 @@ const messages = {
   RESPONSE_TOO_LARGE: 'AI provider response exceeds the size limit',
 } as const;
 
+export type AiDiagnostic =
+  | {
+      readonly stage: 'AI_DECODE';
+      readonly rule: 'JSON_INVALID';
+      readonly field: 'output';
+    }
+  | {
+      readonly stage: 'AI_SCHEMA';
+      readonly rule: 'SCHEMA_MISMATCH';
+      readonly field: 'output';
+    };
+
 export class AiError extends Error {
+  readonly diagnostic?: AiDiagnostic;
   constructor(public readonly code: keyof typeof messages) {
     super(messages[code]);
     this.name = 'AiError';
+    // Derive only from the allowlisted code, never provider/error payloads.
+    if (code === 'INVALID_JSON')
+      this.diagnostic = Object.freeze({
+        stage: 'AI_DECODE',
+        rule: 'JSON_INVALID',
+        field: 'output',
+      });
+    if (code === 'SCHEMA_VALIDATION_FAILURE')
+      this.diagnostic = Object.freeze({
+        stage: 'AI_SCHEMA',
+        rule: 'SCHEMA_MISMATCH',
+        field: 'output',
+      });
   }
 }

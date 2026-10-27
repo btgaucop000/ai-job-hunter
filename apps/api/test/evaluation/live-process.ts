@@ -17,12 +17,20 @@ export function startLocalBoundary(): LiveBoundary {
   );
   return supervise(child);
 }
-export function supervise(
+export interface SupervisedBoundary<T> {
+  prepare?(signal: AbortSignal): Promise<void>;
+  extract(documentId: string, signal: AbortSignal): Promise<T>;
+  close(signal?: AbortSignal): Promise<void>;
+}
+export function supervise<T = ExtractionResult>(
   child: ChildProcess,
   cleanupGraceMs = 5000,
-): LiveBoundary {
+  decodeResult: (value: unknown) => T = (value) => value as T,
+  decodeError: (value: unknown) => LiveError = (value) =>
+    new LiveError(errorCode(value)),
+): SupervisedBoundary<T> {
   let pending: {
-    resolve: (result: ExtractionResult) => void;
+    resolve: (result: T) => void;
     reject: (error: LiveError) => void;
   } | null = null;
   let closing = false;
@@ -66,7 +74,7 @@ export function supervise(
       readyResolve();
     }
     if (message.type === 'error' && 'code' in message) {
-      const failure = new LiveError(errorCode(message));
+      const failure = decodeError(message);
       if (failure.code === 'CLEANUP_FAILURE') cleanupFailed = true;
       readyReject(failure);
       pending?.reject(failure);
@@ -78,7 +86,11 @@ export function supervise(
       message.id === currentId &&
       'result' in message
     ) {
-      pending?.resolve(message.result as ExtractionResult);
+      try {
+        pending?.resolve(decodeResult(message.result));
+      } catch {
+        pending?.reject(new LiveError('UNEXPECTED_FAILURE'));
+      }
       pending = null;
     }
   });
@@ -89,6 +101,20 @@ export function supervise(
     });
   }
   return {
+    async prepare(signal) {
+      const abort = () => {
+        readyReject(new LiveError(errorCode(signal.reason)));
+        child.kill('SIGKILL');
+      };
+      signal.addEventListener('abort', abort, { once: true });
+      try {
+        if (signal.aborted) abort();
+        await ready;
+        if (signal.aborted) throw new LiveError(errorCode(signal.reason));
+      } finally {
+        signal.removeEventListener('abort', abort);
+      }
+    },
     async extract(documentId, signal) {
       if (pending || closing) throw new LiveError('EXTRACTION_BUSY');
       const abort = () => {
@@ -106,7 +132,7 @@ export function supervise(
         await ready;
         if (signal.aborted) throw new LiveError(errorCode(signal.reason));
         currentId = documentId;
-        return await new Promise<ExtractionResult>((resolve, reject) => {
+        return await new Promise<T>((resolve, reject) => {
           pending = { resolve, reject };
           try {
             send({ type: 'extract', id: documentId });
