@@ -11,6 +11,6 @@ import { OllamaProvider } from './ollama.provider.js';
     { provide: AI_PROVIDER, useExisting: OllamaProvider },
     AiService,
   ],
-  exports: [AiService],
+  exports: [AiService, AI_CONFIG],
 })
 export class AiModule {}

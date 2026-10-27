@@ -25,12 +25,20 @@ const fact = (priority = false): OutputSchema =>
       : { type: ['string', 'null'], minLength: 1, maxLength: limits.factUnits },
     evidence: list(quote, limits.evidencePerFact),
   });
+const requiredFact = (): OutputSchema =>
+  object({
+    value: text(limits.factUnits),
+    evidence: list(quote, limits.evidencePerFact),
+  });
 const fields = (...names: string[]): Record<string, OutputSchema> =>
   Object.fromEntries(names.map((name) => [name, fact()]));
 // Model contracts deliberately exclude offsets: only the application resolves them.
 export const CV_OUTPUT_SCHEMA = object({
   ...fields('name', 'email', 'phone', 'location'),
-  skills: list(object(fields('name', 'experienceText')), limits.listItems),
+  skills: list(
+    object({ name: requiredFact(), experienceText: fact() }),
+    limits.listItems,
+  ),
   experience: list(
     object(
       fields(
@@ -57,10 +65,10 @@ export const JD_OUTPUT_SCHEMA = object({
     'compensationText',
   ),
   requirements: list(
-    object({ text: fact(), priority: fact(true) }),
+    object({ text: requiredFact(), priority: fact(true) }),
     limits.listItems,
   ),
-  responsibilities: list(fact(), limits.listItems),
+  responsibilities: list(requiredFact(), limits.listItems),
 });
 export const SOURCE_SCHEMA = object({
   format: { type: 'string', enum: ['pdf', 'docx', 'text'] },

@@ -14,6 +14,7 @@
     "smoke:ollama": "pnpm test:compile && node .test-dist/test/manual/ollama.smoke.js",
     "smoke:extraction": "pnpm test:compile && node .test-dist/test/manual/extraction.smoke.js",
     "eval": "pnpm test:compile && node .test-dist/test/evaluation/live.js",
+    "investigate": "pnpm test:compile && node .test-dist/test/evaluation/investigation.js",
     "eval:offline": "pnpm test:compile && node --permission --allow-fs-read=* --allow-worker --import ./.test-dist/test/evaluation/no-network.js .test-dist/test/evaluation/offline.js"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "@nestjs/typeorm": "12.0.2",
     "@xmldom/xmldom": "0.9.12",
     "ajv": "8.20.0",
+    "busboy": "1.6.0",
     "class-transformer": "0.5.1",
     "class-validator": "0.15.1",
     "mammoth": "1.13.0",
@@ -36,6 +38,7 @@
   "devDependencies": {
     "@jest/globals": "30.5.2",
     "@nestjs/testing": "12.2.0",
+    "@types/busboy": "1.5.4",
     "@types/pg": "^8.23.1",
     "@types/supertest": "7.2.1",
     "@types/yauzl": "3.4.0",

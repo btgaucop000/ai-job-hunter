@@ -1,3 +1,5 @@
+import { sanitizeDiagnostic } from './extraction.diagnostics.js';
+import type { ValidationDiagnostic } from './extraction.diagnostics.js';
 const messages = {
   EXTRACTION_BUSY: 'Extraction is busy',
   EXTRACTION_UNAVAILABLE: 'Extraction is unavailable',
@@ -22,8 +24,13 @@ const messages = {
   INVALID_EVIDENCE: 'Extraction evidence is missing, ambiguous or invalid',
 } as const;
 export class ExtractionError extends Error {
-  constructor(public readonly code: keyof typeof messages) {
+  readonly diagnostic?: ValidationDiagnostic;
+  constructor(
+    public readonly code: keyof typeof messages,
+    diagnostic?: unknown,
+  ) {
     super(messages[code]);
     this.name = 'ExtractionError';
+    this.diagnostic = sanitizeDiagnostic(code, diagnostic);
   }
 }

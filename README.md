@@ -355,3 +355,83 @@ nor production readiness. See the [detailed baseline and analysis](docs/architec
 The original baseline remains unchanged. Future improvements must preserve it;
 any evaluation-policy or ground-truth changes require separate review and
 versioning. Temporary reports and raw inference payloads are not committed.
+
+### Four-case extraction investigation (manual, explicit authorization only)
+
+The test-only harness runs these synthetic fixtures once each, in order:
+`cv-duration-docx`, `jd-mixed`, `jd-injection`, `jd-negation`. It has independent
+parent/child four-call limits, no retries, no fixture selectors, and refuses CI.
+It performs local metadata preflight and preserves existing extraction deadlines
+and cleanup. Infrastructure/profile failures stop remaining cases.
+
+After separate approval for live inference:
+
+```bash
+pnpm --filter @ai-job-hunter/api investigate -- --allow-local-investigation
+```
+
+Do not run this command as an ordinary check: it invokes local Ollama. Without
+the exact opt-in it returns NOT_RUN rows and exits nonzero before starting a child.
+The JSON report contains only fixture IDs, statuses, existing error codes,
+allowlisted diagnostics and bounded elapsed milliseconds. Successful extraction
+content never crosses child IPC. A top-level code reports lifecycle/cleanup
+failure; any rejected/unrun case also exits nonzero. RETURNED does not establish
+semantic correctness. The original `eval` command still runs its unchanged
+18-attempt baseline schedule. Later checkpoints ran the harness only under their
+separate, bounded local authorizations; the command still requires explicit
+authorization for every future invocation.
+
+## Local analysis endpoint
+
+The `/dashboard` MVP uses this endpoint. Open **http://127.0.0.1:5173** through
+the Vite development server. Vite preview has no API proxy; `localhost` is not
+an allowed analysis origin. API readiness does not guarantee Ollama availability
+or extraction quality. Cancel stops browser waiting, but backend cleanup may
+temporarily leave the API busy. Inputs/results are memory-only; Clear removes
+them from the dashboard. No history or feedback submission is implemented.
+
+`POST /api/v1/analyses` accepts a bounded multipart upload:
+one PDF/DOCX `cv` file (maximum 5 MiB) and one nonblank `jdText` field
+(maximum 12,000 UTF-16 units and 49,152 UTF-8 bytes), in either order.
+One admitted request runs CV extraction, then JD extraction, then deterministic
+matching. Concurrent requests return **429 `ANALYSIS_BUSY`**, with no queue.
+Success returns the versioned matching result; failures return a sanitized
+`INCOMPLETE` response with `result: null`. This endpoint now invokes the configured
+local provider when used; the deterministic tests below use fake extraction only.
+Uploads have a 30-second deadline. The default overall deadline is 286 seconds;
+it varies with the validated provider timeout. Disconnects/timeouts prevent later
+stages, but admission remains occupied until active extraction cleanup settles.
+The overall deadline bounds result acceptance, not guaranteed inference
+termination. A nonsettling provider can block admission and shutdown. Parser
+watchdog failure may instead settle analysis while leaving extraction unavailable.
+Live AI quality remains unverified. Multipart preambles, folded headers and
+extended/escaped or unknown disposition parameters are explicitly unsupported.
+Access requires the exact loopback Host and HTTP Origin configured for the API
+or Vite (127.0.0.1:5173). Missing Origin is rejected. Responses are not cacheable.
+
+### Task 06 local end-to-end verification
+
+Checkpoint 6.6 sent three synthetic analysis requests sequentially through the
+local dashboard/API integration with pinned local Ollama and no retries. One of
+three completed: `cv-simple-pdf + jd-priority`. Matching ran for that request and
+returned two requirements with `overallScore: null`, which the dashboard contract
+represents as not calculable rather than zero.
+
+`cv-duration-docx + jd-mixed` returned INCOMPLETE during CV extraction with the
+sanitized `QUOTE_AMBIGUOUS` diagnostic. `cv-sparse-docx + jd-mixed` returned
+INCOMPLETE during JD extraction with the same diagnostic. Matching did not run
+for either incomplete request. The two predefined mixed-JD pairs therefore remain
+0/2 completed. No request was retried.
+
+The HTTP/API-to-Ollama integration and its success/failure response handling were
+exercised, but the browser DOM was not visually verified. This limited run confirms
+local integration and honest failure handling; it does not establish extraction
+quality, semantic correctness, model reliability or candidate suitability. The
+Task 05 18-attempt baseline above remains a separate historical measurement.
+
+Run deterministic transport and lifecycle tests without Ollama or a database:
+
+```bash
+pnpm --filter @ai-job-hunter/api test:compile
+pnpm --filter @ai-job-hunter/api exec node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js --runInBand --testPathPatterns=analysis
+```
