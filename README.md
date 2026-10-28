@@ -178,6 +178,8 @@ node scripts/check-pdf-parser.mjs
 
 This check now covers both PDF and DOCX through `apps/api/dist/extraction/parser.worker.js`, without Jest, Ollama or PostgreSQL. Regular `pnpm test` also covers real workers, bounded parsing, malformed/password-protected documents, resource access and termination recovery. Local listener permission is needed by the existing HTTP tests and the synthetic network canary.
 
+PDF header compatibility permits the exact `%PDF-` signature fully within the first 1,024 bytes (start offsets 0–1019). Input bytes are preserved unchanged, including any preamble. PDF.js still validates the document structure with strict parsing; existing limits and rejection behavior remain in force. Successful parsing does not guarantee AI extraction success or quality.
+
 ## Internal DOCX parser (Task 03 / Checkpoint 4.3C)
 
 The same `documentParser` accepts `.docx` bytes with the OOXML Word MIME type. It validates ZIP structure and expanded-byte limits, OOXML content types and relationships, then calls Mammoth with the same in-memory archive. Results retain Mammoth's text exactly, with paragraph spans, global UTF-16 offsets and null page provenance. DOCX has `pageCount: null`; fixed warnings identify ignored image content and conversion warnings without exposing library diagnostics.
