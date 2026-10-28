@@ -30,6 +30,72 @@ test('real legacy worker extracts text, freezes source and does not detach input
   expect(Object.isFrozen(result.source)).toBe(true);
   expect(Object.isFrozen(result.source.segments[0])).toBe(true);
 });
+test.each([0, 1, 17, 1019])(
+  'accepts a PDF header at byte %s without modifying input or extracted source',
+  async (offset) => {
+    const bytes = new Uint8Array(
+      Buffer.concat([Buffer.alloc(offset, 0x20), pdfFixture()]),
+    );
+    const before = bytes.slice();
+    const instance = parser();
+    const expected = await instance.parse(pdfInput());
+    expect(await instance.parse(pdfInput(bytes))).toEqual(expected);
+    expect(bytes).toEqual(before);
+  },
+);
+test('accepts a non-whitespace synthetic preamble without stripping or rewriting bytes', async () => {
+  const prefix = Buffer.concat([
+    Buffer.from([0xef, 0xbb, 0xbf, 0x00, 0xff]),
+    Buffer.from('SYNTHETIC-PREAMBLE\n'),
+  ]);
+  const bytes = new Uint8Array(Buffer.concat([prefix, pdfFixture()]));
+  const before = bytes.slice();
+  const instance = parser();
+  const expected = await instance.parse(pdfInput());
+  expect(await instance.parse(pdfInput(bytes))).toEqual(expected);
+  expect(bytes).toEqual(before);
+});
+test.each([
+  new Uint8Array(Buffer.concat([Buffer.alloc(1020, 0x20), pdfFixture()])),
+  new Uint8Array(Buffer.from('SYNTHETIC non-PDF payload')),
+  new Uint8Array(Buffer.from('%PDF-synthetic invalid structure')),
+  new Uint8Array(Buffer.from('%PDF-')),
+  new Uint8Array(Buffer.from('%PDF')),
+  new Uint8Array(
+    Buffer.concat([
+      Buffer.from([0xa5, 0xd0, 0xc4, 0xc6, 0xad]),
+      Buffer.from(pdfFixture().subarray(5)),
+    ]),
+  ),
+])(
+  'rejects out-of-window, missing, fake or inexact signatures %#',
+  async (bytes) => {
+    const before = bytes.slice();
+    const instance = parser();
+    await expect(instance.parse(pdfInput(bytes))).rejects.toMatchObject({
+      code: 'PARSING_FAILED',
+      message: 'Document parsing failed',
+    });
+    expect(bytes).toEqual(before);
+    expect((await instance.parse(pdfInput())).source.text).toBe(
+      'Synthetic PDF',
+    );
+  },
+);
+test.each([
+  pdfFixture(Array(limits.pdfPages + 1).fill('a')),
+  pdfFixture(['a'.repeat(limits.textUnits + 1)]),
+])(
+  'preamble compatibility preserves existing page/text limits %#',
+  async (pdf) => {
+    const bytes = new Uint8Array(
+      Buffer.concat([Buffer.from('SYNTHETIC\n'), pdf]),
+    );
+    await expect(parser().parse(pdfInput(bytes))).rejects.toMatchObject({
+      code: 'DOCUMENT_TOO_LARGE',
+    });
+  },
+);
 test('Unicode text uses global UTF-16 offsets across pages', async () => {
   const result = await parser().parse(
     pdfInput(pdfFixture(['one', 'two'], { unicode: true })),
