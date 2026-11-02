@@ -9,6 +9,11 @@ import {
 import { pdfFixture, pdfInput } from '../support/pdf-fixtures.js';
 import { Worker } from 'node:worker_threads';
 import { createServer } from 'node:http';
+import {
+  configurePdfParserDiagnostics,
+  withPdfParserDiagnosticRequest,
+} from '../../src/extraction/pdf-parser.diagnostics.js';
+import type { PdfParserDiagnosticRecord } from '../../src/extraction/pdf-parser.diagnostics.js';
 
 const parsers: DocumentParser[] = [];
 const parser = () => {
@@ -16,8 +21,13 @@ const parser = () => {
   parsers.push(instance);
   return instance;
 };
+const prefixedPdf = (prefixBytes: number): Uint8Array =>
+  new Uint8Array(
+    Buffer.concat([Buffer.alloc(prefixBytes, 0x20), pdfFixture()]),
+  );
 afterEach(async () => {
   for (const instance of parsers.splice(0)) await instance.close();
+  configurePdfParserDiagnostics(false, '127.0.0.1', () => {});
 });
 
 test('real legacy worker extracts text, freezes source and does not detach input', async () => {
@@ -29,6 +39,76 @@ test('real legacy worker extracts text, freezes source and does not detach input
   expect(Object.isFrozen(result)).toBe(true);
   expect(Object.isFrozen(result.source)).toBe(true);
   expect(Object.isFrozen(result.source.segments[0])).toBe(true);
+});
+test.each([
+  ['byte zero', 0],
+  ['first nonzero byte', 1],
+  ['short preamble', 17],
+  ['last allowed position', 1019],
+] as const)(
+  'accepts an exact PDF signature at %s without changing input bytes',
+  async (_position, prefixBytes) => {
+    const bytes = prefixedPdf(prefixBytes);
+    const before = bytes.slice();
+    const result = await parser().parse(pdfInput(bytes));
+    expect(result.source.text).toBe('Synthetic PDF');
+    expect(bytes).toEqual(before);
+  },
+);
+test('recovers one text-stream parse defect, reports it and remains reusable', async () => {
+  let workerCount = 0;
+  const instance = new DocumentParser((url, options) => {
+    workerCount++;
+    return new Worker(url, options);
+  });
+  parsers.push(instance);
+  const result = await instance.parse(
+    pdfInput(
+      pdfFixture(['Synthetic recoverable text'], {
+        recoverableTextDefect: true,
+      }),
+    ),
+  );
+  expect(result.source.text).toBe('Synthetic recoverable text');
+  expect(result.warnings).toEqual([
+    { code: 'IMAGE_CONTENT_NOT_INTERPRETED' },
+    { code: 'PDF_RECOVERY_USED' },
+  ]);
+  expect(workerCount).toBe(1);
+
+  const valid = await instance.parse(pdfInput());
+  expect(valid.source.text).toBe('Synthetic PDF');
+  expect(valid.warnings).toEqual([{ code: 'IMAGE_CONTENT_NOT_INTERPRETED' }]);
+  expect(workerCount).toBe(2);
+});
+test('reports a failed recovery without changing the parser error', async () => {
+  const records: PdfParserDiagnosticRecord[] = [];
+  configurePdfParserDiagnostics(true, '127.0.0.1', (record) =>
+    records.push(record),
+  );
+  const instance = parser();
+  await expect(
+    withPdfParserDiagnosticRequest(
+      '7ef4cc66-c25b-4db2-a846-740165d06d22',
+      () =>
+        instance.parse(
+          pdfInput(
+            pdfFixture(['a'.repeat(limits.textUnits + 1)], {
+              recoverableTextDefect: true,
+            }),
+          ),
+        ),
+    ),
+  ).rejects.toMatchObject({ code: 'DOCUMENT_TOO_LARGE' });
+  expect(records).toEqual([
+    {
+      requestId: '7ef4cc66-c25b-4db2-a846-740165d06d22',
+      phase: 'TEXT_STREAM',
+      category: 'OTHER',
+      recoveryAttempted: true,
+      workerStatus: 'MESSAGE',
+    },
+  ]);
 });
 test('Unicode text uses global UTF-16 offsets across pages', async () => {
   const result = await parser().parse(
@@ -78,10 +158,78 @@ test.each([
   });
   expect((await instance.parse(pdfInput())).source.text).toBe('Synthetic PDF');
 });
+test.each([
+  [
+    'signature just outside the bounded prefix',
+    prefixedPdf(1020),
+    'HEADER_SIGNATURE_REJECTED',
+  ],
+  [
+    'missing signature',
+    new Uint8Array(Buffer.from('synthetic non-PDF payload')),
+    'HEADER_SIGNATURE_REJECTED',
+  ],
+  [
+    'fake signature in a non-PDF payload',
+    new Uint8Array(Buffer.from('%PDF-synthetic non-PDF payload')),
+    'PDFJS_DOCUMENT_REJECTED',
+  ],
+] as const)(
+  'distinguishes %s rejection without changing the parser error',
+  async (_boundary, bytes, category) => {
+    const records: PdfParserDiagnosticRecord[] = [];
+    configurePdfParserDiagnostics(true, '127.0.0.1', (record) =>
+      records.push(record),
+    );
+    await expect(
+      withPdfParserDiagnosticRequest(
+        '7ef4cc66-c25b-4db2-a846-740165d06d22',
+        () => parser().parse(pdfInput(bytes)),
+      ),
+    ).rejects.toMatchObject({
+      code: 'PARSING_FAILED',
+      message: 'Document parsing failed',
+    });
+    expect(records).toEqual([
+      {
+        requestId: '7ef4cc66-c25b-4db2-a846-740165d06d22',
+        phase: 'DOCUMENT_LOAD',
+        category,
+        recoveryAttempted: false,
+        workerStatus: 'MESSAGE',
+      },
+    ]);
+  },
+);
+test('header distinction remains disabled by default', async () => {
+  const records: PdfParserDiagnosticRecord[] = [];
+  configurePdfParserDiagnostics(false, '127.0.0.1', (record) =>
+    records.push(record),
+  );
+  const bytes = prefixedPdf(1020);
+  await expect(parser().parse(pdfInput(bytes))).rejects.toMatchObject({
+    code: 'PARSING_FAILED',
+    message: 'Document parsing failed',
+  });
+  expect(records).toEqual([]);
+});
 test('rejects password protected documents without waiting for a password', async () => {
   await expect(
-    parser().parse(pdfInput(pdfFixture(['private'], { encrypted: true }))),
+    parser().parse(
+      pdfInput(
+        pdfFixture(['private'], {
+          encrypted: true,
+          recoverableTextDefect: true,
+        }),
+      ),
+    ),
   ).rejects.toMatchObject({ code: 'PASSWORD_PROTECTED_DOCUMENT' });
+});
+test('application-owned no-text failure does not become recovered output', async () => {
+  const instance = parser();
+  await expect(
+    instance.parse(pdfInput(pdfFixture([''], { recoverableTextDefect: true }))),
+  ).rejects.toMatchObject({ code: 'NO_EXTRACTABLE_TEXT' });
 });
 test('enforces page and text limits without truncation', async () => {
   const instance = parser();
@@ -209,15 +357,37 @@ test('ignores document JavaScript and external actions without network requests'
 });
 test.each([
   {},
-  { version: 2, format: 'pdf', bytes: new Uint8Array(1) },
-  { version: 1, format: 'unsupported', bytes: new Uint8Array(1) },
-  { version: 1, format: 'pdf', bytes: new Uint8Array() },
+  {
+    version: 2,
+    format: 'pdf',
+    bytes: new Uint8Array(1),
+    diagnostics: false,
+  },
+  {
+    version: 1,
+    format: 'unsupported',
+    bytes: new Uint8Array(1),
+    diagnostics: false,
+  },
+  {
+    version: 1,
+    format: 'pdf',
+    bytes: new Uint8Array(),
+    diagnostics: false,
+  },
+  {
+    version: 1,
+    format: 'pdf',
+    bytes: new Uint8Array(1),
+    diagnostics: 'yes',
+  },
 ])('rejects invalid worker requests %#', (input) =>
   expect(() => validateParseRequest(input)).toThrow('Document parsing failed'),
 );
 test.each([
   {},
   { version: 1, ok: false, code: 'private upstream error' },
+  { version: 1, ok: false, code: 'PARSING_FAILED', diagnostic: null, extra: 1 },
   { version: 1, ok: true, result: {} },
 ])('rejects invalid worker responses %#', (input) =>
   expect(() => validateParseResponse(input)).toThrow('Document parsing failed'),

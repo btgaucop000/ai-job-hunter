@@ -1,6 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { OnModuleDestroy } from '@nestjs/common';
+import { PARTIAL_GENERATION_MAX_MS } from '../ai/ai-provider.js';
+import type { PartialGenerationExecution } from '../ai/ai-provider.js';
 import { AiService } from '../ai/ai.service.js';
+import { partialPrompt, validatePartial } from './partial-extraction.js';
+import {
+  partialOutputSchema,
+  PARTIAL_ENVELOPE_SCHEMA,
+} from './partial-proposal.contract.js';
+import type { PartialDocument } from './partial-extraction.types.js';
 import { AiError } from '../ai/ai.errors.js';
 import { ExtractionError } from './extraction.errors.js';
 import { EXTRACTION_OWNER, ExtractionOwner } from './extraction.owner.js';
@@ -18,6 +26,7 @@ import type {
   JdExtractionInput,
   CvExtractionResult,
   JdExtractionResult,
+  ExtractionSource,
 } from './extraction.types.js';
 
 function freeze<T>(value: T): T {
@@ -45,7 +54,55 @@ export class ExtractionService implements OnModuleDestroy {
     @Inject(EXTRACTION_OWNER) private readonly owner: ExtractionOwner,
   ) {}
 
-  extractCv(input: CvExtractionInput): Promise<CvExtractionResult> {
+  parseCv(input: CvExtractionInput): Promise<ExtractionSource> {
+    return this.run(() => this.parseCvSource(input));
+  }
+
+  private async parseCvSource(input: CvExtractionInput) {
+    const format = validateDocumentInput(input);
+    const parsed = await this.owner.parser.parse(input);
+    this.ensureAvailable();
+    const source = createExtractionSource(parsed.source);
+    if (source.format !== format) throw new ExtractionError('INVALID_SOURCE');
+    return freeze(source);
+  }
+
+  extractPartial(
+    kind: 'cv' | 'jd',
+    sourceInput: ExtractionSource,
+    execution?: PartialGenerationExecution,
+  ): Promise<PartialDocument> {
+    return this.run(async () => {
+      const source = createExtractionSource(sourceInput);
+      if ((kind === 'jd') !== (source.format === 'text'))
+        throw new ExtractionError('INVALID_SOURCE');
+      const output = await this.ai.generatePartialStructured(
+        {
+          partial: execution ?? {
+            signal: new AbortController().signal,
+            deadline: performance.now() + PARTIAL_GENERATION_MAX_MS,
+          },
+          prompt: partialPrompt(kind, source),
+          schema: partialOutputSchema(kind),
+        },
+        PARTIAL_ENVELOPE_SCHEMA,
+      );
+      // Only the outer object/array was schema-checked. Every item is unknown
+      // until the partial validator resolves it independently against source.
+      return freeze(
+        validatePartial(
+          kind,
+          (output as { proposals: unknown }).proposals,
+          source,
+        ),
+      );
+    });
+  }
+
+  extractCv(
+    input: CvExtractionInput,
+    onParsed?: (source: ExtractionSource) => void,
+  ): Promise<CvExtractionResult> {
     return this.run(async () => {
       const format = validateDocumentInput(input);
       // parse copies bytes synchronously before yielding; caller mutation cannot
@@ -54,6 +111,7 @@ export class ExtractionService implements OnModuleDestroy {
       this.ensureAvailable();
       const source = createExtractionSource(parsed.source);
       if (source.format !== format) throw new ExtractionError('INVALID_SOURCE');
+      onParsed?.(freeze(source));
       const prompt = buildExtractionPrompt('cv', source);
       const output = await this.ai.generateStructured({
         prompt,

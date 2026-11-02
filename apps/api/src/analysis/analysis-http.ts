@@ -3,10 +3,15 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
 import { initialStages } from './analysis.contracts.js';
 import type {
+  AnalysisDocumentsDto,
   AnalysisResponseDto,
   StageSummary,
 } from './analysis.contracts.js';
-import { analysisError, ANALYSIS_HTTP_STATUS } from './analysis.errors.js';
+import {
+  AnalysisError,
+  analysisError,
+  ANALYSIS_HTTP_STATUS,
+} from './analysis.errors.js';
 import {
   checkAnalysisSecurity,
   localAnalysisSecurity,
@@ -17,7 +22,14 @@ import { AnalysisService } from './analysis.service.js';
 import type { AnalysisErrorDto } from './analysis.contracts.js';
 
 export interface AnalysisRequest extends IncomingMessage {
-  analysis?: { requestId: string; stages: StageSummary };
+  analysis?: {
+    requestId: string;
+    stages: StageSummary;
+    documents?: AnalysisDocumentsDto;
+    parseOnly?: boolean;
+    cvOnly?: boolean;
+    partialOnly?: boolean;
+  };
 }
 export const REJECT_CLOSE_MS = 250;
 export function sendAnalysisError(
@@ -27,7 +39,7 @@ export function sendAnalysisError(
   stage: AnalysisErrorDto['stage'] = 'REQUEST',
 ): void {
   const safe = analysisError(error, stage);
-  const context = req.analysis ?? {
+  const context: NonNullable<AnalysisRequest['analysis']> = req.analysis ?? {
     requestId: randomUUID(),
     stages: initialStages(),
   };
@@ -43,6 +55,7 @@ export function sendAnalysisError(
     requestId: context.requestId,
     outcome: 'INCOMPLETE',
     stages: context.stages,
+    documents: context.documents,
     result: null,
     error: safe,
   };
@@ -86,6 +99,24 @@ export function configureAnalysisHttp(
       res.setHeader('Cache-Control', 'no-store');
       try {
         checkAnalysisSecurity(req, security);
+        const query = new URL(
+          (req as AnalysisRequest & { originalUrl?: string }).originalUrl ??
+            req.url ??
+            '/',
+          'http://localhost',
+        ).searchParams;
+        if (
+          [...query.keys()].some((key) => key !== 'mode') ||
+          query.getAll('mode').length > 1 ||
+          (query.has('mode') &&
+            !['parse-only', 'partial', 'cv-only'].includes(query.get('mode')!))
+        )
+          throw new AnalysisError('INVALID_REQUEST');
+        req.analysis.parseOnly = ['parse-only', 'cv-only'].includes(
+          query.get('mode')!,
+        );
+        req.analysis.cvOnly = query.get('mode') === 'cv-only';
+        req.analysis.partialOnly = query.get('mode') === 'partial';
         checkUploadHeaders(req);
         analysis.admit(req, res);
         next();

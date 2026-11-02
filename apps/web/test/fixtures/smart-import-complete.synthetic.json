@@ -1,0 +1,226 @@
+{
+  "rejected": 0,
+  "fields": [
+    {
+      "field": "title",
+      "value": "AI Developer",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "title",
+          "value": "AI Developer",
+          "source": "post",
+          "quote": "AI Developer"
+        },
+        {
+          "field": "title",
+          "value": "AI Developer",
+          "source": "jd",
+          "quote": "1. Tuyển AI Developer : số lượng tuyển: 02"
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "company",
+      "value": "Tinh Vân",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "company",
+          "value": "CÔNG TY CỔ PHẦN CÔNG NGHỆ PHẦN MỀM TINH VÂN",
+          "source": "jd",
+          "quote": "CÔNG TY CỔ PHẦN CÔNG NGHỆ PHẦN MỀM TINH VÂN"
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "agency",
+      "value": "",
+      "status": "MISSING",
+      "candidates": [],
+      "reviewed": false
+    },
+    {
+      "field": "contactNotes",
+      "value": "recruiter@example.com",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "contactNotes",
+          "value": "recruiter@example.com",
+          "source": "post",
+          "quote": "- Gửi CV về mail: recruiter@example.com"
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "location",
+      "value": "Quận 7, TP.HCM",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "location",
+          "value": "HCM",
+          "source": "post",
+          "quote": "[HCM] Domain Insurance công ty mình đang cần tìm các bạn:"
+        },
+        {
+          "field": "location",
+          "value": "quận 7",
+          "source": "post",
+          "quote": "- Làm việc quận 7"
+        },
+        {
+          "field": "location",
+          "value": "quận 7, HCM",
+          "source": "jd",
+          "quote": "- Làm việc onsite tại quận 7, HCM."
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "workMode",
+      "value": "Onsite",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "workMode",
+          "value": "onsite",
+          "source": "jd",
+          "quote": "- Làm việc onsite tại quận 7, HCM."
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "employmentType",
+      "value": "",
+      "status": "MISSING",
+      "candidates": [],
+      "reviewed": false
+    },
+    {
+      "field": "seniority",
+      "value": "",
+      "status": "MISSING",
+      "candidates": [],
+      "reviewed": false
+    },
+    {
+      "field": "skills",
+      "value": "AI application development\nPython\nAI/ML",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "skills",
+          "value": "phát triển AI",
+          "source": "jd",
+          "quote": "- Bắt buộc có kinh nghiệm thực tế phát triển AI."
+        },
+        {
+          "field": "skills",
+          "value": "Python",
+          "source": "jd",
+          "quote": "- Thành thạo Python và các framework AI/ML."
+        },
+        {
+          "field": "skills",
+          "value": "AI/ML",
+          "source": "jd",
+          "quote": "- Thành thạo Python và các framework AI/ML."
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "preferredSkills",
+      "value": "Backend Java\nVoicebot",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "preferredSkills",
+          "value": "BE Java",
+          "source": "post",
+          "quote": "- Từ 3 năm KN, ưu tiên làm BE Java"
+        },
+        {
+          "field": "preferredSkills",
+          "value": "voicebot",
+          "source": "jd",
+          "quote": "- Ưu tiên kinh nghiệm voicebot."
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "experience",
+      "value": "Minimum 3 years",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "experience",
+          "value": "Từ 3 năm",
+          "source": "post",
+          "quote": "- Từ 3 năm KN, ưu tiên làm BE Java"
+        },
+        {
+          "field": "experience",
+          "value": "Tối thiểu 3 năm",
+          "source": "jd",
+          "quote": "- Tối thiểu 3 năm kinh nghiệm phát triển phần mềm."
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "domain",
+      "value": "Insurance",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "domain",
+          "value": "Insurance",
+          "source": "post",
+          "quote": "[HCM] Domain Insurance công ty mình đang cần tìm các bạn:"
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "salary",
+      "value": "23M-25M gross",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "salary",
+          "value": "23-25M gross",
+          "source": "post",
+          "quote": "- Lương từ 23-25M gross"
+        },
+        {
+          "field": "salary",
+          "value": "23M-25M",
+          "source": "jd",
+          "quote": "- Lương 23M-25M."
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "originalLink",
+      "value": "",
+      "status": "MISSING",
+      "candidates": [],
+      "reviewed": false
+    }
+  ],
+  "postText": "[HCM] Domain Insurance công ty mình đang cần tìm các bạn:\n\nAI Developer\n\n- Từ 3 năm KN, ưu tiên làm BE Java\n- Lương từ 23-25M gross\n- Làm việc quận 7\n- Gửi CV về mail: recruiter@example.com",
+  "jdText": "CÔNG TY CỔ PHẦN CÔNG NGHỆ PHẦN MỀM TINH VÂN\n\n1. Tuyển AI Developer : số lượng tuyển: 02\n\n- Nghiên cứu, phát triển và triển khai các giải pháp AI.\n- Xây dựng, tích hợp và tối ưu các mô hình AI/ML, LLM.\n- Làm việc onsite tại quận 7, HCM.\n- Tối thiểu 3 năm kinh nghiệm phát triển phần mềm.\n- Bắt buộc có kinh nghiệm thực tế phát triển AI.\n- Thành thạo Python và các framework AI/ML.\n- Ưu tiên kinh nghiệm voicebot.\n- Lương 23M-25M.",
+  "description": "Recruitment post\n[HCM] Domain Insurance công ty mình đang cần tìm các bạn:\n\nAI Developer\n\n- Từ 3 năm KN, ưu tiên làm BE Java\n- Lương từ 23-25M gross\n- Làm việc quận 7\n- Gửi CV về mail: recruiter@example.com\n\nJob description document\nCÔNG TY CỔ PHẦN CÔNG NGHỆ PHẦN MỀM TINH VÂN\n\n1. Tuyển AI Developer : số lượng tuyển: 02\n\n- Nghiên cứu, phát triển và triển khai các giải pháp AI.\n- Xây dựng, tích hợp và tối ưu các mô hình AI/ML, LLM.\n- Làm việc onsite tại quận 7, HCM.\n- Tối thiểu 3 năm kinh nghiệm phát triển phần mềm.\n- Bắt buộc có kinh nghiệm thực tế phát triển AI.\n- Thành thạo Python và các framework AI/ML.\n- Ưu tiên kinh nghiệm voicebot.\n- Lương 23M-25M.",
+  "warnings": [],
+  "error": null
+}

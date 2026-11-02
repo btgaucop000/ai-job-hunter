@@ -5,6 +5,16 @@ import { EXTRACTION_LIMITS as limits } from './extraction.limits.js';
 import { validateDocumentInput } from './extraction.validation.js';
 import { validateParseResponse } from './parser.protocol.js';
 import type { ParsedDocument } from './parser.protocol.js';
+import {
+  currentPdfParserDiagnosticRequestId,
+  emitPdfParserDiagnostic,
+  pdfParserDiagnosticsEnabled,
+} from './pdf-parser.diagnostics.js';
+import type {
+  PdfFailurePhase,
+  PdfWorkerFailureDiagnostic,
+  PdfWorkerStatus,
+} from './pdf-parser.diagnostics.js';
 
 type WorkerFactory = (url: URL, options: WorkerOptions) => Worker;
 interface ActiveParse {
@@ -32,6 +42,20 @@ export class DocumentParser {
     if (this.active) throw new ExtractionError('PARSER_BUSY');
     const format = validateDocumentInput(input);
     const bytes = new Uint8Array(input.bytes as Uint8Array); // Do not detach caller memory.
+    const diagnosticsEnabled =
+      format === 'pdf' && pdfParserDiagnosticsEnabled();
+    const diagnosticRequestId = currentPdfParserDiagnosticRequestId();
+    let diagnosticEmitted = false;
+    const report = (
+      diagnostic: PdfWorkerFailureDiagnostic,
+      status: PdfWorkerStatus,
+    ) => {
+      if (!diagnosticsEnabled || diagnosticEmitted) return;
+      diagnosticEmitted = true;
+      emitPdfParserDiagnostic(diagnostic, status, diagnosticRequestId);
+    };
+    const reportBoundary = (phase: PdfFailurePhase, status: PdfWorkerStatus) =>
+      report({ phase, category: 'OTHER', recoveryAttempted: false }, status);
     let resolveResult!: (value: ParsedDocument) => void;
     let rejectResult!: (error: ExtractionError) => void;
     const resultPromise = new Promise<ParsedDocument>((resolve, reject) => {
@@ -81,6 +105,7 @@ export class DocumentParser {
     };
     const failClosed = () => {
       if (confirmed || finished) return;
+      reportBoundary('WORKER_IPC', 'ERROR');
       this.unavailable = true;
       failure ??= new ExtractionError('PARSER_UNAVAILABLE');
       result.reject(failure);
@@ -105,18 +130,29 @@ export class DocumentParser {
       immediate = false,
     ) {
       if (finished) return;
-      failure ??= new ExtractionError(code);
+      failure ??= new ExtractionError(
+        code,
+        undefined,
+        format === 'docx' && code === 'PARSING_FAILED'
+          ? 'WORKER_FAILED'
+          : undefined,
+      );
       terminal = true;
       if (immediate) result.reject(failure);
       terminate();
     }
-    const deadline = setTimeout(
-      () => fail('PARSING_TIMEOUT', true),
-      limits.parserTimeoutMs,
-    );
+    const deadline = setTimeout(() => {
+      reportBoundary('WORKER_IPC', 'TIMEOUT');
+      fail('PARSING_TIMEOUT', true);
+    }, limits.parserTimeoutMs);
     try {
       worker = this.makeWorker(new URL('./parser.worker.js', import.meta.url), {
-        workerData: { version: 1, format, bytes },
+        workerData: {
+          version: 1,
+          format,
+          bytes,
+          diagnostics: diagnosticsEnabled,
+        },
         transferList: [bytes.buffer],
         execArgv: ['--no-addons'],
         env: {},
@@ -135,21 +171,57 @@ export class DocumentParser {
           if (response.ok) {
             if (response.result.source.format !== format) throw new Error();
             value = response.result;
-          } else failure = new ExtractionError(response.code);
+          } else {
+            if (format !== 'docx' && response.docxFailure) throw new Error();
+            failure = new ExtractionError(
+              response.code,
+              undefined,
+              format === 'docx' ? response.docxFailure : undefined,
+            );
+            report(
+              response.diagnostic ?? {
+                phase: 'WORKER_STARTUP',
+                category: 'OTHER',
+                recoveryAttempted: false,
+              },
+              'MESSAGE',
+            );
+          }
         } catch {
-          failure = new ExtractionError('PARSING_FAILED');
+          failure = new ExtractionError(
+            'PARSING_FAILED',
+            undefined,
+            format === 'docx' ? 'WORKER_FAILED' : undefined,
+          );
+          reportBoundary('RESULT_VALIDATION', 'MESSAGE');
         }
         terminate();
       });
-      worker.on('error', () => fail('PARSING_FAILED'));
-      worker.on('messageerror', () => fail('PARSING_FAILED'));
+      worker.on('error', () => {
+        reportBoundary('WORKER_IPC', 'ERROR');
+        fail('PARSING_FAILED');
+      });
+      worker.on('messageerror', () => {
+        reportBoundary('WORKER_IPC', 'MESSAGE_ERROR');
+        fail('PARSING_FAILED');
+      });
       worker.once('exit', (code: number) => {
-        if (!terminal || (code !== 0 && !terminating))
+        if (!terminal || (code !== 0 && !terminating)) {
+          reportBoundary(
+            'WORKER_IPC',
+            code === 0 ? 'EXIT_ZERO' : 'EXIT_NONZERO',
+          );
           failure ??= new ExtractionError('PARSING_FAILED');
+        }
         observeTermination();
       });
     } catch {
-      failure = new ExtractionError('PARSING_FAILED');
+      failure = new ExtractionError(
+        'PARSING_FAILED',
+        undefined,
+        format === 'docx' ? 'WORKER_FAILED' : undefined,
+      );
+      reportBoundary('WORKER_STARTUP', 'ERROR');
       if (worker) terminate();
       else {
         confirmed = true;

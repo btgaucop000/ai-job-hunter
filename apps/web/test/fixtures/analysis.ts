@@ -67,6 +67,7 @@ export function completed(): Extract<
       },
       extractionWarnings: [
         { document: 'cv', warning: { code: 'PAGE_WITHOUT_TEXT', page: 2 } },
+        { document: 'cv', warning: { code: 'PDF_RECOVERY_USED' } },
         {
           document: 'jd',
           warning: { code: 'EXTRACTION_COMPLETENESS_NOT_VERIFIED' },

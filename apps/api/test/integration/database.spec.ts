@@ -1,3 +1,4 @@
+import { CompleteJobImportFields1793490000000 } from '../../src/database/migrations/1793490000000-CompleteJobImportFields.js';
 import 'reflect-metadata';
 import { afterAll, beforeAll, expect, test } from '@jest/globals';
 import { Test } from '@nestjs/testing';
@@ -46,17 +47,55 @@ test('applies the application schema migration', async () => {
     ),
   ).toEqual([{ schema_name: 'ai_job_hunter' }]);
 });
-test('reverts and reapplies the migration', async () => {
-  await database.undoLastMigration();
+test('reverts and reapplies the complete import fields migration without losing an older job', async () => {
+  const [existing] = await database.query(
+    `SELECT count(*)::int AS count FROM ai_job_hunter.opportunities WHERE experience<>'' OR "preferredSkills"<>'' OR domain<>''`,
+  );
+  expect(existing.count).toBe(0);
+  const [seed] = await database.query(
+    `INSERT INTO ai_job_hunter.opportunities ("ownerId",title,company,source,status,"originalLink","contactNotes",description,notes,"contactDates","followUpDate") VALUES ('00000000-0000-4000-8000-000000000001','Synthetic migration preservation','Example Company','Other','APPLIED','','','','Synthetic tracking notes','["2026-10-30"]'::jsonb,'2026-11-02') RETURNING id`,
+  );
+  const runner = database.createQueryRunner();
+  await runner.connect();
+  const migration = new CompleteJobImportFields1793490000000();
   try {
+    await migration.down(runner);
     expect(
       await database.query(
-        "SELECT schema_name FROM information_schema.schemata WHERE schema_name='ai_job_hunter'",
+        "SELECT column_name FROM information_schema.columns WHERE table_schema='ai_job_hunter' AND table_name='opportunities' AND column_name='experience'",
       ),
     ).toEqual([]);
-    expect(await database.showMigrations()).toBe(true);
+    const [old] = await database.query(
+      'SELECT title,status,notes,"contactDates","followUpDate"::text FROM ai_job_hunter.opportunities WHERE id=$1',
+      [seed.id],
+    );
+    expect(old).toEqual({
+      title: 'Synthetic migration preservation',
+      status: 'APPLIED',
+      notes: 'Synthetic tracking notes',
+      contactDates: ['2026-10-30'],
+      followUpDate: '2026-11-02',
+    });
+    expect(await database.showMigrations()).toBe(false);
   } finally {
-    await database.runMigrations();
+    await migration.up(runner);
+    await runner.release();
+    try {
+      const [restored] = await database.query(
+        'SELECT experience,"preferredSkills",domain FROM ai_job_hunter.opportunities WHERE id=$1',
+        [seed.id],
+      );
+      expect(restored).toEqual({
+        experience: '',
+        preferredSkills: '',
+        domain: '',
+      });
+    } finally {
+      await database.query(
+        "DELETE FROM ai_job_hunter.opportunities WHERE id=$1 AND title='Synthetic migration preservation'",
+        [seed.id],
+      );
+    }
   }
   expect(await database.showMigrations()).toBe(false);
 });

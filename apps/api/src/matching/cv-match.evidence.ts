@@ -1,0 +1,131 @@
+import { normalize } from './matching.policy.js';
+import type { MatchRequirement } from './cv-match.js';
+
+// Narrow recovery for explicit evidence, not fuzzy matching of arbitrary skills.
+export function recoveredCvQuote(item: MatchRequirement, cv: string): string {
+  const requirement = normalize(item.requirement);
+  const javaBackend =
+    requirement === 'java' ||
+    (/\bmanaged languages?\b/u.test(requirement) &&
+      /\b(?:at least one|one of|either)\b/u.test(requirement) &&
+      !/\b(?:not|except|excluding|without)\b/u.test(requirement) &&
+      /\bjava\b/u.test(requirement)) ||
+    /^(?:backend[\s—–-]+java|java[\s—–-]+backend|java spring boot)$/u.test(
+      requirement,
+    );
+  const minimum =
+    item.category === 'experience'
+      ? /^(?:(?:minimum|at least|min\.?)\s+)?(\d+)\+?\s+(?:years?|yrs?)(?:\s+(?:of\s+)?(?:(?:professional|overall|software development|software|development|working)\s+)?experience)?$/u.exec(
+          requirement,
+        )
+      : null;
+  if (!javaBackend && !minimum) return '';
+  for (const line of cv.split(/[\r\n\u2028\u2029]+/u)) {
+    if (!line.trim() || line.length > 2000) continue;
+    const text = normalize(line);
+    // Do not turn negation, aspirations or AI-tool usage into qualifications.
+    if (
+      /\b(?:no|not|without|never|seeking|aspiring|interested|aspiration|copilot|chatgpt)\b|ai[- ]assisted|\b(?:không|chưa)\b/u.test(
+        text,
+      )
+    )
+      continue;
+    if (
+      javaBackend &&
+      /\bjava\b/u.test(text) &&
+      (/^\s*(?:(?:technical )?skills\s*[:—–-]|(?:technical skills[:\s]*)?backend\s*[:—–-])/u.test(
+        text,
+      ) ||
+        (/\bjava\s+spring\s+boot\b/u.test(text) &&
+          /\b(?:led|built|developed|development|implemented|using)\b/u.test(
+            text,
+          )))
+    )
+      return line;
+    if (minimum) {
+      const years =
+        /\b(\d+)\+?\s+(?:years?|yrs?)\s+(?:of\s+)?(?:professional\s+)?experience\s+(?:(?:building|developing)\s+(?:enterprise\s+)?(?:applications|software|systems|services)|in software|in enterprise)\b/u.exec(
+          text,
+        );
+      if (years && Number(years[1]) >= Number(minimum[1])) return line;
+      // Use an explicit stated role duration, never sum potentially overlapping roles.
+      const span =
+        /\b(\d+)\s+(?:yrs?|years?)(?:\s+(\d+)\s+(?:mos?|months?))?\b/u.exec(
+          text,
+        );
+      const datedRole =
+        /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\s*[–—-]\s*(?:[a-z]+\s+\d{4}|present)\b/u.test(
+          text,
+        );
+      if (
+        span &&
+        datedRole &&
+        Number(span[1]) * 12 + Number(span[2] ?? 0) >= Number(minimum[1]) * 12
+      )
+        return line;
+    }
+  }
+  return '';
+}
+
+// Resolve only whitespace differences, preserving an exact original source span.
+// No case folding, Unicode normalization, punctuation repair or semantic search.
+export function resolveCvQuote(source: string, quote: string): string | null {
+  if (!quote.trim()) return null;
+  if (source.includes(quote)) return quote;
+  const target = quote.replace(/\s+/gu, ' ').trim();
+  let text = '';
+  const starts: number[] = [];
+  const ends: number[] = [];
+  for (let i = 0; i < source.length;) {
+    const start = i;
+    if (/\s/u.test(source[i]!)) {
+      while (i < source.length && /\s/u.test(source[i]!)) i++;
+      text += ' ';
+    } else {
+      text += source[i]!;
+      i++;
+    }
+    starts.push(start);
+    ends.push(i);
+  }
+  const index = text.indexOf(target);
+  if (index < 0 || text.indexOf(target, index + 1) >= 0) return null;
+  const original = source.slice(starts[index], ends[index + target.length - 1]);
+  return original.replace(/\s+/gu, ' ').trim() === target ? original : null;
+}
+
+// Constrain model quote selection to original passages, never generated prose.
+export function cvQuoteChoices(source: string): string[] {
+  const spans: { start: number; end: number }[] = [];
+  for (const match of source.matchAll(/[^\r\n\u2028\u2029]+/gu)) {
+    const line = match[0];
+    let start = match.index;
+    const end = start + line.length;
+    while (start < end) {
+      let next = Math.min(start + 1000, end);
+      if (next < end) {
+        const boundary = source.lastIndexOf(' ', next);
+        if (boundary > start) next = boundary;
+      }
+      const text = source.slice(start, next).trim();
+      if (text) {
+        const offset = source.indexOf(text, start);
+        spans.push({ start: offset, end: offset + text.length });
+      }
+      start = next;
+    }
+  }
+  const choices = new Set<string>(['']);
+  for (let i = 0; i < spans.length; i++) {
+    for (let j = i; j < Math.min(i + 3, spans.length); j++) {
+      const quote = source.slice(spans[i]!.start, spans[j]!.end);
+      if (quote.length > 2000) break;
+      choices.add(quote);
+      const compact = quote.replace(/\s+/gu, ' ').trim();
+      if (compact !== quote && resolveCvQuote(source, compact) !== null)
+        choices.add(compact);
+    }
+  }
+  return [...choices];
+}

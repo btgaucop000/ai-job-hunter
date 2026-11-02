@@ -13,7 +13,10 @@ Limits: at most 1000 UTF-16 units per value/quote, two evidence references per f
 const kindInstructions = {
   cv: `Extract CV name, email, phone, location, skills (name and experienceText), experience (employer, title, startDateText, endDateText, descriptionText), and education (institution, qualification, dateText).
 Enumerate every explicitly supported skill, including every item in a skill list and skills without stated durations. For each skill with an explicitly stated duration, copy that duration verbatim into skills[].experienceText.value with supporting evidence for that skill. If a skill has no explicitly stated experience, set experienceText to {"value":null,"evidence":[]}; do not omit the skill. Never invent years or copy the skill name into experienceText.
-Do not repeat an exact skill name. Employment/education records with identical values are distinct only when their source evidence references differ.`,
+Do not repeat an exact skill name. Employment/education records with identical values are distinct only when their source evidence references differ.
+Return compact JSON with no indentation or optional formatting whitespace outside string values. Preserve all whitespace inside verbatim values and quotes.
+Schema array maxima are upper bounds, not targets; do not add entries to reach them. Preserve exhaustive extraction of supported facts within the existing limits.
+When one evidence reference fully supports a fact, avoid unnecessary additional references. Preserve multiple references when needed for duration linkage, qualification, negation, uncertainty, attribution or conflicting evidence, within the existing two-reference limit. Never shorten quotes at the expense of uniqueness or supporting context.`,
   jd: `Extract JD title, company, location, employmentType, compensationText, requirements (text and priority), and responsibilities.
 Requirement priority is null unless a quoted passage explicitly associates the requirement with the whole-word cue required or preferred. Priority evidence must enclose the requirement evidence in the same segment. Never infer priority from ordering or importance.
 Do not repeat exact requirement or responsibility text, including requirements with conflicting priorities.`,

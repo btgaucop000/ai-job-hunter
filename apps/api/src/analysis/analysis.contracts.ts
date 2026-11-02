@@ -1,3 +1,4 @@
+import type { PartialDocument } from '../extraction/partial-extraction.types.js';
 import type { MatchingResult } from '../matching/matching.types.js';
 import type { ExtractionDiagnostic } from '../extraction/extraction.diagnostics.js';
 import type { AnalysisErrorCode } from './analysis.errors.js';
@@ -18,13 +19,27 @@ export interface AnalysisErrorDto {
   code: AnalysisErrorCode;
   diagnostic: ExtractionDiagnostic | null;
 }
+// Source visibility is separate from extraction-v1. A parsed document never
+// implies validated facts; null facts cannot enter the matching service.
+export interface AnalysisDocumentDto {
+  partial?: PartialDocument;
+  text: string;
+  facts: readonly { path: string; value: string | null }[] | null;
+}
+export interface AnalysisDocumentsDto {
+  cv: AnalysisDocumentDto | null;
+  jd: AnalysisDocumentDto | null;
+}
 interface ResponseBase {
+  documents?: AnalysisDocumentsDto;
   contractVersion: '1';
   requestId: string;
   stages: StageSummary;
 }
 export type AnalysisResponseDto = ResponseBase &
   (
+    | { outcome: 'PARTIAL'; result: null; error: null }
+    | { outcome: 'PARSED'; result: null; error: null }
     | { outcome: 'COMPLETED'; result: MatchingResultDto; error: null }
     | { outcome: 'INCOMPLETE'; result: null; error: AnalysisErrorDto }
   );

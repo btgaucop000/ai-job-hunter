@@ -1,0 +1,143 @@
+{
+  "postText": "Synthetic recruitment post for verification only.\nJob title: Synthetic Backend Engineer\nRecruitment agency: Example Talent Agency\nRecruiter/contact: Alex Example, synthetic.recruiter@example.com\nWork mode: Remote\nOriginal URL: https://example.com/synthetic-job",
+  "jdText": "Hiring company: Example Labs\n\nWork mode: Hybrid\n\nLocation: Example City\n\nEmployment type: Full-time\n\nRequired skill: TypeScript",
+  "description": "Recruitment post\nSynthetic recruitment post for verification only.\nJob title: Synthetic Backend Engineer\nRecruitment agency: Example Talent Agency\nRecruiter/contact: Alex Example, synthetic.recruiter@example.com\nWork mode: Remote\nOriginal URL: https://example.com/synthetic-job\n\nJob description document\nHiring company: Example Labs\n\nWork mode: Hybrid\n\nLocation: Example City\n\nEmployment type: Full-time\n\nRequired skill: TypeScript",
+  "warnings": ["IMAGE_CONTENT_NOT_INTERPRETED"],
+  "rejected": 1,
+  "fields": [
+    {
+      "field": "title",
+      "value": "",
+      "status": "MISSING",
+      "candidates": [],
+      "reviewed": false
+    },
+    {
+      "field": "company",
+      "value": "Example Labs",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "company",
+          "value": "Example Labs",
+          "source": "jd",
+          "quote": "Hiring company: Example Labs"
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "agency",
+      "value": "Example Talent Agency",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "agency",
+          "value": "Example Talent Agency",
+          "source": "post",
+          "quote": "Recruitment agency: Example Talent Agency"
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "contactNotes",
+      "value": "",
+      "status": "MISSING",
+      "candidates": [],
+      "reviewed": false
+    },
+    {
+      "field": "location",
+      "value": "Example City",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "location",
+          "value": "Example City",
+          "source": "jd",
+          "quote": "Location: Example City"
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "workMode",
+      "value": "",
+      "status": "CONFLICT",
+      "candidates": [
+        {
+          "field": "workMode",
+          "value": "Remote",
+          "source": "post",
+          "quote": "Work mode: Remote"
+        },
+        {
+          "field": "workMode",
+          "value": "Hybrid",
+          "source": "jd",
+          "quote": "Work mode: Hybrid"
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "employmentType",
+      "value": "Full-time",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "employmentType",
+          "value": "Full-time",
+          "source": "jd",
+          "quote": "Employment type: Full-time"
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "seniority",
+      "value": "",
+      "status": "MISSING",
+      "candidates": [],
+      "reviewed": false
+    },
+    {
+      "field": "skills",
+      "value": "TypeScript",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "skills",
+          "value": "TypeScript",
+          "source": "jd",
+          "quote": "Required skill: TypeScript"
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "salary",
+      "value": "",
+      "status": "MISSING",
+      "candidates": [],
+      "reviewed": false
+    },
+    {
+      "field": "originalLink",
+      "value": "https://example.com/synthetic-job",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "originalLink",
+          "value": "https://example.com/synthetic-job",
+          "source": "post",
+          "quote": "Original URL: https://example.com/synthetic-job"
+        }
+      ],
+      "reviewed": false
+    }
+  ],
+  "error": null,
+  "errorCode": null
+}

@@ -1,0 +1,235 @@
+import { importTopcvPage } from './topcv-page-import.js';
+import { PinnedJobPageTransport } from './job-url.transport.js';
+import { JobUrlImportService } from './job-url-import.js';
+import { CvMatchError } from '../matching/cv-match.error.js';
+import { DiscoveryService } from '../discovery/discovery.service.js';
+import { JobMatchService } from '../matching/job-match.service.js';
+import { JobDocumentError } from './job-document.error.js';
+import { localOpportunitySecurity } from './opportunities.security.js';
+import { JobImportService } from './job-import.service.js';
+import { readJobUpload } from './job-import.upload.js';
+import { Catch, HttpException, UseFilters } from '@nestjs/common';
+import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
+import type { ServerResponse } from 'node:http';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Header,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Put,
+  Req,
+  Res,
+} from '@nestjs/common';
+import type { IncomingMessage } from 'node:http';
+import { OpportunitiesService } from './opportunities.service.js';
+import { checkAnalysisSecurity } from '../analysis/analysis-security.js';
+import { EXTRACTION_LIMITS } from '../extraction/extraction.limits.js';
+function localWrite(req: IncomingMessage) {
+  try {
+    checkAnalysisSecurity(
+      req,
+      localOpportunitySecurity(Number(process.env.API_PORT ?? 3000)),
+    );
+  } catch {
+    throw new ForbiddenException(
+      'Local browser requests only. Open http://127.0.0.1:5173 or http://localhost:5173; a single local Host and Origin are required.',
+    );
+  }
+}
+@Catch()
+export class OpportunityErrors implements ExceptionFilter {
+  catch(error: unknown, host: ArgumentsHost): void {
+    const response = host.switchToHttp().getResponse<ServerResponse>();
+    const status = error instanceof HttpException ? error.getStatus() : 503;
+    response.statusCode = status;
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('Connection', 'close');
+    response.setHeader('Content-Type', 'application/json');
+    response.end(
+      JSON.stringify({
+        statusCode: status,
+        ...(error instanceof CvMatchError ? { errorCode: error.errorCode } : {}),
+        ...(error instanceof JobDocumentError
+          ? {
+              errorCode: error.errorCode,
+              parserReason: error.parserReason ?? null,
+            }
+          : {}),
+        message:
+          error instanceof HttpException
+            ? error.message
+            : 'Opportunity storage unavailable. Retry later.',
+      }),
+    );
+  }
+}
+@Controller('opportunities')
+@UseFilters(OpportunityErrors)
+export class OpportunitiesController {
+  private readonly urlImports = new JobUrlImportService(new PinnedJobPageTransport());
+  constructor(
+    private readonly opportunities: OpportunitiesService,
+    private readonly imports: JobImportService,
+    private readonly matches: JobMatchService,
+    private readonly discovery: DiscoveryService,
+  ) {}
+  @Get() @Header('Cache-Control', 'no-store') list() {
+    return this.opportunities.list();
+  }
+  @Post('import-url') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  importUrl(@Req() req: IncomingMessage, @Body() body: unknown) {
+    localWrite(req);
+    const url = body && typeof body === 'object' && !Array.isArray(body)
+      ? (body as Record<string, unknown>).url : undefined;
+    return this.urlImports.preview(url);
+  }
+  @Post('import-page') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  importPage(@Req() req: IncomingMessage, @Body() body: unknown) {
+    localWrite(req);
+    return importTopcvPage(body);
+  }
+  @Post('discover') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  discover(@Req() req: IncomingMessage, @Body() body: unknown) {
+    localWrite(req);
+    return this.discovery.discover(body);
+  }
+  @Get('cv/current') @Header('Cache-Control', 'no-store')
+  cv() {
+    return this.matches.cv();
+  }
+  @Post('cv/current') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  async saveCv(@Req() req: IncomingMessage) {
+    localWrite(req);
+    return this.matches.saveCv((await readJobUpload(req)).document);
+  }
+  @Post(':id/match') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  match(@Req() req: IncomingMessage, @Param('id', new ParseUUIDPipe()) id: string) {
+    localWrite(req);
+    return this.matches.analyze(id);
+  }
+  @Get(':id') @Header('Cache-Control', 'no-store') get(
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.opportunities.get(id);
+  }
+  @Post() async create(@Req() req: IncomingMessage, @Body() body: unknown) {
+    localWrite(req);
+    if (req.headers['content-type']?.startsWith('multipart/form-data')) {
+      const upload = await readJobUpload(req);
+      return this.opportunities.create(upload.record, upload.document);
+    }
+    return this.opportunities.create(body);
+  }
+  @Put(':id') async update(
+    @Req() req: IncomingMessage,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() body: unknown,
+  ) {
+    localWrite(req);
+    if (req.headers['content-type']?.startsWith('multipart/form-data')) {
+      const upload = await readJobUpload(req);
+      return this.opportunities.update(id, upload.record, upload.document);
+    }
+    return this.opportunities.update(id, body);
+  }
+  @Post('extract')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  async extract(@Req() req: IncomingMessage) {
+    localWrite(req);
+    return this.imports.extract(await readJobUpload(req));
+  }
+  @Post(':id/extract')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  async extractExisting(
+    @Req() req: IncomingMessage,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    localWrite(req);
+    const row = await this.opportunities.get(id);
+    const upload = await readJobUpload(req);
+    if (row.documentName) {
+      if (upload.document)
+        throw new BadRequestException('The original JD is preserved.');
+      upload.document = await this.opportunities.document(id);
+    }
+    return this.imports.extract(upload);
+  }
+  @Get(':id/document')
+  async download(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Res() res: ServerResponse,
+  ) {
+    const document = await this.opportunities.document(id);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent(document.fileName).replace(/'/g, '%27')}`,
+    );
+    res.end(document.bytes);
+  }
+  @Post('parse-document')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  async parse(@Req() req: IncomingMessage) {
+    localWrite(req);
+    const type = req.headers['content-type'];
+    const extension =
+      type === 'application/pdf'
+        ? 'pdf'
+        : type ===
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          ? 'docx'
+          : null;
+    if (!extension)
+      throw new BadRequestException(
+        'Only PDF and DOCX are supported. Paste text for other formats.',
+      );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const bytes = await new Promise<Buffer>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        const fail = () => {
+          req.pause();
+          reject(new BadRequestException('Upload failed or exceeds 5 MiB.'));
+        };
+        timer = setTimeout(fail, 15000);
+        req.on('data', (chunk: Buffer) => {
+          size += chunk.length;
+          if (size > EXTRACTION_LIMITS.fileBytes) {
+            fail();
+            return;
+          }
+          chunks.push(chunk);
+        });
+        req.once('end', () => resolve(Buffer.concat(chunks)));
+        req.once('error', fail);
+        req.once('aborted', fail);
+      });
+      clearTimeout(timer);
+      const parsed = await this.imports.parse({
+        bytes,
+        fileName: `job.${extension}`,
+        mediaType: type!,
+      });
+      return { text: parsed.source.text, warnings: parsed.warnings };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException(
+        'Could not parse document. Paste JD text instead.',
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}

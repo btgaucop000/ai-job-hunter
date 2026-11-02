@@ -5,6 +5,11 @@ import { DocumentParser } from '../../src/extraction/document-parser.js';
 import { EXTRACTION_LIMITS as limits } from '../../src/extraction/extraction.limits.js';
 import { pdfInput } from '../support/pdf-fixtures.js';
 import { docxInput } from '../support/docx-fixtures.js';
+import {
+  configurePdfParserDiagnostics,
+  withPdfParserDiagnosticRequest,
+} from '../../src/extraction/pdf-parser.diagnostics.js';
+import type { PdfParserDiagnosticRecord } from '../../src/extraction/pdf-parser.diagnostics.js';
 
 class FakeWorker extends EventEmitter {
   terminate = jest.fn<() => Promise<number>>(() => new Promise(() => {}));
@@ -29,6 +34,7 @@ const success = {
 };
 afterEach(() => {
   jest.useRealTimers();
+  configurePdfParserDiagnostics(false, '127.0.0.1', () => {});
 });
 
 test('holds active slot and successful result until exit, then recovers', async () => {
@@ -65,11 +71,18 @@ test('fulfilled terminate confirms exit without an exit event', async () => {
 });
 test('timeout rejects promptly, ignores late messages and holds slot until termination', async () => {
   jest.useFakeTimers();
+  const records: PdfParserDiagnosticRecord[] = [];
+  configurePdfParserDiagnostics(true, '127.0.0.1', (record) =>
+    records.push(record),
+  );
   const worker = new FakeWorker();
   const parser = new DocumentParser(() => worker.asWorker());
-  const pending = expect(parser.parse(pdfInput())).rejects.toMatchObject({
-    code: 'PARSING_TIMEOUT',
-  });
+  const pending = expect(
+    withPdfParserDiagnosticRequest(
+      '7ef4cc66-c25b-4db2-a846-740165d06d22',
+      () => parser.parse(pdfInput()),
+    ),
+  ).rejects.toMatchObject({ code: 'PARSING_TIMEOUT' });
   await jest.advanceTimersByTimeAsync(limits.parserTimeoutMs);
   await pending;
   worker.emit('message', success);
@@ -79,6 +92,15 @@ test('timeout rejects promptly, ignores late messages and holds slot until termi
   expect(worker.terminate).toHaveBeenCalledTimes(1);
   worker.emit('exit', 1);
   await parser.close();
+  expect(records).toEqual([
+    {
+      requestId: '7ef4cc66-c25b-4db2-a846-740165d06d22',
+      phase: 'WORKER_IPC',
+      category: 'OTHER',
+      recoveryAttempted: false,
+      workerStatus: 'TIMEOUT',
+    },
+  ]);
   expect(jest.getTimerCount()).toBe(0);
 });
 test.each(['reject', 'throw', 'never'] as const)(
@@ -109,9 +131,19 @@ test.each(['reject', 'throw', 'never'] as const)(
     expect(jest.getTimerCount()).toBe(0);
   },
 );
-test.each(['error', 'messageerror', 'exit', 'malformed'] as const)(
+test.each([
+  ['error', 'WORKER_IPC', 'ERROR', 1],
+  ['messageerror', 'WORKER_IPC', 'MESSAGE_ERROR', 1],
+  ['exit-zero', 'WORKER_IPC', 'EXIT_ZERO', 0],
+  ['exit-nonzero', 'WORKER_IPC', 'EXIT_NONZERO', 1],
+  ['malformed', 'RESULT_VALIDATION', 'MESSAGE', 1],
+] as const)(
   'sanitizes %s and recovers after observed exit',
-  async (mode) => {
+  async (mode, phase, workerStatus, exitCode) => {
+    const records: PdfParserDiagnosticRecord[] = [];
+    configurePdfParserDiagnostics(true, '127.0.0.1', (record) =>
+      records.push(record),
+    );
     const workers = [new FakeWorker(), new FakeWorker()];
     let next = 0;
     const parser = new DocumentParser(() => workers[next++]!.asWorker());
@@ -121,9 +153,19 @@ test.each(['error', 'messageerror', 'exit', 'malformed'] as const)(
     });
     if (mode === 'malformed')
       workers[0]!.emit('message', { private: 'secret' });
-    else if (mode !== 'exit') workers[0]!.emit(mode, new Error('private'));
-    workers[0]!.emit('exit', 1);
+    else if (mode === 'error' || mode === 'messageerror')
+      workers[0]!.emit(mode, new Error('private'));
+    workers[0]!.emit('exit', exitCode);
     await pending;
+    expect(records).toEqual([
+      {
+        requestId: null,
+        phase,
+        category: 'OTHER',
+        recoveryAttempted: false,
+        workerStatus,
+      },
+    ]);
     const second = parser.parse(pdfInput());
     workers[1]!.emit('message', success);
     workers[1]!.emit('exit', 0);
@@ -133,6 +175,10 @@ test.each(['error', 'messageerror', 'exit', 'malformed'] as const)(
 );
 test('constructor failure releases admission and clears timers', async () => {
   jest.useFakeTimers();
+  const records: PdfParserDiagnosticRecord[] = [];
+  configurePdfParserDiagnostics(true, '127.0.0.1', (record) =>
+    records.push(record),
+  );
   const worker = new FakeWorker();
   let calls = 0;
   const parser = new DocumentParser(() => {
@@ -147,7 +193,58 @@ test('constructor failure releases admission and clears timers', async () => {
   worker.emit('exit', 0);
   await second;
   await parser.close();
+  expect(records).toEqual([
+    {
+      requestId: null,
+      phase: 'WORKER_STARTUP',
+      category: 'OTHER',
+      recoveryAttempted: false,
+      workerStatus: 'ERROR',
+    },
+  ]);
   expect(jest.getTimerCount()).toBe(0);
+});
+
+test('reports a sanitized worker failure once and keeps the parser result unchanged', async () => {
+  const records: PdfParserDiagnosticRecord[] = [];
+  configurePdfParserDiagnostics(true, '127.0.0.1', (record) =>
+    records.push(record),
+  );
+  const worker = new FakeWorker();
+  const parser = new DocumentParser((_url, options) => {
+    expect(options.workerData).toMatchObject({
+      version: 1,
+      format: 'pdf',
+      diagnostics: true,
+    });
+    return worker.asWorker();
+  });
+  const pending = expect(parser.parse(pdfInput())).rejects.toMatchObject({
+    code: 'PARSING_FAILED',
+    message: 'Document parsing failed',
+  });
+  worker.emit('message', {
+    version: 1,
+    ok: false,
+    code: 'PARSING_FAILED',
+    diagnostic: {
+      phase: 'DOCUMENT_LOAD',
+      category: 'PDFJS_DOCUMENT_REJECTED',
+      recoveryAttempted: true,
+    },
+  });
+  worker.emit('exit', 1);
+  await pending;
+  expect(records).toEqual([
+    {
+      requestId: null,
+      phase: 'DOCUMENT_LOAD',
+      category: 'PDFJS_DOCUMENT_REJECTED',
+      recoveryAttempted: true,
+      workerStatus: 'MESSAGE',
+    },
+  ]);
+  await parser.close();
 });
 test('shutdown rejects active call, waits for termination and permanently closes admission', async () => {
   const worker = new FakeWorker();

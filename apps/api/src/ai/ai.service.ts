@@ -1,6 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AI_PROVIDER } from './ai-provider.js';
-import type { AiProvider, GenerationRequest } from './ai-provider.js';
+import type {
+  AiProvider,
+  GenerationRequest,
+  OutputSchema,
+  PartialGenerationExecution,
+} from './ai-provider.js';
 import { AiError } from './ai.errors.js';
 import { compileOutputSchema } from './ai.schema.js';
 
@@ -9,8 +14,33 @@ export class AiService {
   constructor(@Inject(AI_PROVIDER) private readonly provider: AiProvider) {}
 
   async generateStructured(request: GenerationRequest): Promise<unknown> {
-    const { schema, validate } = compileOutputSchema(request.schema);
+    return this.generate(request, request.schema);
+  }
+
+  // Partial extraction validates candidate items independently after decoding.
+  // Keep the stricter model-facing schema while checking its envelope here.
+  generatePartialStructured(
+    request: GenerationRequest & {
+      readonly partial: PartialGenerationExecution;
+    },
+    envelopeSchema: OutputSchema,
+  ): Promise<unknown> {
+    return this.generate(request, envelopeSchema);
+  }
+
+  private async generate(
+    request: GenerationRequest,
+    runtimeSchema: OutputSchema,
+  ): Promise<unknown> {
+    const { schema, validate: validateModel } = compileOutputSchema(
+      request.schema,
+    );
+    const validate =
+      runtimeSchema === request.schema
+        ? validateModel
+        : compileOutputSchema(runtimeSchema).validate;
     const text = await this.provider.generate({
+      ...(request.partial ? { partial: request.partial } : {}),
       prompt: request.prompt,
       schema,
     });

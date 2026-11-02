@@ -24,6 +24,13 @@ import {
   validateJd,
 } from '../src/features/dashboard/analysis-validation';
 import { completed, incomplete } from './fixtures/analysis';
+function renderDashboard() {
+  const view = render(<Dashboard />);
+  fireEvent.click(
+    screen.getByText('Existing CV/JD extraction and fact review'),
+  );
+  return view;
+}
 const cv = () =>
   new File(['synthetic'], 'synthetic.pdf', { type: 'application/pdf' });
 function deferred<T>() {
@@ -40,14 +47,28 @@ const json = (data: unknown, status = 200) =>
 function mockFetch(
   analysis: () => Promise<Response> = async () => json(completed()),
 ) {
-  const fetch = vi.fn((url: string) =>
-    url === '/api/v1/health/ready'
+  const fetch = vi.fn((url: string, options?: RequestInit) => {
+    void options;
+    return url === '/api/v1/health/ready'
       ? Promise.resolve(json({ status: 'ok' }))
-      : url === '/api/v1/analyses'
+      : url === '/api/v1/analyses?mode=partial'
         ? analysis()
-        : Promise.reject(new Error('unexpected URL')),
+        : Promise.reject(new Error('unexpected URL'));
+  });
+  vi.stubGlobal('fetch', (url: string, options?: RequestInit) =>
+    url === '/api/v1/jobs'
+      ? Promise.resolve(
+          json({
+            source: 'Arbeitnow',
+            sourceUrl: 'https://www.arbeitnow.com/api/job-board-api',
+            fetchedAt: '2026-10-30T00:00:00Z',
+            jobs: [],
+            omittedCount: 0,
+            scope: 'Synthetic empty feed',
+          }),
+        )
+      : fetch(url, options),
   );
-  vi.stubGlobal('fetch', fetch);
   return fetch;
 }
 async function fill(text = ' \nSynthetic JD 😀\t') {
@@ -107,7 +128,7 @@ test('JD validates UTF-16, UTF-8, blank text and malformed surrogates without no
 });
 test('accessible empty/validation state and counters', async () => {
   mockFetch();
-  render(<Dashboard />);
+  renderDashboard();
   await submit();
   expect(
     screen.getByText('Choose exactly one PDF or DOCX file.'),
@@ -122,7 +143,7 @@ test('accessible empty/validation state and counters', async () => {
 });
 test('FormData contains exactly the original CV and whitespace-preserved JD', async () => {
   const fetch = mockFetch();
-  render(<Dashboard />);
+  renderDashboard();
   const text = ' \r\nSynthetic 😀\t';
   await fill(text);
   await submit();
@@ -148,7 +169,7 @@ test('FormData contains exactly the original CV and whitespace-preserved JD', as
 test('completed UI preserves zero/null, statuses, coverage, exclusions, warnings and plain evidence', async () => {
   const result = completed();
   mockFetch(async () => json(result));
-  const { container } = render(<Dashboard />);
+  const { container } = renderDashboard();
   await fill();
   await submit();
   expect(
@@ -169,6 +190,7 @@ test('completed UI preserves zero/null, statuses, coverage, exclusions, warnings
     screen.getByText(/Evaluable: 4; excluded: 2; unclassified: 1/),
   ).toBeInTheDocument();
   expect(screen.getByText(/PAGE_WITHOUT_TEXT \(page 2\)/)).toBeInTheDocument();
+  expect(screen.getByText(/CV: PDF_RECOVERY_USED/)).toBeInTheDocument();
   expect(
     screen.getAllByText(/does not establish that the candidate lacks/).length,
   ).toBeGreaterThan(0);
@@ -184,7 +206,7 @@ test('null overall remains not calculable', async () => {
   const data = completed();
   data.result = { ...data.result, overallScore: null };
   mockFetch(async () => json(data));
-  render(<Dashboard />);
+  renderDashboard();
   await fill();
   await submit();
   expect(
@@ -206,7 +228,7 @@ test.each([
   'INCOMPLETE %s shows sanitized stage/code with no score',
   async (status, code) => {
     mockFetch(async () => json(incomplete(code), status));
-    render(<Dashboard />);
+    renderDashboard();
     await fill();
     await submit();
     expect(
@@ -255,10 +277,14 @@ test.each([
       };
     return json(value, value.outcome === 'INCOMPLETE' ? 422 : 200);
   });
-  render(<Dashboard />);
+  renderDashboard();
   await fill();
   await submit();
-  expect(await screen.findByRole('alert')).toHaveTextContent(
+  expect(
+    await within(
+      screen.getByRole('region', { name: 'CV/JD analysis' }),
+    ).findByRole('alert'),
+  ).toHaveTextContent(
     kind === 'network' ? 'Could not reach' : 'invalid or incompatible',
   );
   expect(screen.queryByText(/PRIVATE source/)).toBeNull();
@@ -271,7 +297,7 @@ test('editing clears results; Clear removes inputs, file selection, evidence and
   ];
   const storage = vi.spyOn(Storage.prototype, 'setItem');
   mockFetch();
-  render(<Dashboard />);
+  renderDashboard();
   await fill('Synthetic private JD');
   await submit();
   await screen.findByLabelText('Overall documented requirement support');
@@ -296,7 +322,7 @@ test('editing clears results; Clear removes inputs, file selection, evidence and
 test('processing disables edits; Cancel retains inputs and ignores a late completion', async () => {
   const pending = deferred<Response>();
   const fetch = mockFetch(() => pending.promise);
-  render(<Dashboard />);
+  renderDashboard();
   await fill('Retained JD');
   await submit();
   expect(screen.getByLabelText('Job description')).toBeDisabled();
@@ -420,7 +446,7 @@ test('Clear invalidates a cancelled request before its late response, and blocks
       .mockReturnValueOnce(pending.promise)
       .mockResolvedValue(json(completed())),
   );
-  render(<Dashboard />);
+  renderDashboard();
   await fill('Synthetic retained input');
   await submit();
   await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));

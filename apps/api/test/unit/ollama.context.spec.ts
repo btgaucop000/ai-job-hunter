@@ -1,7 +1,15 @@
 import { afterEach, expect, jest, test } from '@jest/globals';
 import { OllamaProvider } from '../../src/ai/ollama.provider.js';
-import { OLLAMA_CONTEXT_PROFILE as p } from '../../src/ai/ollama.context.js';
+import {
+  OLLAMA_CONTEXT_PROFILE as p,
+  outputBudget,
+} from '../../src/ai/ollama.context.js';
 import { aiConfig } from '../../src/ai/ai.config.js';
+import {
+  configureAiGenerationDiagnostics,
+  withAiGenerationDiagnosticRequest,
+} from '../../src/ai/ai-generation.diagnostics.js';
+import type { FinalLengthDiagnosticRecord } from '../../src/ai/ai-generation.diagnostics.js';
 
 const input = { prompt: 'Synthetic only', schema: { type: 'object' } };
 const model = {
@@ -40,6 +48,7 @@ const provider = () =>
 afterEach(() => {
   jest.restoreAllMocks();
   jest.useRealTimers();
+  configureAiGenerationDiagnostics(false, '127.0.0.1', () => {});
 });
 
 test('admits exactly 6080, discards measurement length output, preserves both request bodies', async () => {
@@ -136,6 +145,48 @@ test('accepts measurement stop and final full output reservation', async () => {
   setup({ 2: result, 4: { ...result, eval_count: 2048 } });
   await expect(provider().generate(input)).resolves.toBe('{}');
 });
+test.each([
+  ['CV', '{"partial":', 'INVALID'],
+  ['JD', '{}', 'VALID'],
+] as const)(
+  'reports sanitized %s final-length metadata and preserves rejection',
+  async (extractionKind, response, jsonSyntax) => {
+    const records: FinalLengthDiagnosticRecord[] = [];
+    configureAiGenerationDiagnostics(true, '127.0.0.1', (record) =>
+      records.push(record),
+    );
+    const mock = setup({
+      4: {
+        ...result,
+        response,
+        done_reason: 'length',
+        eval_count: 2048,
+      },
+    });
+    await expect(
+      withAiGenerationDiagnosticRequest(
+        '7ef4cc66-c25b-4db2-a846-740165d06d22',
+        extractionKind,
+        () => provider().generate(input),
+      ),
+    ).rejects.toMatchObject({ code: 'OUTPUT_LIMIT_EXCEEDED' });
+    expect(records).toEqual([
+      {
+        requestId: '7ef4cc66-c25b-4db2-a846-740165d06d22',
+        extractionKind,
+        reason: 'FINAL_LENGTH',
+        promptTokens: 6080,
+        evalCount: 2048,
+        outputTokenLimit: 2048,
+        jsonSyntax,
+      },
+    ]);
+    expect(JSON.stringify(records)).not.toContain('partial');
+    expect(
+      mock.mock.calls.filter(([url]) => String(url).endsWith('/api/generate')),
+    ).toHaveLength(2);
+  },
+);
 test('rejects unsupported configured model before networking', async () => {
   const mock = jest.spyOn(globalThis, 'fetch');
   await expect(
@@ -220,3 +271,86 @@ test('invalid evidence and provider payloads are not logged or exposed', async (
   expect(warn).not.toHaveBeenCalled();
   expect(error).not.toHaveBeenCalled();
 });
+
+test.each([
+  [1, 4096],
+  [1701, 4096],
+  [4032, 4096],
+  [4033, 4095],
+  [6080, 2048],
+])(
+  'allocates a bounded final budget for %s prompt tokens',
+  async (tokens, budget) => {
+    const envelope = {
+      ...result,
+      prompt_eval_count: tokens,
+      prompt_eval_cached_count: 0,
+    };
+    const mock = setup({
+      2: envelope,
+      4: { ...envelope, eval_count: budget },
+    });
+    expect(await provider().generate(input)).toBe('{}');
+    expect(
+      JSON.parse(mock.mock.calls[4]![1]!.body as string).options.num_predict,
+    ).toBe(budget);
+  },
+);
+
+test('reports the actual dynamic output limit on length rejection', async () => {
+  const records: FinalLengthDiagnosticRecord[] = [];
+  configureAiGenerationDiagnostics(true, '127.0.0.1', (record) =>
+    records.push(record),
+  );
+  const envelope = {
+    ...result,
+    prompt_eval_count: 1701,
+    prompt_eval_cached_count: 0,
+  };
+  setup({
+    2: envelope,
+    4: { ...envelope, eval_count: 4096, done_reason: 'length', response: '{' },
+  });
+  await expect(
+    withAiGenerationDiagnosticRequest(
+      '7ef4cc66-c25b-4db2-a846-740165d06d22',
+      'CV',
+      () => provider().generate(input),
+    ),
+  ).rejects.toMatchObject({ code: 'OUTPUT_LIMIT_EXCEEDED' });
+  expect(records).toHaveLength(1);
+  expect(records[0]).toMatchObject({
+    outputTokenLimit: 4096,
+    evalCount: 4096,
+    jsonSyntax: 'INVALID',
+  });
+});
+
+test('rejects counts above the selected dynamic limit', async () => {
+  const envelope = {
+    ...result,
+    prompt_eval_count: 4033,
+    prompt_eval_cached_count: 0,
+  };
+  setup({ 2: envelope, 4: { ...envelope, eval_count: 4096 } });
+  await expect(provider().generate(input)).rejects.toMatchObject({
+    code: 'MALFORMED_RESPONSE',
+  });
+});
+
+test.each([6081, 8192])(
+  'refuses a subminimum budget for %s prompt tokens',
+  (tokens) => {
+    expect(() => outputBudget(tokens)).toThrow(
+      'AI prompt exceeds the context budget',
+    );
+  },
+);
+test.each([0, -1, NaN, Infinity, 1.5])(
+  'rejects invalid measured token count %s',
+  (tokens) => {
+    expect(() => outputBudget(tokens)).toThrow(
+      'AI provider returned a malformed response',
+    );
+  },
+);

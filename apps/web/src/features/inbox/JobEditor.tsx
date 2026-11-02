@@ -1,0 +1,1293 @@
+import { SourceJdPreview } from './SourceJdPreview';
+import { ImportMethodCards, type ImportMethod } from './ImportMethodCards';
+import { JobActionLayout } from './JobActionLayout';
+import { RequirementInputs } from './RequirementInputs';
+import { UnsavedJobGuard } from './UnsavedJobGuard';
+import { TopcvBookmarkletInstall } from './TopcvBookmarkletInstall';
+import { receiveTopcvPage } from './topcv-bookmarklet';
+import {
+  applyUrlJobPreview,
+  canFetchJobUrl,
+  urlImportHelp,
+  type UrlJobPreview,
+} from './job-url-import';
+import { CvMatchPanel } from './CvMatchPanel';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Box,
+  Button,
+  Checkbox,
+  Chip,
+  CircularProgress,
+  FormControlLabel,
+  MenuItem,
+  Paper,
+  Stack,
+  Tabs,
+  Tab,
+  Stepper,
+  Step,
+  StepLabel,
+  TextField,
+  Typography,
+} from '@mui/material';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  emptyOpportunity,
+  fieldLabels,
+  importFields,
+  importUpload,
+  jobUrlInfo,
+  opportunityRequest,
+  sources,
+  statuses,
+} from './opportunities-api';
+import type {
+  ImportFieldName,
+  ImportPreview,
+  Opportunity,
+  OpportunityInput,
+} from './opportunities-api';
+const message = (error: unknown) =>
+  error instanceof Error
+    ? error.message
+    : 'Request failed. Retry or enter fields manually.';
+export function JobEditor({
+  onViewportLayoutChange,
+}: {
+  onViewportLayoutChange?: (bounded: boolean) => void;
+}) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [view, setView] = useState('overview');
+  const [step, setStep] = useState(0);
+  const [importMethod, setImportMethod] = useState<ImportMethod>('url');
+  const usesViewport = !id || view === 'edit';
+  useLayoutEffect(() => {
+    onViewportLayoutChange?.(usesViewport);
+    return () => onViewportLayoutChange?.(false);
+  }, [onViewportLayoutChange, usesViewport]);
+  const baseline = useRef(JSON.stringify(emptyOpportunity()));
+  const savedNavigation = useRef(false);
+  const [form, setForm] = useState<OpportunityInput>(emptyOpportunity);
+  const formSnapshot = useRef(form);
+  formSnapshot.current = form;
+  const urlFetchRunning = useRef(false);
+  const fetchedJob = useRef<UrlJobPreview | null>(null);
+  const editedFields = useRef(new Set<keyof OpportunityInput>());
+  const [loading, setLoading] = useState(Boolean(id));
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [sourceErrors, setSourceErrors] = useState<
+    Partial<Record<ImportMethod, string>>
+  >({});
+  const parseRequest = useRef<AbortController | null>(null);
+  const parseGeneration = useRef(0);
+  useEffect(
+    () => () => {
+      parseGeneration.current++;
+      parseRequest.current?.abort();
+    },
+    [],
+  );
+  const [file, setFile] = useState<File>();
+  const [documentName, setDocumentName] = useState<string | null>(null);
+  const [jdText, setJdText] = useState('');
+  const [discovery, setDiscovery] = useState<Opportunity['discovery']>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [notice, setNotice] = useState('');
+  const [contactDate, setContactDate] = useState('');
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    opportunityRequest<Opportunity>(`/${id}`)
+      .then(
+        (row) => {
+          if (!active) return;
+          const defaults = emptyOpportunity();
+          const editable = Object.fromEntries(
+            Object.keys(defaults).map((key) => [
+              key,
+              row[key as keyof OpportunityInput] ??
+                defaults[key as keyof OpportunityInput],
+            ]),
+          ) as unknown as OpportunityInput;
+          editedFields.current.clear();
+          for (const field of importFields) {
+            const suggestion = editable.importReview.find(
+              (item) => item.field === field,
+            );
+            if (
+              suggestion
+                ? editable[field] !== suggestion.value
+                : Boolean(editable[field])
+            )
+              editedFields.current.add(field);
+          }
+          if (editable.description) editedFields.current.add('description');
+          baseline.current = JSON.stringify(editable);
+          setForm(editable);
+          setContactDate(editable.contactDates.at(-1) ?? '');
+          setJdText(row.jdText ?? '');
+          setDiscovery(row.discovery);
+          setDocumentName(row.documentName ?? null);
+          setError('');
+        },
+        (error) => {
+          if (active) {
+            setError(message(error));
+            setLoadFailed(true);
+          }
+        },
+      )
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id]);
+  useEffect(() => {
+    if (id) return;
+    return receiveTopcvPage(
+      window,
+      (payload) => {
+        setBusy(true);
+        setError('');
+        setSourceErrors((errors) => ({ ...errors, bookmarklet: '' }));
+        void opportunityRequest<UrlJobPreview>('/import-page', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        })
+          .then((result) => {
+            const next = applyUrlJobPreview(
+              formSnapshot.current,
+              result,
+              editedFields.current,
+            );
+            fetchedJob.current = result;
+            setImportMethod('bookmarklet');
+            setForm(next);
+            setNotice(
+              `${result.expired ? 'This listing is expired. ' : ''}JD loaded from ${result.platform}. ${(result.importWarnings ?? []).join(' ')}`,
+            );
+          })
+          .catch((error) => {
+            setError(message(error));
+            setSourceErrors((errors) => ({
+              ...errors,
+              bookmarklet: message(error),
+            }));
+          })
+          .finally(() => setBusy(false));
+      },
+      (error) => setError(error),
+    );
+  }, [id]);
+  const change = <K extends keyof OpportunityInput>(
+    key: K,
+    value: OpportunityInput[K],
+  ) => {
+    if (importFields.includes(key as ImportFieldName) || key === 'description')
+      editedFields.current.add(key);
+    setForm((row) => ({ ...row, [key]: value }));
+    setSuccess('');
+  };
+  const sourcesChanged = () => {
+    setForm((row) => ({ ...row, importReview: [] }));
+    setNotice(
+      'Sources changed. Extract again or review the current fields manually before saving.',
+    );
+    setSuccess('');
+  };
+  const conflicts = form.importReview.filter(
+    (field) => field.status === 'CONFLICT' && !field.reviewed,
+  );
+  async function extract() {
+    if (
+      form.importReview.length &&
+      !window.confirm(
+        'Refresh the AI suggestions? Your manually edited values will be kept.',
+      )
+    )
+      return;
+    setExtracting(true);
+    setError('');
+    setSuccess('');
+    setNotice('');
+    try {
+      const result = await opportunityRequest<ImportPreview>(
+        id ? `/${id}/extract` : '/extract',
+        {
+          method: 'POST',
+          body: importUpload({ postText: form.postText }, file),
+        },
+      );
+      setJdText(result.jdText);
+      if (result.error) {
+        setError(result.error);
+        setForm((row) => ({
+          ...row,
+          description: row.description || result.description,
+          importReview: [],
+        }));
+      } else {
+        const suggested = Object.fromEntries(
+          result.fields.map((field) => [field.field, field.value]),
+        ) as Record<ImportFieldName, string>;
+        setForm((row) => ({
+          ...row,
+          ...Object.fromEntries(
+            Object.entries(suggested).filter(([key, value]) => {
+              if (editedFields.current.has(key as ImportFieldName))
+                return false;
+              // Clear obsolete automatic domain/work-mode suggestions when no
+              // supporting evidence remains. Intentional edits stay protected.
+              if (!value.trim()) {
+                if (
+                  key === 'workMode' &&
+                  fetchedJob.current?.workMode &&
+                  row.postText.includes(fetchedJob.current.sourceText)
+                )
+                  return false;
+                return (
+                  ['domain', 'workMode'].includes(key) &&
+                  result.fields.find((field) => field.field === key)?.status ===
+                    'MISSING'
+                );
+              }
+              // URL source fields remain available even if AI omits them,
+              // shortens them, or returns an unresolved conflict.
+              const fetched = fetchedJob.current;
+              if (
+                key === 'experience' &&
+                result.fields.find((field) => field.field === key)?.status ===
+                  'SUPPORTED'
+              )
+                return true;
+              return !(
+                fetched &&
+                row.postText.includes(fetched.sourceText) &&
+                [
+                  'title',
+                  'company',
+                  'location',
+                  'originalLink',
+                  'salary',
+                  'experience',
+                  'workMode',
+                ].includes(key) &&
+                row[key as ImportFieldName]
+              );
+            }),
+          ),
+          description:
+            editedFields.current.has('description') ||
+            (fetchedJob.current &&
+              row.postText.includes(fetchedJob.current.sourceText) &&
+              row.description)
+              ? row.description
+              : result.description || row.description,
+          importReview: result.fields,
+        }));
+        setNotice(
+          `Review every suggestion before saving. Manually edited values are kept.${result.rejected ? ` ${result.rejected} unsupported proposal(s) were discarded.` : ''}`,
+        );
+      }
+      if (!id) setStep(1);
+      if (result.warnings.length)
+        setNotice(
+          (previous) =>
+            `${previous} Document warnings: ${result.warnings.join(', ')}. Check the original for missing content.`,
+        );
+    } catch (error) {
+      setError(message(error));
+    } finally {
+      setExtracting(false);
+    }
+  }
+  async function fetchFromUrl() {
+    if (
+      urlFetchRunning.current ||
+      disabled ||
+      !canFetchJobUrl(form.originalLink)
+    )
+      return;
+    urlFetchRunning.current = true;
+    setSourceErrors((errors) => ({ ...errors, url: '' }));
+    setBusy(true);
+    setError('');
+    setNotice('');
+    setSuccess('');
+    try {
+      const result = await opportunityRequest<UrlJobPreview>('/import-url', {
+        method: 'POST',
+        body: JSON.stringify({ url: form.originalLink }),
+      });
+      const next = applyUrlJobPreview(form, result, editedFields.current);
+      fetchedJob.current = result;
+      setForm(next);
+      setNotice(
+        `${result.expired ? 'This listing is expired. ' : ''}JD loaded from ${result.platform}. Review it, then use Extract with AI when ready.`,
+      );
+    } catch (error) {
+      setError(message(error));
+      setSourceErrors((errors) => ({ ...errors, url: message(error) }));
+    } finally {
+      urlFetchRunning.current = false;
+      setBusy(false);
+    }
+  }
+  async function save() {
+    if (!form.title.trim()) {
+      setError('Enter a job title before saving.');
+      if (id) setView('edit');
+      else setStep(1);
+      return;
+    }
+    if (!jobUrlInfo(form.originalLink).valid) {
+      setError(
+        'Enter a full HTTP(S) job URL without credentials, or leave it blank.',
+      );
+      return;
+    }
+    if (conflicts.length) {
+      setError('Review every conflicting field before saving.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setSuccess('');
+    try {
+      const payload = {
+        ...form,
+        contactDates: contactDate
+          ? [
+              ...form.contactDates.filter((date) => date !== contactDate),
+              contactDate,
+            ]
+          : form.contactDates,
+      };
+      const record = JSON.stringify(payload);
+      const row = await opportunityRequest<Opportunity>(id ? `/${id}` : '', {
+        method: id ? 'PUT' : 'POST',
+        body:
+          file || record.length > 20000 ? importUpload(payload, file) : record,
+      });
+      if (id) {
+        baseline.current = JSON.stringify({
+          ...form,
+          contactDates: row.contactDates,
+        });
+        setForm((current) => ({ ...current, contactDates: row.contactDates }));
+        setContactDate(row.contactDates.at(-1) ?? '');
+        setJdText(row.jdText ?? '');
+        setDocumentName(row.documentName ?? null);
+        setFile(undefined);
+        setSuccess('Changes saved.');
+      } else {
+        savedNavigation.current = true;
+        navigate(`/jobs/${row.id}`, { replace: true });
+      }
+    } catch (error) {
+      setError(message(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function attach(document: File) {
+    if (
+      !/\.(pdf|docx)$/i.test(document.name) ||
+      !document.size ||
+      document.size > 5 * 1024 * 1024
+    ) {
+      setError('Use a PDF or DOCX up to 5 MiB, or paste text instead.');
+      return;
+    }
+    setFile(document);
+    setJdText('');
+    setError('');
+    sourcesChanged();
+    setSourceErrors((errors) => ({ ...errors, upload: '' }));
+    const generation = ++parseGeneration.current;
+    parseRequest.current?.abort();
+    const controller = new AbortController();
+    parseRequest.current = controller;
+    setParsing(true);
+    try {
+      const type = /\.pdf$/iu.test(document.name)
+        ? 'application/pdf'
+        : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      const parsed = await opportunityRequest<{
+        text: string;
+        warnings: { code: string }[];
+      }>('/parse-document', {
+        method: 'POST',
+        body: new Blob([document], { type }),
+        headers: { 'Content-Type': type },
+        signal: controller.signal,
+      });
+      if (generation !== parseGeneration.current) return;
+      if (typeof parsed.text !== 'string' || !parsed.text.trim())
+        throw new Error(
+          'No readable document text found. Paste the JD or choose another supported document.',
+        );
+      setJdText(parsed.text);
+      if (parsed.warnings?.length)
+        setNotice(
+          `Document warnings: ${parsed.warnings.map((warning) => warning.code).join(', ')}. Check the original document.`,
+        );
+    } catch (error) {
+      if (generation === parseGeneration.current)
+        setSourceErrors((errors) => ({ ...errors, upload: message(error) }));
+    } finally {
+      if (generation === parseGeneration.current) setParsing(false);
+    }
+  }
+  const dirty =
+    JSON.stringify(form) !== baseline.current ||
+    Boolean(file) ||
+    Boolean(contactDate && contactDate !== form.contactDates.at(-1));
+  const disabled = busy || extracting || parsing || loadFailed;
+  if (loading) return <CircularProgress aria-label="Loading job" />;
+  return (
+    <Stack
+      spacing={3}
+      sx={{ minWidth: 0, ...(usesViewport && { flex: 1, minHeight: 0 }) }}
+    >
+      <UnsavedJobGuard dirty={dirty} savedNavigation={savedNavigation} />
+      <JobActionLayout
+        scrollable={usesViewport}
+        scrollKey={id ? view : String(step)}
+        feedbackKey={error || success}
+        active={id ? view === 'edit' : step === 1}
+        actions={
+          <Stack
+            spacing={1}
+            direction={{ xs: 'column', sm: 'row' }}
+            sx={{
+              display: id
+                ? ['edit', 'application'].includes(view)
+                  ? undefined
+                  : 'none'
+                : step === 1
+                  ? undefined
+                  : 'none',
+              bgcolor: 'background.paper',
+              py: id && view === 'application' ? 2 : 0,
+              '& > .MuiButton-root': { flex: 1, minWidth: 0 },
+            }}
+          >
+            {!id && (
+              <Button disabled={disabled} onClick={() => setStep(0)}>
+                Back to Import sources
+              </Button>
+            )}
+            <Button
+              type="submit"
+              form="job-editor-form"
+              variant="contained"
+              disabled={disabled || conflicts.length > 0}
+            >
+              {busy ? 'Saving…' : id ? 'Save changes' : 'Confirm and save job'}
+            </Button>
+          </Stack>
+        }
+      >
+        <Stack spacing={3} sx={{ minWidth: 0 }}>
+          <Button
+            component={Link}
+            to="/dashboard"
+            sx={{ alignSelf: 'flex-start' }}
+          >
+            Back to Job Inbox
+          </Button>
+          <Box>
+            <Typography variant="h4" component="h1">
+              {id ? form.title || 'Job details' : 'Add Job'}
+            </Typography>
+            <Typography color="text.secondary">
+              {id
+                ? `${form.company || 'Unknown company'} · ${form.location || 'Unknown location'}`
+                : 'Import your sources, then review and save. You can also enter a job manually.'}
+            </Typography>
+            {id && (
+              <Stack
+                direction="row"
+                spacing={1}
+                useFlexGap
+                sx={{ flexWrap: 'wrap', mt: 1 }}
+              >
+                {[
+                  form.status.replaceAll('_', ' '),
+                  form.seniority || 'Unknown seniority',
+                  form.workMode || 'Unknown work mode',
+                  form.salary || 'Unknown salary',
+                ].map((value, index) => (
+                  <Chip key={index} label={value} size="small" />
+                ))}
+              </Stack>
+            )}
+            {dirty && (
+              <Chip
+                label="Unsaved changes"
+                size="small"
+                color="warning"
+                sx={{ mt: 1 }}
+              />
+            )}
+          </Box>
+          {id ? (
+            <Tabs
+              value={view}
+              onChange={(_, value: string) => setView(value)}
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
+              sx={{
+                minWidth: 0,
+                maxWidth: '100%',
+                '& .MuiTabs-scroller': {
+                  overflowX: 'auto',
+                  overscrollBehaviorX: 'contain',
+                },
+                '& .MuiTab-root': { flexShrink: 0 },
+                '& .MuiTabs-scrollButtons.Mui-disabled': { opacity: 0.3 },
+              }}
+              aria-label="Job sections"
+            >
+              {['Overview', 'CV Match', 'Application', 'Edit JD'].map(
+                (label, index) => (
+                  <Tab
+                    key={label}
+                    label={label}
+                    value={['overview', 'match', 'application', 'edit'][index]}
+                    id={`job-tab-${index}`}
+                    aria-controls={`job-panel-${index}`}
+                  />
+                ),
+              )}
+            </Tabs>
+          ) : (
+            <Stepper activeStep={step}>
+              <Step>
+                <StepLabel>Import sources</StepLabel>
+              </Step>
+              <Step>
+                <StepLabel>Review &amp; Save</StepLabel>
+              </Step>
+            </Stepper>
+          )}
+          {id && (
+            <Box
+              role="tabpanel"
+              id="job-panel-0"
+              aria-labelledby="job-tab-0"
+              hidden={view !== 'overview'}
+            >
+              <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+                <Stack spacing={2}>
+                  <Typography variant="h6" component="h2">
+                    Job overview
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                      gap: 2,
+                    }}
+                  >
+                    {(
+                      [
+                        'experience',
+                        'domain',
+                        'skills',
+                        'preferredSkills',
+                        'contactNotes',
+                      ] as const
+                    ).map((field) => (
+                      <Box key={field}>
+                        <Typography variant="subtitle2">
+                          {fieldLabels[field]}
+                        </Typography>
+                        <Typography
+                          sx={{
+                            whiteSpace: 'pre-line',
+                            overflowWrap: 'anywhere',
+                          }}
+                        >
+                          {form[field]
+                            ? form[field].split('\n').slice(0, 5).join('\n')
+                            : 'Unknown'}
+                        </Typography>
+                        {form[field].split('\n').length > 5 && (
+                          <Box component="details">
+                            <summary>
+                              Show all {fieldLabels[field].toLowerCase()}
+                            </summary>
+                            <Typography
+                              sx={{
+                                whiteSpace: 'pre-line',
+                                overflowWrap: 'anywhere',
+                              }}
+                            >
+                              {form[field]}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
+                  {form.originalLink && jobUrlInfo(form.originalLink).valid && (
+                    <a
+                      href={form.originalLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View Original Job
+                    </a>
+                  )}
+                  <Box component="details">
+                    <summary>Full job description</summary>
+                    <Typography
+                      sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
+                    >
+                      {form.description || 'Unknown'}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Paper>
+            </Box>
+          )}
+
+          {discovery && (
+            <Alert severity="info">
+              Discovered from {discovery.sourceName} on{' '}
+              {new Date(discovery.discoveredAt).toLocaleString()}. The original
+              job/application link is below.
+            </Alert>
+          )}
+          {error && (
+            <Alert severity="error">
+              {error} Your inputs are retained; you can edit fields manually.
+            </Alert>
+          )}
+          {success && <Alert severity="success">{success}</Alert>}
+          {id && !loading && !loadFailed && (
+            <Box
+              role="tabpanel"
+              id="job-panel-1"
+              aria-labelledby="job-tab-1"
+              hidden={view !== 'match'}
+            >
+              <CvMatchPanel
+                key={id}
+                jobId={id}
+                revision={JSON.stringify(form)}
+              />
+            </Box>
+          )}
+          <Box
+            component="form"
+            id="job-editor-form"
+            noValidate
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!id && step === 0) {
+                setStep(1);
+                return;
+              }
+              void save();
+            }}
+          >
+            <Stack
+              component="fieldset"
+              disabled={disabled}
+              spacing={3}
+              sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}
+            >
+              <Stack
+                role={id ? 'tabpanel' : undefined}
+                id="job-panel-3"
+                aria-labelledby={id ? 'job-tab-3' : undefined}
+                spacing={3}
+                sx={{ display: id && view !== 'edit' ? 'none' : undefined }}
+              >
+                <Box hidden={!id && step !== 0}>
+                  <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+                    <Stack spacing={2}>
+                      <Typography variant="h6" component="h2">
+                        How would you like to add this job?
+                      </Typography>
+                      <ImportMethodCards
+                        value={importMethod}
+                        onChange={setImportMethod}
+                        panelId="job-import-panel"
+                        disabled={disabled}
+                      />
+                      <Box
+                        id="job-import-panel"
+                        role="region"
+                        aria-label="Import method input"
+                        sx={{ minWidth: 0 }}
+                      >
+                        {importMethod === 'url' && (
+                          <Stack spacing={1.5}>
+                            <TextField
+                              label="Original Job URL (optional)"
+                              type="url"
+                              value={form.originalLink}
+                              onChange={(e) =>
+                                change('originalLink', e.target.value)
+                              }
+                              error={!jobUrlInfo(form.originalLink).valid}
+                              slotProps={{ htmlInput: { maxLength: 2048 } }}
+                              helperText={
+                                !jobUrlInfo(form.originalLink).valid
+                                  ? 'Enter a full HTTP(S) URL without credentials, or leave it blank.'
+                                  : `${jobUrlInfo(form.originalLink).platform ? `Platform: ${jobUrlInfo(form.originalLink).platform}. ` : ''}Fetching is manual and supports ITviec only.`
+                              }
+                            />
+                            <Button
+                              variant="outlined"
+                              disabled={
+                                disabled || !canFetchJobUrl(form.originalLink)
+                              }
+                              onClick={() => void fetchFromUrl()}
+                              aria-describedby="url-import-help"
+                            >
+                              {urlFetchRunning.current
+                                ? 'Fetching JD…'
+                                : 'Fetch from URL'}
+                            </Button>
+                            <Typography
+                              id="url-import-help"
+                              variant="body2"
+                              color="text.secondary"
+                            >
+                              {!form.originalLink ||
+                              canFetchJobUrl(form.originalLink)
+                                ? 'Direct fetch supports ITviec only and runs when you click Fetch from URL.'
+                                : urlImportHelp(form.originalLink)}
+                            </Typography>
+                          </Stack>
+                        )}
+                        {importMethod === 'bookmarklet' && (
+                          <TopcvBookmarkletInstall />
+                        )}
+                        {importMethod === 'paste' && (
+                          <Stack spacing={1.5}>
+                            <TextField
+                              label="Recruitment post"
+                              multiline
+                              minRows={4}
+                              maxRows={12}
+                              value={form.postText}
+                              onChange={(e) => {
+                                change('postText', e.target.value);
+                                sourcesChanged();
+                              }}
+                              slotProps={{ htmlInput: { maxLength: 12000 } }}
+                              helperText="Paste the entire post, including contact details and links. Up to 12,000 characters. The original text is preserved when saved."
+                            />
+                          </Stack>
+                        )}
+                        {importMethod === 'upload' && (
+                          <Stack spacing={1.5}>
+                            {documentName ? (
+                              <Box>
+                                <Typography>
+                                  Original JD: {documentName}
+                                </Typography>
+                                <a
+                                  href={`/api/v1/opportunities/${id}/document`}
+                                >
+                                  Download original JD
+                                </a>
+                              </Box>
+                            ) : (
+                              <Box>
+                                <Typography
+                                  component="label"
+                                  htmlFor="jd-document"
+                                >
+                                  Upload JD document (PDF or DOCX)
+                                </Typography>
+                                <input
+                                  id="jd-document"
+                                  type="file"
+                                  accept=".pdf,.docx"
+                                  disabled={disabled}
+                                  onChange={(e) => {
+                                    const selected = e.target.files?.[0];
+                                    if (selected) void attach(selected);
+                                    e.target.value = '';
+                                  }}
+                                />
+                                {file && (
+                                  <Stack direction="row" spacing={1}>
+                                    <Typography>{file.name}</Typography>
+                                    <Button
+                                      type="button"
+                                      onClick={() => {
+                                        parseGeneration.current++;
+                                        parseRequest.current?.abort();
+                                        setSourceErrors((errors) => ({
+                                          ...errors,
+                                          upload: '',
+                                        }));
+                                        setFile(undefined);
+                                        setJdText('');
+                                        sourcesChanged();
+                                      }}
+                                    >
+                                      Remove selected document
+                                    </Button>
+                                  </Stack>
+                                )}
+                              </Box>
+                            )}
+                            <Typography variant="body2" color="text.secondary">
+                              Optional PDF/DOCX up to 5 MiB and 20 PDF pages.
+                              Original document is preserved on save. Scans/OCR,
+                              images and legacy DOC are unsupported; paste text
+                              instead.
+                            </Typography>
+                          </Stack>
+                        )}
+                      </Box>
+                      {importMethod !== 'paste' && (
+                        <SourceJdPreview
+                          text={
+                            importMethod === 'upload' ? jdText : form.postText
+                          }
+                          source={
+                            importMethod === 'upload'
+                              ? `Document${file?.name || documentName ? ` · ${file?.name ?? documentName}` : ''}`
+                              : (fetchedJob.current?.platform ??
+                                jobUrlInfo(form.originalLink).platform ??
+                                (importMethod === 'bookmarklet'
+                                  ? 'Bookmarklet'
+                                  : 'Job URL'))
+                          }
+                          loading={
+                            importMethod === 'upload'
+                              ? parsing
+                              : urlFetchRunning.current
+                          }
+                          error={
+                            sourceErrors[importMethod] &&
+                            sourceErrors[importMethod] === error
+                              ? 'Loading this source failed. See the request error above, or use Paste JD.'
+                              : sourceErrors[importMethod]
+                          }
+                        />
+                      )}
+                      <TextField
+                        select
+                        label="Source"
+                        value={form.source}
+                        onChange={(e) =>
+                          change(
+                            'source',
+                            e.target.value as OpportunityInput['source'],
+                          )
+                        }
+                        helperText="Choose the platform yourself; AI does not infer it. Use Other for LinkedIn or another platform."
+                      >
+                        {sources.map((value) => (
+                          <MenuItem key={value} value={value}>
+                            {value}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                      {(form.postText.trim() || file || documentName) && (
+                        <Typography variant="body2" color="text.secondary">
+                          Source content is available. Switching methods keeps
+                          your inputs.
+                        </Typography>
+                      )}
+                      <Button
+                        type="button"
+                        variant="contained"
+                        disabled={
+                          disabled ||
+                          (!form.postText.trim() && !file && !documentName)
+                        }
+                        onClick={() => void extract()}
+                      >
+                        {extracting ? 'Extracting…' : 'Extract with AI'}
+                      </Button>
+                      <Typography variant="body2" color="text.secondary">
+                        Uses the configured local Ollama model only when you
+                        click Extract. You can also enter fields manually and
+                        save without AI.
+                      </Typography>
+                      {extracting && (
+                        <Typography role="status">
+                          Reading sources and extracting suggestions… This may
+                          take up to 90 seconds after document parsing.
+                        </Typography>
+                      )}
+                      {notice && <Alert severity="info">{notice}</Alert>}
+                    </Stack>
+                  </Paper>
+                  {!id && (
+                    <Button
+                      sx={{ mt: 2 }}
+                      variant="outlined"
+                      onClick={() => setStep(1)}
+                    >
+                      Continue to Review &amp; Save
+                    </Button>
+                  )}
+                </Box>
+                <Stack
+                  spacing={2}
+                  sx={{
+                    display: (id ? view === 'edit' : step === 1)
+                      ? undefined
+                      : 'none',
+                  }}
+                >
+                  <Typography variant="h6" component="h2">
+                    Review &amp; Save
+                  </Typography>
+                  <Typography color="text.secondary">
+                    Unknown values can stay blank. Only job title is required.
+                    Quotes show textual support; verify that each value
+                    describes this job.
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: {
+                        xs: '1fr',
+                        sm: 'repeat(2, minmax(0, 1fr))',
+                      },
+                      gap: 2,
+                    }}
+                  >
+                    {importFields.map((field) => {
+                      const review = form.importReview.find(
+                        (item) => item.field === field,
+                      );
+                      const conflict = review?.status === 'CONFLICT';
+                      const multiline = [
+                        'contactNotes',
+                        'skills',
+                        'preferredSkills',
+                      ].includes(field);
+                      const maxLength =
+                        field === 'title' || field === 'company'
+                          ? 300
+                          : field === 'originalLink'
+                            ? 2048
+                            : multiline
+                              ? 10000
+                              : 2000;
+                      return (
+                        <Stack
+                          spacing={1}
+                          key={field}
+                          sx={{
+                            minWidth: 0,
+                            gridColumn: multiline ? '1 / -1' : undefined,
+                          }}
+                        >
+                          {field === 'skills' || field === 'preferredSkills' ? (
+                            <RequirementInputs
+                              label={fieldLabels[field]}
+                              value={form[field]}
+                              maxLength={maxLength}
+                              error={Boolean(conflict && !review.reviewed)}
+                              helperText={
+                                conflict
+                                  ? 'Review conflicting source values below.'
+                                  : review?.status === 'MISSING'
+                                    ? 'Missing / unknown — no supported value found.'
+                                    : undefined
+                              }
+                              onChange={(value) => {
+                                change(field, value);
+                                if (conflict)
+                                  change(
+                                    'importReview',
+                                    form.importReview.map((item) =>
+                                      item.field === field
+                                        ? { ...item, reviewed: false }
+                                        : item,
+                                    ),
+                                  );
+                              }}
+                            />
+                          ) : (
+                            <TextField
+                              label={fieldLabels[field]}
+                              placeholder={
+                                field === 'title' ? undefined : 'Unknown'
+                              }
+                              required={field === 'title'}
+                              type={field === 'originalLink' ? 'url' : 'text'}
+                              multiline={multiline}
+                              minRows={multiline ? 2 : undefined}
+                              maxRows={multiline ? 8 : undefined}
+                              value={form[field]}
+                              onChange={(e) => {
+                                change(field, e.target.value);
+                                if (conflict)
+                                  change(
+                                    'importReview',
+                                    form.importReview.map((item) =>
+                                      item.field === field
+                                        ? { ...item, reviewed: false }
+                                        : item,
+                                    ),
+                                  );
+                              }}
+                              slotProps={{ htmlInput: { maxLength } }}
+                              error={Boolean(conflict && !review.reviewed)}
+                              helperText={
+                                conflict
+                                  ? 'Conflicting source values. Choose a value, type a correction, or leave unknown; acknowledge below.'
+                                  : review?.status === 'MISSING'
+                                    ? 'Missing / unknown — no supported value found.'
+                                    : review
+                                      ? field === 'company'
+                                        ? 'Suggested company or JD issuer. This does not identify an unnamed end-client.'
+                                        : undefined
+                                      : undefined
+                              }
+                            />
+                          )}
+                          {review && review.candidates.length > 0 && (
+                            <Box component="details" open={conflict}>
+                              <summary>
+                                {conflict
+                                  ? 'Conflicting evidence'
+                                  : 'Source evidence'}
+                              </summary>
+                              <Stack spacing={1}>
+                                {review.candidates.map((candidate, index) => (
+                                  <Box
+                                    key={index}
+                                    sx={{
+                                      p: 1,
+                                      bgcolor: 'action.hover',
+                                      overflowWrap: 'anywhere',
+                                    }}
+                                  >
+                                    <Typography variant="body2">
+                                      {candidate.source === 'post'
+                                        ? 'Recruitment post'
+                                        : 'JD document'}
+                                      : {candidate.value}
+                                    </Typography>
+                                    <Typography
+                                      component="blockquote"
+                                      variant="body2"
+                                      sx={{ m: 1, whiteSpace: 'pre-wrap' }}
+                                    >
+                                      {candidate.quote}
+                                    </Typography>
+                                    {conflict && (
+                                      <Button
+                                        type="button"
+                                        onClick={() => {
+                                          change(field, candidate.value);
+                                          change(
+                                            'importReview',
+                                            form.importReview.map((item) =>
+                                              item.field === field
+                                                ? { ...item, reviewed: true }
+                                                : item,
+                                            ),
+                                          );
+                                        }}
+                                      >
+                                        Use this value for {fieldLabels[field]}
+                                      </Button>
+                                    )}
+                                  </Box>
+                                ))}
+                              </Stack>
+                            </Box>
+                          )}
+                          {conflict && (
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={review.reviewed}
+                                  onChange={(e) =>
+                                    change(
+                                      'importReview',
+                                      form.importReview.map((item) =>
+                                        item.field === field
+                                          ? {
+                                              ...item,
+                                              reviewed: e.target.checked,
+                                            }
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                />
+                              }
+                              label={`I reviewed the conflict for ${fieldLabels[field]}`}
+                            />
+                          )}
+                        </Stack>
+                      );
+                    })}
+                  </Box>
+                  {form.originalLink && jobUrlInfo(form.originalLink).valid && (
+                    <a
+                      href={form.originalLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View Original Job
+                    </a>
+                  )}
+                  <TextField
+                    label="Job description"
+                    multiline
+                    minRows={6}
+                    maxRows={14}
+                    value={form.description}
+                    onChange={(e) => change('description', e.target.value)}
+                    slotProps={{ htmlInput: { maxLength: 26000 } }}
+                    helperText="Both source texts are included after extraction; edit the description as needed. The original sources are preserved separately."
+                  />
+                </Stack>
+              </Stack>
+              <Stack
+                role="tabpanel"
+                id="job-panel-2"
+                aria-labelledby="job-tab-2"
+                spacing={2}
+                sx={{
+                  display: id && view === 'application' ? undefined : 'none',
+                }}
+              >
+                <Typography variant="h6" component="h2">
+                  Application
+                </Typography>
+                <TextField
+                  select
+                  label="Application status"
+                  value={form.status}
+                  onChange={(e) =>
+                    change(
+                      'status',
+                      e.target.value as OpportunityInput['status'],
+                    )
+                  }
+                  helperText="Choose any status; steps can be skipped."
+                >
+                  {statuses.map((value) => (
+                    <MenuItem key={value} value={value}>
+                      {value.replaceAll('_', ' ')}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  label="Application notes"
+                  multiline
+                  minRows={3}
+                  value={form.notes}
+                  onChange={(e) => change('notes', e.target.value)}
+                  slotProps={{ htmlInput: { maxLength: 20000 } }}
+                />
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <TextField
+                    label="Contact date"
+                    type="date"
+                    value={contactDate}
+                    onChange={(e) => {
+                      setContactDate(e.target.value);
+                      setSuccess('');
+                    }}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                  <Button
+                    type="button"
+                    disabled={!contactDate || form.contactDates.length >= 100}
+                    onClick={() => {
+                      change('contactDates', [
+                        ...form.contactDates.filter(
+                          (date) => date !== contactDate,
+                        ),
+                        contactDate,
+                      ]);
+                      setContactDate('');
+                    }}
+                  >
+                    Record contact date
+                  </Button>
+                </Stack>
+                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                  {form.contactDates.map((date) => (
+                    <Chip
+                      key={date}
+                      label={date}
+                      onDelete={() => {
+                        if (date === contactDate) setContactDate('');
+                        change(
+                          'contactDates',
+                          form.contactDates.filter((value) => value !== date),
+                        );
+                      }}
+                    />
+                  ))}
+                </Stack>
+                <TextField
+                  label="Follow-up date"
+                  type="date"
+                  value={form.followUpDate ?? ''}
+                  onChange={(e) =>
+                    change('followUpDate', e.target.value || null)
+                  }
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+              </Stack>
+              <Stack
+                spacing={2}
+                sx={{
+                  display: id
+                    ? ['edit', 'application'].includes(view)
+                      ? undefined
+                      : 'none'
+                    : step === 1
+                      ? undefined
+                      : 'none',
+                }}
+              >
+                {conflicts.length > 0 && (
+                  <Alert severity="warning">
+                    Review {conflicts.length} conflicting field(s) before
+                    saving.
+                    {id && view !== 'edit' && (
+                      <Button onClick={() => setView('edit')}>
+                        Review conflicts in Edit JD
+                      </Button>
+                    )}
+                  </Alert>
+                )}
+                <Typography variant="body2" color="text.secondary">
+                  Save confirms your reviewed values. Nothing is sent to
+                  recruiters and no application is submitted. Changes across
+                  sections are saved together.
+                </Typography>
+              </Stack>
+            </Stack>
+          </Box>
+        </Stack>
+      </JobActionLayout>
+    </Stack>
+  );
+}

@@ -82,6 +82,7 @@ export function validateMatchingInput(
           if (
             ![
               'IMAGE_CONTENT_NOT_INTERPRETED',
+              'PDF_RECOVERY_USED',
               'DOCX_CONTENT_WARNING',
               'EXTRACTION_COMPLETENESS_NOT_VERIFIED',
             ].includes(String(warning.code))

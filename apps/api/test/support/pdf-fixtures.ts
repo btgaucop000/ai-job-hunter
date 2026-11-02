@@ -25,6 +25,7 @@ export function pdfFixture(
     encrypted?: boolean;
     externalAction?: boolean;
     cmap?: string;
+    recoverableTextDefect?: boolean;
   } = {},
 ): Uint8Array {
   const objects = [
@@ -42,7 +43,7 @@ export function pdfFixture(
     const content = options.image
       ? 'q 10 0 0 10 72 700 cm BI /W 1 /H 1 /CS /RGB /BPC 8 ID abc EI Q'
       : text
-        ? `BT /F1 12 Tf 72 720 Td ${options.unicode ? '<000100020003>' : `(${text.replace(/[\\()]/g, '\\$&')})`} Tj ET`
+        ? `BT /F1 12 Tf 72 720 Td ${options.unicode ? '<000100020003>' : `(${text.replace(/[\\()]/g, '\\$&')})`} Tj ET${options.recoverableTextDefect ? ' [ ET' : ''}`
         : '';
     objects.push(
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${Math.max(612, text.length * 10 + 200)} 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${7 + index * 2} 0 R >>`,

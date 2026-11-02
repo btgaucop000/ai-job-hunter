@@ -82,3 +82,39 @@ test('collection clarification preserves nullable CV experience and JD priority'
     'Priority evidence must enclose the requirement evidence in the same segment.',
   );
 });
+
+const cvEfficiencyClauses = [
+  'Return compact JSON with no indentation or optional formatting whitespace outside string values. Preserve all whitespace inside verbatim values and quotes.',
+  'Schema array maxima are upper bounds, not targets; do not add entries to reach them. Preserve exhaustive extraction of supported facts within the existing limits.',
+  'When one evidence reference fully supports a fact, avoid unnecessary additional references.',
+  'Preserve multiple references when needed for duration linkage, qualification, negation, uncertainty, attribution or conflicting evidence, within the existing two-reference limit.',
+  'Never shorten quotes at the expense of uniqueness or supporting context.',
+] as const;
+
+test.each(cvEfficiencyClauses)(
+  'CV-only efficiency instruction preserves the document payload: %s',
+  (clause) => {
+    const source = syntheticSource('  Synthetic\tvalue\r\n😀  ');
+    const cv = buildExtractionPrompt('cv', source);
+    const jd = buildExtractionPrompt('jd', source);
+    const instructions = cv.split('\nBEGIN_UNTRUSTED_DOCUMENT_JSON\n')[0]!;
+    expect(instructions.split(clause)).toHaveLength(2);
+    expect(jd).not.toContain(clause);
+    expect(cv).toContain(
+      JSON.stringify({ text: source.text, segments: source.segments }),
+    );
+  },
+);
+
+test('CV efficiency preserves exhaustive skills, verbatim values and complete evidence context', () => {
+  const prompt = buildExtractionPrompt('cv', syntheticSource());
+  for (const clause of [
+    'Copy fact values verbatim.',
+    'Enumerate every explicitly supported skill, including every item in a skill list and skills without stated durations.',
+    'For each skill with an explicitly stated duration, copy that duration verbatim into skills[].experienceText.value with supporting evidence for that skill.',
+    'Use a short supporting clause that retains relevant qualification, negation, uncertainty and attribution within the quote limit.',
+    'Do not silently truncate facts or lists to fit; if the document cannot be represented, do not present a partial extraction as complete.',
+    'Before returning, check every explicitly supported skill-list item for an output entry; keep unstated experience null with empty evidence.',
+  ])
+    expect(prompt).toContain(clause);
+});

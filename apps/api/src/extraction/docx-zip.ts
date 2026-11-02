@@ -10,6 +10,21 @@ export interface DocxPackage {
 const invalid = () => new ExtractionError('PARSING_FAILED');
 const oversized = () => new ExtractionError('DOCUMENT_TOO_LARGE');
 
+// OPC growth hints reserve local-header space and may be absent from the
+// central directory (PKWARE APPNOTE 4.6.10). Accept only one well-formed,
+// zero-filled hint with no other local-only extra data. Other mismatches fail.
+function matchingExtraFields(local: Buffer, central: Buffer): boolean {
+  if (local.equals(central)) return true;
+  if (central.length !== 0 || local.length < 8) return false;
+  return (
+    local.readUInt16LE(0) === 0xa220 &&
+    local.readUInt16LE(2) === local.length - 4 &&
+    local.readUInt16LE(4) === 0xa028 &&
+    local.readUInt16LE(6) === local.length - 8 &&
+    local.subarray(8).every((byte) => byte === 0)
+  );
+}
+
 // Strict supported ZIP profile: ASCII canonical paths, STORE/DEFLATE, no ZIP64,
 // data descriptors or alternative name encodings. Parsing belongs to yauzl.
 export async function inspectDocxZip(buffer: Buffer): Promise<DocxPackage> {
@@ -84,7 +99,11 @@ export async function inspectDocxZip(buffer: Buffer): Promise<DocxPackage> {
         ) ||
         ((entry.externalFileAttributes >>> 16) & 0xf000) === 0xa000
       )
-        throw invalid();
+        throw new ExtractionError(
+          'PARSING_FAILED',
+          undefined,
+          'ZIP_UNSUPPORTED_PROFILE',
+        );
       if (!entry.fileNameRaw.equals(Buffer.from(name, 'ascii')))
         throw invalid();
       if (
@@ -102,7 +121,7 @@ export async function inspectDocxZip(buffer: Buffer): Promise<DocxPackage> {
         header.uncompressedSize !== entry.uncompressedSize ||
         header.crc32 !== entry.crc32 ||
         header.versionNeededToExtract !== entry.versionNeededToExtract ||
-        !header.extraField.equals(entry.extraFieldRaw)
+        !matchingExtraFields(header.extraField, entry.extraFieldRaw)
       )
         throw invalid();
       const end = header.fileDataStart + entry.compressedSize;
