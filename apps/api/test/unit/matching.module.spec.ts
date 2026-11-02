@@ -2,7 +2,9 @@ import 'reflect-metadata';
 import { afterEach, expect, jest, test } from '@jest/globals';
 import { Global, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { getDataSourceToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { Opportunity } from '../../src/opportunities/opportunity.entity.js';
+import { SavedCv } from '../../src/matching/saved-cv.entity.js';
 import { AppModule } from '../../src/app.module.js';
 import { DatabaseModule } from '../../src/database/database.module.js';
 import { AI_PROVIDER } from '../../src/ai/ai-provider.js';
@@ -135,6 +137,12 @@ test('AppModule compiles with matching registered and no AI or extraction invoca
   const app = await Test.createTestingModule({ imports: [AppModule] })
     .overrideModule(DatabaseModule)
     .useModule(OfflineDatabaseModule)
+    // Repository construction belongs to database integration tests. Keep this
+    // module-wiring test offline; any accidental repository query still fails.
+    .overrideProvider(getRepositoryToken(Opportunity))
+    .useValue(Object.freeze({}))
+    .overrideProvider(getRepositoryToken(SavedCv))
+    .useValue(Object.freeze({}))
     .overrideProvider(AI_CONFIG)
     .useValue(aiConfig({}))
     .overrideProvider(AI_PROVIDER)
