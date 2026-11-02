@@ -148,6 +148,7 @@ test('parses a synthetic JD PDF without inference and rejects unsupported upload
 test('Contact Date save read edit read preserves date-only values and other tracking fields', async () => {
   const original = {
     ...input,
+    originalLink: 'https://example.com/synthetic-contact-date-job',
     status: 'APPLIED',
     notes: 'Synthetic Contact Date tracking',
     contactDates: ['2026-10-30'],
