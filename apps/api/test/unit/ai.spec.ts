@@ -79,7 +79,7 @@ test('sends exact Ollama fields and validates nullable output', async () => {
     think: false,
     truncate: false,
     shift: false,
-    options: { num_ctx: 8192, num_predict: 2048, temperature: 0 },
+    options: { num_ctx: 8192, num_predict: 4096, temperature: 0 },
   });
 });
 

@@ -1,3 +1,10 @@
+import { JobDiscovery1793510000000 } from './migrations/1793510000000-JobDiscovery.js';
+import { SavedCv } from '../matching/saved-cv.entity.js';
+import { SavedCv1793500000000 } from './migrations/1793500000000-SavedCv.js';
+import { CompleteJobImportFields1793490000000 } from './migrations/1793490000000-CompleteJobImportFields.js';
+import { SmartJobImport1793400000000 } from './migrations/1793400000000-SmartJobImport.js';
+import { Opportunity } from '../opportunities/opportunity.entity.js';
+import { CreateOpportunities1792800000000 } from './migrations/1792800000000-CreateOpportunities.js';
 import type { DataSourceOptions } from 'typeorm';
 import { CreateApplicationSchema1792598400000 } from './migrations/1792598400000-CreateApplicationSchema.js';
 
@@ -44,8 +51,15 @@ export function databaseOptions(
     // History stays in public so it can exist before the application schema.
     schema: 'public',
     migrationsTableName: 'typeorm_migrations',
-    entities: [],
-    migrations: [CreateApplicationSchema1792598400000],
+    entities: [Opportunity, SavedCv],
+    migrations: [
+      CreateApplicationSchema1792598400000,
+      CreateOpportunities1792800000000,
+      SmartJobImport1793400000000,
+      CompleteJobImportFields1793490000000,
+      SavedCv1793500000000,
+      JobDiscovery1793510000000,
+    ],
     synchronize: false,
     migrationsRun: false,
     migrationsTransactionMode: 'all',

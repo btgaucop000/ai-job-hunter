@@ -12,6 +12,7 @@ import {
   relationship,
   relationships,
   mainType,
+  opcGrowthPadding,
 } from '../support/docx-fixtures.js';
 import type { ZipFixtureEntry } from '../support/docx-fixtures.js';
 import { createServer } from 'node:http';
@@ -462,4 +463,87 @@ test('accepts exact DOCX text/segment limits and rejects too many paragraphs', a
       ),
     ),
   ).rejects.toMatchObject({ code: 'DOCUMENT_TOO_LARGE' });
+});
+
+test.each([256, 512])(
+  'accepts Office local-header growth padding (%i bytes) absent from central directory',
+  async (size) => {
+    const entries = docxEntries({ body: paragraph('Synthetic HR JD') }).map(
+      (entry, index) => ({
+        ...entry,
+        deflate: true,
+        flags: 6,
+        ...(index === 0 ? { localExtra: opcGrowthPadding(size) } : {}),
+      }),
+    );
+    const result = await parser().parse(docxInput(entries));
+    expect(result.source.text).toBe('Synthetic HR JD\n\n');
+  },
+);
+
+test.each([
+  'wrong-id',
+  'wrong-size',
+  'wrong-signature',
+  'wrong-hint',
+  'nonzero-padding',
+  'truncated',
+  'duplicate',
+  'unknown-suffix',
+  'central-mismatch',
+])(
+  'rejects malformed or unrecognized local-only extra data: %s',
+  async (variant) => {
+    let extra = opcGrowthPadding(256);
+    let centralExtra: Buffer | undefined;
+    switch (variant) {
+      case 'wrong-id':
+        extra.writeUInt16LE(0x7075, 0);
+        break;
+      case 'wrong-size':
+        extra.writeUInt16LE(extra.length - 5, 2);
+        break;
+      case 'wrong-signature':
+        extra.writeUInt16LE(0xffff, 4);
+        break;
+      case 'wrong-hint':
+        extra.writeUInt16LE(255, 6);
+        break;
+      case 'nonzero-padding':
+        extra[extra.length - 1] = 1;
+        break;
+      case 'truncated':
+        extra = extra.subarray(0, 7);
+        break;
+      case 'duplicate':
+        extra = Buffer.concat([extra, extra]);
+        break;
+      case 'unknown-suffix':
+        extra = Buffer.concat([extra, Buffer.from([0x55, 0x54, 0, 0])]);
+        break;
+      case 'central-mismatch':
+        centralExtra = Buffer.from([0x55, 0x54, 0, 0]);
+        break;
+    }
+    const entries = docxEntries().map((entry, index) => ({
+      ...entry,
+      ...(index === 0
+        ? { localExtra: extra, ...(centralExtra ? { centralExtra } : {}) }
+        : {}),
+    }));
+    await expect(parser().parse(docxInput(entries))).rejects.toMatchObject({
+      code: 'PARSING_FAILED',
+    });
+  },
+);
+test('valid growth padding does not bypass CRC or filename consistency', async () => {
+  for (const change of [{ crc: 1 }, { localName: 'wrong.xml' }]) {
+    const entries = docxEntries().map((entry, index) => ({
+      ...entry,
+      ...(index === 0 ? { localExtra: opcGrowthPadding(512), ...change } : {}),
+    }));
+    await expect(parser().parse(docxInput(entries))).rejects.toMatchObject({
+      code: 'PARSING_FAILED',
+    });
+  }
 });

@@ -471,12 +471,17 @@ describe('matching boundaries and arithmetic', () => {
           ...candidate.warnings,
           { code: 'PAGE_WITHOUT_TEXT', page: 2 },
           { code: 'IMAGE_CONTENT_NOT_INTERPRETED' },
+          { code: 'PDF_RECOVERY_USED' },
         ],
       },
       ['React'],
     );
     expect(result.overallScore).toBe(100);
-    expect(result.extractionWarnings).toHaveLength(4);
+    expect(result.extractionWarnings).toHaveLength(5);
+    expect(result.extractionWarnings).toContainEqual({
+      document: 'cv',
+      warning: { code: 'PDF_RECOVERY_USED' },
+    });
     expect(result.uncertainty).toContain('SEMANTICS_NOT_VERIFIED');
   });
 });

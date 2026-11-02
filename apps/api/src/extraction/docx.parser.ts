@@ -1,3 +1,4 @@
+import type { DocxFailureReason } from './docx-failure.js';
 import mammoth from 'mammoth';
 import { inspectDocxZip } from './docx-zip.js';
 import { validateDocxPackage } from './docx-package.validation.js';
@@ -11,10 +12,13 @@ import type { SourceSegment } from './extraction.types.js';
 import type { ParsedDocument } from './parser.protocol.js';
 
 export async function parseDocx(bytes: Uint8Array): Promise<ParsedDocument> {
+  let phase: DocxFailureReason = 'ZIP_INVALID';
   try {
     const buffer = Buffer.from(bytes); // Same immutable archive is used for both passes.
     const pkg = await inspectDocxZip(buffer);
+    phase = 'PACKAGE_INVALID';
     validateDocxPackage(pkg);
+    phase = 'TEXT_EXTRACTION_FAILED';
     const result = await mammoth.extractRawText({ buffer });
     if (result.messages.some((message) => message.type === 'error'))
       throw new ExtractionError('PARSING_FAILED');
@@ -52,7 +56,12 @@ export async function parseDocx(bytes: Uint8Array): Promise<ParsedDocument> {
       ],
     };
   } catch (error) {
-    if (error instanceof ExtractionError) throw error;
-    throw new ExtractionError('PARSING_FAILED');
+    if (error instanceof ExtractionError && error.code !== 'PARSING_FAILED')
+      throw error;
+    throw new ExtractionError(
+      'PARSING_FAILED',
+      undefined,
+      error instanceof ExtractionError ? (error.docxFailure ?? phase) : phase,
+    );
   }
 }

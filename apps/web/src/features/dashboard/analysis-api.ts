@@ -1,3 +1,4 @@
+import { isPartialDocument } from './partial-validation';
 import type { AnalysisResponse } from './analysis.types';
 export const ERROR_CODES = [
   'INVALID_REQUEST',
@@ -38,6 +39,7 @@ export const ERROR_CODES = [
   'INVALID_SCHEMA',
   'INVALID_SOURCE',
   'INVALID_MATCHING_INPUT',
+  'INSUFFICIENT_MATCHING_INPUT',
   'EXTRACTION_FAILED',
   'ANALYSIS_FAILED',
 ] as const;
@@ -207,6 +209,7 @@ const warning: Check = (v) =>
     ? count(v.page) && (v.page as number) > 0
     : one(
         'IMAGE_CONTENT_NOT_INTERPRETED',
+        'PDF_RECOVERY_USED',
         'DOCX_CONTENT_WARNING',
         'EXTRACTION_COMPLETENESS_NOT_VERIFIED',
       )(v.code));
@@ -279,7 +282,65 @@ export function decodeAnalysis(value: unknown, ok: boolean): AnalysisResponse {
       ),
     stages,
   });
-  if (record(value) && base(value)) {
+  const document = nullable(
+    shape({
+      text: string,
+      facts: nullable(list(shape({ path: string, value: nullable(string) }))),
+    }),
+  );
+  const partialDocumentsValid = (documents: unknown): boolean =>
+    record(documents) &&
+    (['cv', 'jd'] as const).every((kind) => {
+      const doc = documents[kind];
+      return (
+        doc === null ||
+        (record(doc) &&
+          (doc.partial === undefined ||
+            (typeof doc.text === 'string' &&
+              isPartialDocument(doc.partial, doc.text, kind, ERROR_CODES))))
+      );
+    });
+  if (
+    record(value) &&
+    base(value) &&
+    (value.documents === undefined ||
+      (shape({ cv: document, jd: document })(value.documents) &&
+        partialDocumentsValid(value.documents)))
+  ) {
+    if (
+      ok &&
+      value.outcome === 'PARTIAL' &&
+      value.result === null &&
+      value.error === null &&
+      record(value.documents) &&
+      record(value.documents.cv) &&
+      record(value.documents.jd) &&
+      value.documents.cv.partial !== undefined &&
+      value.documents.jd.partial !== undefined &&
+      value.documents.cv.facts === null &&
+      value.documents.jd.facts === null &&
+      record(value.stages) &&
+      value.stages.upload === 'SUCCEEDED' &&
+      value.stages.matching === 'NOT_RUN'
+    )
+      return value as unknown as AnalysisResponse;
+    if (
+      ok &&
+      value.outcome === 'PARSED' &&
+      value.result === null &&
+      value.error === null &&
+      record(value.documents) &&
+      record(value.documents.cv) &&
+      (value.documents.jd === null || record(value.documents.jd)) &&
+      value.documents.cv.facts === null &&
+      (value.documents.jd === null || value.documents.jd.facts === null) &&
+      record(value.stages) &&
+      value.stages.upload === 'SUCCEEDED' &&
+      ['cv', 'jd', 'matching'].every(
+        (key) => (value.stages as Record<string, unknown>)[key] === 'NOT_RUN',
+      )
+    )
+      return value as unknown as AnalysisResponse;
     if (
       ok &&
       value.outcome === 'COMPLETED' &&
@@ -308,20 +369,26 @@ export async function analyze(
   file: File,
   jdText: string,
   signal: AbortSignal,
+  parseOnly = false,
 ): Promise<AnalysisResponse> {
   const body = new FormData();
   body.append('cv', file);
   body.append('jdText', jdText);
   let response: Response;
   try {
-    response = await fetch('/api/v1/analyses', {
-      method: 'POST',
-      body,
-      signal,
-      cache: 'no-store',
-      credentials: 'omit',
-      redirect: 'error',
-    });
+    response = await fetch(
+      parseOnly
+        ? '/api/v1/analyses?mode=parse-only'
+        : '/api/v1/analyses?mode=partial',
+      {
+        method: 'POST',
+        body,
+        signal,
+        cache: 'no-store',
+        credentials: 'omit',
+        redirect: 'error',
+      },
+    );
   } catch {
     throw new AnalysisClientError('network');
   }

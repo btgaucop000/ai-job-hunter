@@ -1,6 +1,11 @@
+import { PartialFacts } from './PartialFacts';
 import { useState } from 'react';
 import { Alert, Box, Paper, Stack, Typography } from '@mui/material';
-import type { AnalysisResponse, Category } from './analysis.types';
+import type {
+  AnalysisDocument,
+  AnalysisResponse,
+  Category,
+} from './analysis.types';
 import { RequirementCard } from './RequirementCard';
 import {
   requirementFeedbackKeys,
@@ -44,6 +49,96 @@ function guidance(code: string): string {
   return 'The analysis could not complete. Review the input and retry only when ready.';
 }
 export function AnalysisResult({ response }: { response: AnalysisResponse }) {
+  return (
+    <Stack spacing={3}>
+      {response.documents &&
+        (['cv', 'jd'] as const).map((kind) => (
+          <DocumentSource
+            key={`${response.requestId}:${kind}`}
+            label={kind.toUpperCase()}
+            document={response.documents![kind]}
+          />
+        ))}
+      {response.outcome === 'COMPLETED' ? (
+        <CompletedAnalysis key={response.requestId} response={response} />
+      ) : (
+        <IncompleteAnalysis response={response} />
+      )}
+    </Stack>
+  );
+}
+function DocumentSource({
+  label,
+  document,
+}: {
+  label: string;
+  document: AnalysisDocument | null;
+}) {
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Typography component="h2" variant="h6">
+        {label} source
+      </Typography>
+      {!document ? (
+        <Typography>
+          Source unavailable. Review the file and parse again.
+        </Typography>
+      ) : (
+        <Stack spacing={2}>
+          <Typography sx={{ ...plainText, maxHeight: 400, overflow: 'auto' }}>
+            {document.text}
+          </Typography>
+          {document.partial && (
+            <PartialFacts
+              key={JSON.stringify(document.partial)}
+              partial={document.partial}
+            />
+          )}
+          <Typography>
+            {document.partial
+              ? 'Partial extraction only; matching is disabled.'
+              : document.facts === null
+                ? 'Parsed source only. Facts are unverified; matching is disabled.'
+                : 'Evidence-validated facts. Completeness and semantic correctness still require review.'}
+          </Typography>
+          {document.facts !== null && (
+            <Box component="ul">
+              {document.facts.map((fact) => (
+                <li key={fact.path}>
+                  {fact.path}: {fact.value ?? 'Not stated / review source'}
+                </li>
+              ))}
+              {document.facts.length === 0 && (
+                <li>No validated facts available.</li>
+              )}
+            </Box>
+          )}
+        </Stack>
+      )}
+    </Paper>
+  );
+}
+function IncompleteAnalysis({
+  response,
+}: {
+  response: Exclude<AnalysisResponse, { outcome: 'COMPLETED' }>;
+}) {
+  if (response.outcome === 'PARTIAL')
+    return (
+      <Alert severity="info">
+        Partial extraction finished. Review each field and its evidence above.
+        Missing fields do not establish absence from the source. Matching is
+        disabled.
+      </Alert>
+    );
+  if (response.outcome === 'PARSED')
+    return (
+      <Alert severity="info">
+        Parsed successfully without AI. No facts were validated and matching is
+        disabled. Review the source above. Choose Analyze only when you are
+        ready to run local AI extraction.
+      </Alert>
+    );
   if (response.outcome === 'INCOMPLETE')
     return (
       <Stack spacing={2}>
@@ -58,6 +153,11 @@ export function AnalysisResult({ response }: { response: AnalysisResponse }) {
         </Typography>
         <Typography>
           Extraction can fail even when the document contains valid information.
+        </Typography>
+        <Typography>
+          Matching is disabled. Review the retained source above, check local
+          services, then choose Analyze to retry manually. Parse without AI lets
+          you view source without running the model.
         </Typography>
         <Box component="ul">
           {Object.entries(response.stages).map(([stage, status]) => (
@@ -79,7 +179,7 @@ export function AnalysisResult({ response }: { response: AnalysisResponse }) {
         </Box>
       </Stack>
     );
-  return <CompletedAnalysis key={response.requestId} response={response} />;
+  return null;
 }
 
 function CompletedAnalysis({

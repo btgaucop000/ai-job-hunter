@@ -1,3 +1,5 @@
+import { sanitizeDocxFailure } from './docx-failure.js';
+import type { DocxFailureReason } from './docx-failure.js';
 import { sanitizeDiagnostic } from './extraction.diagnostics.js';
 import type { ValidationDiagnostic } from './extraction.diagnostics.js';
 const messages = {
@@ -25,12 +27,16 @@ const messages = {
 } as const;
 export class ExtractionError extends Error {
   readonly diagnostic?: ValidationDiagnostic;
+  readonly docxFailure?: DocxFailureReason;
   constructor(
     public readonly code: keyof typeof messages,
     diagnostic?: unknown,
+    docxFailure?: unknown,
   ) {
     super(messages[code]);
     this.name = 'ExtractionError';
     this.diagnostic = sanitizeDiagnostic(code, diagnostic);
+    this.docxFailure =
+      code === 'PARSING_FAILED' ? sanitizeDocxFailure(docxFailure) : undefined;
   }
 }

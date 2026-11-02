@@ -16,6 +16,28 @@ test('accepts isolated test settings and disables schema automation', () => {
   expect(options.synchronize).toBe(false);
   expect(options.migrationsRun).toBe(false);
   expect(validateEnvironment(env).port).toBe(3000);
+  expect(validateEnvironment(env).pdfParserDiagnostics).toBe(false);
+  expect(validateEnvironment(env).aiGenerationDiagnostics).toBe(false);
+});
+test('enables PDF parser diagnostics only for the literal opt-in value', () => {
+  expect(
+    validateEnvironment({ ...env, PDF_PARSER_DIAGNOSTICS: '1' })
+      .pdfParserDiagnostics,
+  ).toBe(true);
+  expect(
+    validateEnvironment({ ...env, PDF_PARSER_DIAGNOSTICS: 'true' })
+      .pdfParserDiagnostics,
+  ).toBe(false);
+});
+test('enables AI generation diagnostics only for the literal opt-in value', () => {
+  expect(
+    validateEnvironment({ ...env, AI_GENERATION_DIAGNOSTICS: '1' })
+      .aiGenerationDiagnostics,
+  ).toBe(true);
+  expect(
+    validateEnvironment({ ...env, AI_GENERATION_DIAGNOSTICS: 'true' })
+      .aiGenerationDiagnostics,
+  ).toBe(false);
 });
 test.each(['0', '65536', 'abc', '3000.5', ''])(
   'rejects invalid API_PORT %s',

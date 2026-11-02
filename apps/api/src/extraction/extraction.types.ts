@@ -66,6 +66,7 @@ export interface JdExtractionInput {
 }
 export type ExtractionWarning =
   | { readonly code: 'IMAGE_CONTENT_NOT_INTERPRETED' }
+  | { readonly code: 'PDF_RECOVERY_USED' }
   | { readonly code: 'PAGE_WITHOUT_TEXT'; readonly page: number }
   | { readonly code: 'DOCX_CONTENT_WARNING' }
   | { readonly code: 'EXTRACTION_COMPLETENESS_NOT_VERIFIED' };

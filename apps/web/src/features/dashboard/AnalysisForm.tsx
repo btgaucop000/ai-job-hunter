@@ -11,7 +11,7 @@ import {
 import type { FormErrors } from './analysis-validation';
 interface Props {
   busy: boolean;
-  onStart: (file: File, text: string) => void;
+  onStart: (file: File, text: string, parseOnly: boolean) => void;
   onEdit: () => void;
   onCancel: () => void;
   onClear: () => void;
@@ -50,7 +50,12 @@ export function AnalysisForm({
           jdInput.current?.focus();
           return;
         }
-        onStart(files[0]!, jdText);
+        const submitter = (event.nativeEvent as SubmitEvent).submitter;
+        onStart(
+          files[0]!,
+          jdText,
+          submitter?.getAttribute('value') === 'parse-only',
+        );
       }}
     >
       <Stack spacing={2}>
@@ -119,7 +124,19 @@ export function AnalysisForm({
           {jdBytes(jdText).toLocaleString('en-US')} /{' '}
           {JD_BYTES.toLocaleString('en-US')} UTF-8 bytes.
         </Typography>
+        <Typography variant="body2">
+          Analyze runs local AI for basic facts only. It does not generate a
+          matching score.
+        </Typography>
         <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
+          <Button
+            type="submit"
+            value="parse-only"
+            variant="outlined"
+            disabled={busy}
+          >
+            Parse without AI
+          </Button>
           <Button type="submit" variant="contained" disabled={busy}>
             Analyze
           </Button>

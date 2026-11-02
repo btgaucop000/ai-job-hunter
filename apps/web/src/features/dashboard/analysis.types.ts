@@ -1,3 +1,4 @@
+import type { PartialDocument } from './partial.types';
 // Browser-owned version-1 wire types. No backend runtime imports.
 interface EvidenceReference {
   readonly segmentId: string;
@@ -9,6 +10,7 @@ type ExtractionWarning =
   | {
       readonly code:
         | 'IMAGE_CONTENT_NOT_INTERPRETED'
+        | 'PDF_RECOVERY_USED'
         | 'DOCX_CONTENT_WARNING'
         | 'EXTRACTION_COMPLETENESS_NOT_VERIFIED';
     }
@@ -122,13 +124,21 @@ export interface AnalysisError {
   code: string;
   diagnostic: { stage: string; rule: string; field: string } | null;
 }
+export interface AnalysisDocument {
+  partial?: PartialDocument;
+  text: string;
+  facts: readonly { path: string; value: string | null }[] | null;
+}
 interface Base {
+  documents?: { cv: AnalysisDocument | null; jd: AnalysisDocument | null };
   contractVersion: '1';
   requestId: string;
   stages: Stages;
 }
 export type AnalysisResponse = Base &
   (
+    | { outcome: 'PARTIAL'; result: null; error: null }
+    | { outcome: 'PARSED'; result: null; error: null }
     | { outcome: 'COMPLETED'; result: MatchingResult; error: null }
     | { outcome: 'INCOMPLETE'; result: null; error: AnalysisError }
   );

@@ -8,6 +8,8 @@ export interface ZipFixtureEntry {
   crc?: number;
   declaredSize?: number;
   localName?: string;
+  localExtra?: Buffer;
+  centralExtra?: Buffer;
   mode?: number;
 }
 // Minimal synthetic ZIP encoder for adversarial fixtures, never used in production.
@@ -21,6 +23,8 @@ export function zipFixture(entries: ZipFixtureEntry[]): Uint8Array {
       : Buffer.from(entry.data);
     const name = Buffer.from(entry.name);
     const localName = Buffer.from(entry.localName ?? entry.name);
+    const localExtra = entry.localExtra ?? Buffer.alloc(0);
+    const centralExtra = entry.centralExtra ?? Buffer.alloc(0);
     const packed = entry.deflate ? deflateRawSync(data) : data;
     const checksum = entry.crc ?? crc32(data);
     const size = entry.declaredSize ?? data.length;
@@ -33,7 +37,8 @@ export function zipFixture(entries: ZipFixtureEntry[]): Uint8Array {
     header.writeUInt32LE(packed.length, 18);
     header.writeUInt32LE(size, 22);
     header.writeUInt16LE(localName.length, 26);
-    local.push(header, localName, packed);
+    header.writeUInt16LE(localExtra.length, 28);
+    local.push(header, localName, localExtra, packed);
     const directory = Buffer.alloc(46);
     directory.writeUInt32LE(0x02014b50);
     directory.writeUInt16LE(0x314, 4);
@@ -44,10 +49,12 @@ export function zipFixture(entries: ZipFixtureEntry[]): Uint8Array {
     directory.writeUInt32LE(packed.length, 20);
     directory.writeUInt32LE(size, 24);
     directory.writeUInt16LE(name.length, 28);
+    directory.writeUInt16LE(centralExtra.length, 30);
     directory.writeUInt32LE(((entry.mode ?? 0x81a4) << 16) >>> 0, 38);
     directory.writeUInt32LE(offset, 42);
-    central.push(directory, name);
-    offset += header.length + localName.length + packed.length;
+    central.push(directory, name, centralExtra);
+    offset +=
+      header.length + localName.length + localExtra.length + packed.length;
   }
   const directory = Buffer.concat(central);
   const end = Buffer.alloc(22);
@@ -126,3 +133,13 @@ export const docxInput = (entries = docxEntries()) => ({
   mediaType:
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 });
+
+// Synthetic Office OPC local-header growth hint; contains only zero padding.
+export function opcGrowthPadding(size: number): Buffer {
+  const extra = Buffer.alloc(8 + size);
+  extra.writeUInt16LE(0xa220, 0);
+  extra.writeUInt16LE(4 + size, 2);
+  extra.writeUInt16LE(0xa028, 4);
+  extra.writeUInt16LE(size, 6);
+  return extra;
+}

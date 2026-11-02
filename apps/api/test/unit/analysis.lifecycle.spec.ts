@@ -39,6 +39,12 @@ import {
   syntheticSource,
   unknownFact,
 } from '../support/extraction-fixtures.js';
+import { currentPdfParserDiagnosticRequestId } from '../../src/extraction/pdf-parser.diagnostics.js';
+import {
+  configureAiGenerationDiagnostics,
+  emitFinalLengthDiagnostic,
+} from '../../src/ai/ai-generation.diagnostics.js';
+import type { FinalLengthDiagnosticRecord } from '../../src/ai/ai-generation.diagnostics.js';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -95,6 +101,7 @@ let cvEntered: ReturnType<typeof deferred<void>>;
 let jdEntered: ReturnType<typeof deferred<void>>;
 let shutdownBarrier: () => Promise<void>;
 let order: string[];
+let cvDiagnosticRequestId: string | null;
 const host = '127.0.0.1:3000';
 const origin = 'http://127.0.0.1:5173';
 const boundary = 'lifecycle';
@@ -148,6 +155,7 @@ function streaming() {
 beforeEach(async () => {
   values = fixtures();
   order = [];
+  cvDiagnosticRequestId = null;
   cvEntered = deferred<void>();
   jdEntered = deferred<void>();
   cvWork = async () => values.cv;
@@ -166,6 +174,7 @@ beforeEach(async () => {
           },
           extractCv: async () => {
             order.push('cv');
+            cvDiagnosticRequestId = currentPdfParserDiagnosticRequestId();
             cvEntered.resolve();
             return cvWork();
           },
@@ -194,6 +203,7 @@ afterEach(async () => {
   jest.useRealTimers();
   await app.close();
   jest.restoreAllMocks();
+  configureAiGenerationDiagnostics(false, '127.0.0.1', () => {});
 });
 
 test.each(['pdf', 'docx'])(
@@ -229,18 +239,39 @@ test.each(['pdf', 'docx'])(
     expect(response.body.result).toEqual(JSON.parse(JSON.stringify(expected)));
     expect(response.body).not.toHaveProperty('source');
     expect(JSON.stringify(response.body)).not.toContain('synthetic.pdf');
+    expect(cvDiagnosticRequestId).toBe(response.body.requestId);
   },
 );
+test('completed API result preserves the PDF recovery warning', async () => {
+  values = {
+    ...values,
+    cv: {
+      ...values.cv,
+      warnings: [...values.cv.warnings, { code: 'PDF_RECOVERY_USED' as const }],
+    },
+  };
+  const response = await start();
+  expect(response.status).toBe(200);
+  expect(response.body.result.extractionWarnings).toContainEqual({
+    document: 'cv',
+    warning: { code: 'PDF_RECOVERY_USED' },
+  });
+});
 test.each([
-  [false, false, null],
-  [false, true, 0],
+  [false, false],
+  [false, true],
+  [true, false],
 ] as const)(
-  'null and zero remain distinct (%s,%s)',
-  async (skill, requirement, score) => {
+  'insufficient validated inputs block matching (%s,%s)',
+  async (skill, requirement) => {
     values = fixtures(skill, requirement);
+    const spy = jest.spyOn(matching, 'match');
     const response = await start();
-    expect(response.body.result.overallScore).toBe(score);
-    expect(response.body.result).toEqual(new MatchingService().match(values));
+    expect(response.status).toBe(422);
+    expect(response.body.result).toBeNull();
+    expect(response.body.error.code).toBe('INSUFFICIENT_MATCHING_INPUT');
+    expect(response.body.documents.cv.facts).not.toBeNull();
+    expect(spy).not.toHaveBeenCalled();
   },
 );
 test.each(['cv', 'jd'] as const)(
@@ -278,6 +309,45 @@ test.each(['cv', 'jd'] as const)(
           .attach('cv', Buffer.from('x'), 'synthetic.pdf')
       ).status,
     ).toBe(422);
+  },
+);
+test.each(['cv', 'jd'] as const)(
+  '%s output-length diagnostics retain request correlation outside the API response',
+  async (stage) => {
+    const records: FinalLengthDiagnosticRecord[] = [];
+    configureAiGenerationDiagnostics(true, '127.0.0.1', (record) =>
+      records.push(record),
+    );
+    const fail = async () => {
+      emitFinalLengthDiagnostic({
+        promptTokens: 4000,
+        evalCount: 2048,
+        outputTokenLimit: 2048,
+        jsonSyntax: 'INVALID',
+      });
+      throw new AiError('OUTPUT_LIMIT_EXCEEDED');
+    };
+    if (stage === 'cv') cvWork = fail;
+    else jdWork = fail;
+    const response = await start();
+    expect(response.status).toBe(422);
+    expect(response.body.error).toEqual({
+      stage: stage.toUpperCase(),
+      code: 'OUTPUT_LIMIT_EXCEEDED',
+      diagnostic: null,
+    });
+    expect(records).toEqual([
+      {
+        requestId: response.body.requestId,
+        extractionKind: stage.toUpperCase(),
+        reason: 'FINAL_LENGTH',
+        promptTokens: 4000,
+        evalCount: 2048,
+        outputTokenLimit: 2048,
+        jsonSyntax: 'INVALID',
+      },
+    ]);
+    expect(JSON.stringify(response.body)).not.toContain('promptTokens');
   },
 );
 test.each([
@@ -609,5 +679,20 @@ test.each(['cv', 'jd'] as const)(
     cvWork = async () => values.cv;
     jdWork = async () => values.jd;
     expect((await start()).status).toBe(200);
+  },
+);
+
+test.each(['mode=unknown', 'mode=parse-only&mode=parse-only', 'other=value'])(
+  'invalid query %s is rejected before extraction',
+  async (query) => {
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/analyses?${query}`)
+      .set('Host', host)
+      .set('Origin', origin)
+      .set('Content-Type', `multipart/form-data; boundary=${boundary}`)
+      .send(payload());
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('INVALID_REQUEST');
+    expect(order).toEqual([]);
   },
 );

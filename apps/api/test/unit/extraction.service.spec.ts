@@ -111,6 +111,22 @@ test.each(['pdf', 'docx'] as const)(
     expect(parser.close).not.toHaveBeenCalled();
   },
 );
+test('preserves the PDF recovery warning in the extraction envelope', async () => {
+  const { service, parser } = setup();
+  parser.parse.mockResolvedValue({
+    ...parsed(),
+    warnings: [
+      { code: 'IMAGE_CONTENT_NOT_INTERPRETED' },
+      { code: 'PDF_RECOVERY_USED' },
+    ],
+  });
+  const result = await service.extractCv(pdfInput());
+  expect(result.warnings).toEqual([
+    { code: 'IMAGE_CONTENT_NOT_INTERPRETED' },
+    { code: 'PDF_RECOVERY_USED' },
+    { code: 'EXTRACTION_COMPLETENESS_NOT_VERIFIED' },
+  ]);
+});
 test('JD has one immutable segment with null page and exact source text', async () => {
   const { service, generate, parser } = setup({
     ...emptyJd(),
@@ -490,4 +506,26 @@ test('duplicate facts reject entire service result rather than removing duplicat
     code: 'DUPLICATE_FACT',
   });
   expect(generate).toHaveBeenCalledTimes(1);
+});
+
+test('parse-only returns validated source without invoking AI', async () => {
+  const { service, generate } = setup();
+  const source = await service.parseCv(pdfInput());
+  expect(source).toEqual(parsed().source);
+  expect(Object.isFrozen(source)).toBe(true);
+  expect(generate).not.toHaveBeenCalled();
+});
+
+test('parsed source remains available when model evidence is rejected', async () => {
+  const { service } = setup({
+    ...emptyCv(),
+    name: quotedFact('Not in source'),
+  });
+  const onParsed =
+    jest.fn<(source: ReturnType<typeof syntheticSource>) => void>();
+  await expect(service.extractCv(pdfInput(), onParsed)).rejects.toMatchObject({
+    code: 'INVALID_EVIDENCE',
+  });
+  expect(onParsed).toHaveBeenCalledWith(parsed().source);
+  expect(Object.isFrozen(onParsed.mock.calls[0]![0])).toBe(true);
 });

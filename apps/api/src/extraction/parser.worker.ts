@@ -1,12 +1,15 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { ExtractionError } from './extraction.errors.js';
 import { parserErrorCodes, validateParseRequest } from './parser.protocol.js';
+import { diagnosticFromError } from './pdf-parser.diagnostics.js';
+import type { ParseRequest } from './parser.protocol.js';
 import type { ParseResponse } from './parser.protocol.js';
 
 if (!parentPort) throw new Error('Parser worker requires a parent port');
 let response: ParseResponse;
+let request: ParseRequest | undefined;
 try {
-  const request = validateParseRequest(workerData);
+  request = validateParseRequest(workerData);
   // Import inside the guarded path. Parent captures/discards library startup diagnostics.
   const result =
     request.format === 'pdf'
@@ -18,7 +21,28 @@ try {
     error instanceof ExtractionError
       ? parserErrorCodes.find((code) => code === error.code)
       : undefined;
-  response = { version: 1, ok: false, code: code ?? 'PARSING_FAILED' };
+  response = {
+    version: 1,
+    ok: false,
+    code: code ?? 'PARSING_FAILED',
+    ...(request?.format === 'docx' &&
+    (code ?? 'PARSING_FAILED') === 'PARSING_FAILED'
+      ? {
+          docxFailure:
+            error instanceof ExtractionError
+              ? (error.docxFailure ?? 'WORKER_FAILED')
+              : 'WORKER_FAILED',
+        }
+      : {}),
+    diagnostic:
+      request?.format === 'pdf' && request.diagnostics
+        ? (diagnosticFromError(error) ?? {
+            phase: 'WORKER_STARTUP',
+            category: 'OTHER',
+            recoveryAttempted: false,
+          })
+        : null,
+  };
 }
 parentPort.postMessage(response);
 parentPort.close();

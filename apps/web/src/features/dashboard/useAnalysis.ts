@@ -9,7 +9,10 @@ export type AnalysisState =
     }
   | {
       status: 'incomplete';
-      response: Extract<AnalysisResponse, { outcome: 'INCOMPLETE' }>;
+      response: Extract<
+        AnalysisResponse,
+        { outcome: 'INCOMPLETE' | 'PARSED' | 'PARTIAL' }
+      >;
     }
   | { status: 'clientError'; kind: 'network' | 'malformed' };
 export function useAnalysis() {
@@ -31,14 +34,19 @@ export function useAnalysis() {
     },
     [],
   );
-  const start = async (file: File, jdText: string) => {
+  const start = async (file: File, jdText: string, parseOnly = false) => {
     if (active.current) return;
     const id = ++generation.current;
     const controller = new AbortController();
     active.current = controller;
     setState({ status: 'processing' });
     try {
-      const response = await analyze(file, jdText, controller.signal);
+      const response = await analyze(
+        file,
+        jdText,
+        controller.signal,
+        parseOnly,
+      );
       if (id !== generation.current) return;
       setState(
         response.outcome === 'COMPLETED'

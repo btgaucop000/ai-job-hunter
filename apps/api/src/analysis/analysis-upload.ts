@@ -71,6 +71,7 @@ export async function readAnalysisUpload(
   req: IncomingMessage,
   uploadMs: number = UPLOAD_LIMITS.uploadMs,
   signal?: AbortSignal,
+  cvOnly = false,
 ): Promise<AnalysisUpload> {
   const boundary = checkUploadHeaders(req);
   return new Promise((resolve, reject) => {
@@ -218,6 +219,10 @@ export async function readAnalysisUpload(
     });
     parser.on('field', (name, value, info) => {
       if (settled) return;
+      if (cvOnly) {
+        fail(new AnalysisError('INVALID_REQUEST'));
+        return;
+      }
       if (
         ++fields !== 1 ||
         name !== 'jdText' ||
@@ -246,12 +251,16 @@ export async function readAnalysisUpload(
     });
     parser.on('close', () => {
       if (settled) return;
-      if (files !== 1 || fields !== 1 || !cv || jdText === undefined) {
+      if (
+        files !== 1 ||
+        !cv ||
+        (cvOnly ? fields !== 0 : fields !== 1 || jdText === undefined)
+      ) {
         fail(new AnalysisError('INVALID_REQUEST'));
         return;
       }
       settled = true;
-      const result = { cv, jdText };
+      const result = { cv, jdText: jdText ?? '' };
       cleanup();
       cv = undefined;
       jdText = undefined;

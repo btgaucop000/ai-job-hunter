@@ -18,67 +18,71 @@ export function Dashboard() {
     <Stack spacing={3}>
       <Box>
         <Typography variant="h4" component="h1">
-          Dashboard
+          CV & Review
         </Typography>
         <Typography>
-          Analyze documented requirement support using a CV and job description.
+          Existing CV upload, document parsing, partial extraction, and fact
+          review.
         </Typography>
       </Box>
-      <Typography color="text.secondary">
-        Local processing; inputs and results stay in memory until cleared or you
-        leave this page. API readiness does not guarantee Ollama availability or
-        extraction quality. Quote ambiguity, negation, uncertainty,
-        source-instruction contamination and sensitivity to evidence annotations
-        remain known limitations.
-      </Typography>
-      <AnalysisForm
-        busy={state.status === 'processing'}
-        onStart={(file, text) => {
-          void start(file, text);
-        }}
-        onEdit={reset}
-        onCancel={cancel}
-        onClear={reset}
-      />
-      <Box ref={statusPanel} tabIndex={-1} sx={{ outlineOffset: 4 }}>
-        <Box role="status" aria-live="polite">
-          {state.status === 'idle' && (
-            <Typography>
-              Choose a CV and enter a JD to start. No analysis results yet.
-            </Typography>
-          )}
-          {state.status === 'processing' && (
-            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-              <CircularProgress size={24} aria-label="Analysis in progress" />
+      <Box component="details" role="region" aria-label="CV/JD analysis">
+        <summary>Existing CV/JD extraction and fact review</summary>
+        <Typography color="text.secondary">
+          Local processing; inputs and results stay in memory until cleared or
+          you leave this page. API readiness does not guarantee Ollama
+          availability or extraction quality. Quote ambiguity, negation,
+          uncertainty, source-instruction contamination and sensitivity to
+          evidence annotations remain known limitations.
+        </Typography>
+        <AnalysisForm
+          busy={state.status === 'processing'}
+          onStart={(file, text, parseOnly) => {
+            void start(file, text, parseOnly);
+          }}
+          onEdit={reset}
+          onCancel={cancel}
+          onClear={reset}
+        />
+        <Box ref={statusPanel} tabIndex={-1} sx={{ outlineOffset: 4 }}>
+          <Box role="status" aria-live="polite">
+            {state.status === 'idle' && (
               <Typography>
-                Processing locally… This can take several minutes. Cancel stops
-                waiting, but may not immediately stop local extraction.
+                Choose a CV and enter a JD to start. No analysis results yet.
               </Typography>
-            </Stack>
+            )}
+            {state.status === 'processing' && (
+              <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+                <CircularProgress size={24} aria-label="Analysis in progress" />
+                <Typography>
+                  Processing locally… This can take several minutes. Cancel
+                  stops waiting, but may not immediately stop local extraction.
+                </Typography>
+              </Stack>
+            )}
+            {state.status === 'completed' && (
+              <Typography>
+                Analysis completed. Review the evidence and limitations below.
+              </Typography>
+            )}
+            {state.status === 'cancelled' && (
+              <Typography>
+                Stopped waiting for this analysis. Local extraction may still be
+                finishing; another request may temporarily return busy. Your
+                inputs were retained.
+              </Typography>
+            )}
+          </Box>
+          {state.status === 'clientError' && (
+            <Alert severity="error">
+              {state.kind === 'network'
+                ? 'Could not reach the local analysis API. Check the local services and retry manually.'
+                : 'The API returned an invalid or incompatible analysis response. No result can be displayed.'}
+            </Alert>
           )}
-          {state.status === 'completed' && (
-            <Typography>
-              Analysis completed. Review the evidence and limitations below.
-            </Typography>
-          )}
-          {state.status === 'cancelled' && (
-            <Typography>
-              Stopped waiting for this analysis. Local extraction may still be
-              finishing; another request may temporarily return busy. Your
-              inputs were retained.
-            </Typography>
+          {(state.status === 'completed' || state.status === 'incomplete') && (
+            <AnalysisResult response={state.response} />
           )}
         </Box>
-        {state.status === 'clientError' && (
-          <Alert severity="error">
-            {state.kind === 'network'
-              ? 'Could not reach the local analysis API. Check the local services and retry manually.'
-              : 'The API returned an invalid or incompatible analysis response. No result can be displayed.'}
-          </Alert>
-        )}
-        {(state.status === 'completed' || state.status === 'incomplete') && (
-          <AnalysisResult response={state.response} />
-        )}
       </Box>
     </Stack>
   );
