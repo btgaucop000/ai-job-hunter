@@ -48,11 +48,15 @@ export function CvMatchPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<MatchResult | null>(null);
-  useEffect(() => {
-    generation.current++;
+  const [source, setSource] = useState({ jobId, revision });
+  if (source.jobId !== jobId || source.revision !== revision) {
+    setSource({ jobId, revision });
     setResult(null);
+  }
+  useEffect(() => {
+    const request = ++generation.current;
     return () => {
-      generation.current++;
+      generation.current = request + 1;
     };
   }, [jobId, revision]);
   useEffect(() => {

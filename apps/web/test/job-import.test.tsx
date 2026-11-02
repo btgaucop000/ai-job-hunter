@@ -61,7 +61,7 @@ function preview(
   };
 }
 function mount() {
-  return render(
+  const view = render(
     <MemoryRouter initialEntries={['/jobs/new']}>
       <Routes>
         <Route path="/jobs/new" element={<JobEditor />} />
@@ -69,6 +69,8 @@ function mount() {
       </Routes>
     </MemoryRouter>,
   );
+  fireEvent.click(screen.getByRole('button', { name: /Paste JD/ }));
+  return view;
 }
 function mock(result: ImportPreview) {
   let saved = {
@@ -78,6 +80,12 @@ function mock(result: ImportPreview) {
     documentName: null,
   };
   const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith('/cv/current')) return Response.json(null);
+    if (url.endsWith('/parse-document'))
+      return Response.json({
+        text: result.jdText || 'Synthetic parsed JD',
+        warnings: [],
+      });
     if (url.endsWith('/extract')) return Response.json(result);
     if (init?.method === 'POST') {
       const record =
@@ -115,7 +123,7 @@ test('paste-first extraction fills editable fields, leaves company optional and 
   await userEvent.click(
     screen.getByRole('button', { name: 'Confirm and save job' }),
   );
-  await screen.findByRole('heading', { name: 'Job details' });
+  await screen.findByRole('heading', { name: 'Job overview' });
   const request = fetch.mock.calls.find(
     ([, init]) => init?.method === 'POST' && typeof init.body === 'string',
   )!;
@@ -144,26 +152,36 @@ test.each([false, true])(
     const file = new File(['synthetic PDF bytes'], 'synthetic.pdf', {
       type: 'application/pdf',
     });
+    fireEvent.click(screen.getByRole('button', { name: /Upload JD/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Upload JD/ }));
     await userEvent.upload(
       screen.getByLabelText('Upload JD document (PDF or DOCX)'),
       file,
     );
-    if (withPost)
+    if (withPost) {
+      fireEvent.click(screen.getByRole('button', { name: /Paste JD/ }));
       fireEvent.change(screen.getByLabelText('Recruitment post'), {
         target: { value: post },
       });
+    }
     await userEvent.click(
       screen.getByRole('button', { name: 'Extract with AI' }),
     );
     await screen.findByDisplayValue('JD Employer');
     expect(
-      (fetch.mock.calls[0]![1]!.body as FormData).get('document'),
+      (
+        fetch.mock.calls.find(([url]) => url.endsWith('/extract'))![1]!
+          .body as FormData
+      ).get('document'),
     ).toBeInstanceOf(File);
     await userEvent.click(
       screen.getByRole('button', { name: 'Confirm and save job' }),
     );
-    await screen.findByRole('heading', { name: 'Job details' });
-    const saved = fetch.mock.calls[1]![1]!.body as FormData;
+    await screen.findByRole('heading', { name: 'Job overview' });
+    const saved = fetch.mock.calls.find(
+      ([url, init]) =>
+        url === '/api/v1/opportunities' && init?.method === 'POST',
+    )![1]!.body as FormData;
     expect(saved.get('document')).toBeInstanceOf(File);
     expect(JSON.parse(saved.get('record') as string).company).toBe(
       'JD Employer',
@@ -211,7 +229,7 @@ test('conflict is blank and saving stays blocked until an explicit review', asyn
   await userEvent.click(
     screen.getByRole('button', { name: 'Confirm and save job' }),
   );
-  await screen.findByRole('heading', { name: 'Job details' });
+  await screen.findByRole('heading', { name: 'Job overview' });
 });
 test('AI failure retains the post and allows manual save without another extraction', async () => {
   const fetch = mock(
@@ -232,7 +250,7 @@ test('AI failure retains the post and allows manual save without another extract
   await userEvent.click(
     screen.getByRole('button', { name: 'Confirm and save job' }),
   );
-  await screen.findByRole('heading', { name: 'Job details' });
+  await screen.findByRole('heading', { name: 'Job overview' });
   expect(
     fetch.mock.calls.filter(([url]) => url.endsWith('/extract')),
   ).toHaveLength(1);
@@ -246,6 +264,7 @@ test('maps the captured single Ollama result, requires conflict review and saves
   fireEvent.change(screen.getByLabelText('Recruitment post'), {
     target: { value: result.postText },
   });
+  fireEvent.click(screen.getByRole('button', { name: /Upload JD/ }));
   await userEvent.upload(
     screen.getByLabelText('Upload JD document (PDF or DOCX)'),
     new File(['synthetic replay attachment'], 'synthetic-jd.pdf', {
@@ -290,8 +309,10 @@ test('maps the captured single Ollama result, requires conflict review and saves
   await userEvent.click(
     screen.getByRole('button', { name: 'Confirm and save job' }),
   );
-  await screen.findByRole('heading', { name: 'Job details' });
-  const savedRequest = fetch.mock.calls[1]![1]!;
+  await screen.findByRole('heading', { name: 'Job overview' });
+  const savedRequest = fetch.mock.calls.find(
+    ([url, init]) => url === '/api/v1/opportunities' && init?.method === 'POST',
+  )![1]!;
   const body = savedRequest.body;
   const saved =
     typeof body === 'string'
@@ -338,21 +359,23 @@ test('an actionable DOCX parsing failure retains the post, file and manual field
   fireEvent.change(screen.getByLabelText(/Job title/), {
     target: { value: 'Synthetic manual title' },
   });
+  fireEvent.click(screen.getByRole('button', { name: /Upload JD/ }));
   await userEvent.upload(
     screen.getByLabelText('Upload JD document (PDF or DOCX)'),
     new File(['synthetic corrupted docx'], 'retained-synthetic.docx', {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     }),
   );
-  await userEvent.click(
-    screen.getByRole('button', { name: 'Extract with AI' }),
-  );
   await screen.findByText(/The DOCX archive is damaged/);
+  expect(screen.getByText('retained-synthetic.docx')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: /Paste JD/ }));
   expect(screen.getByLabelText('Recruitment post')).toHaveValue(post);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Continue to Review & Save' }),
+  );
   expect(screen.getByLabelText(/Job title/)).toHaveValue(
     'Synthetic manual title',
   );
-  expect(screen.getByText('retained-synthetic.docx')).toBeVisible();
   expect(
     screen.getByRole('button', { name: 'Confirm and save job' }),
   ).toBeEnabled();
@@ -368,6 +391,7 @@ test('complete synthetic extraction populates new review fields and corrections 
   fireEvent.change(screen.getByLabelText('Recruitment post'), {
     target: { value: result.postText },
   });
+  fireEvent.click(screen.getByRole('button', { name: /Upload JD/ }));
   await userEvent.upload(
     screen.getByLabelText('Upload JD document (PDF or DOCX)'),
     new File(['synthetic-only docx'], 'synthetic-vietnamese.docx', {
@@ -405,7 +429,7 @@ test('complete synthetic extraction populates new review fields and corrections 
   await userEvent.click(
     screen.getByRole('button', { name: 'Confirm and save job' }),
   );
-  await screen.findByRole('heading', { name: 'Job details' });
+  await screen.findByRole('heading', { name: 'Job overview' });
   expect(screen.getByLabelText('Experience')).toHaveValue(
     'Minimum 4 years (reviewed)',
   );
@@ -490,6 +514,7 @@ test('a saved manually cleared field stays empty when extracting again', async (
     </MemoryRouter>,
   );
   await screen.findByDisplayValue('AI Developer');
+  fireEvent.click(screen.getByRole('tab', { name: 'Edit JD' }));
   expect(screen.getByLabelText('Company')).toHaveValue('');
   await userEvent.click(
     screen.getByRole('button', { name: 'Extract with AI' }),
@@ -520,7 +545,7 @@ test('all contact methods display, save and reload while manual contacts survive
   await userEvent.click(
     screen.getByRole('button', { name: 'Confirm and save job' }),
   );
-  await screen.findByRole('heading', { name: 'Job details' });
+  await screen.findByRole('heading', { name: 'Job overview' });
   expect(screen.getByLabelText('Recruiter / contact notes')).toHaveValue(
     contacts,
   );
@@ -537,11 +562,14 @@ test('all contact methods display, save and reload while manual contacts survive
       contacts,
     ),
   );
+  fireEvent.click(screen.getByRole('tab', { name: 'Edit JD' }));
   const manual = 'Manual contact correction\n' + contacts;
   fireEvent.change(screen.getByLabelText('Recruiter / contact notes'), {
     target: { value: manual },
   });
   vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const back = screen.queryByRole('button', { name: 'Back to Import sources' });
+  if (back) fireEvent.click(back);
   await userEvent.click(
     screen.getByRole('button', { name: 'Extract with AI' }),
   );
@@ -570,6 +598,18 @@ test('JD office contacts stay in parsed source text while filtered recruiter sug
   fireEvent.change(screen.getByLabelText('Recruitment post'), {
     target: { value: 'Email: recruiter@example.com\nZalo: 0900 123 456' },
   });
+  fireEvent.click(screen.getByRole('button', { name: /Upload JD/ }));
+  await userEvent.upload(
+    screen.getByLabelText('Upload JD document (PDF or DOCX)'),
+    new File(['synthetic office-contact fixture'], 'synthetic-contacts.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Extract with AI' }),
+    ).toBeEnabled(),
+  );
   await userEvent.click(
     screen.getByRole('button', { name: 'Extract with AI' }),
   );
@@ -578,14 +618,20 @@ test('JD office contacts stay in parsed source text while filtered recruiter sug
       contacts,
     ),
   );
-  expect(
-    screen.getByText('Parsed JD text').closest('details')?.textContent,
-  ).toContain(jd);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Back to Import sources' }),
+  );
+  expect(screen.getByLabelText('Source JD text (read-only)')).toHaveValue(jd);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Continue to Review & Save' }),
+  );
   const manual = 'Manually corrected recruiter: 0900 555 444';
   fireEvent.change(screen.getByLabelText('Recruiter / contact notes'), {
     target: { value: manual },
   });
   vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const back = screen.queryByRole('button', { name: 'Back to Import sources' });
+  if (back) fireEvent.click(back);
   await userEvent.click(
     screen.getByRole('button', { name: 'Extract with AI' }),
   );
@@ -597,36 +643,69 @@ test('JD office contacts stay in parsed source text while filtered recruiter sug
   await userEvent.click(
     screen.getByRole('button', { name: 'Confirm and save job' }),
   );
-  await screen.findByRole('heading', { name: 'Job details' });
+  await screen.findByRole('heading', { name: 'Job overview' });
   expect(screen.getByLabelText('Recruiter / contact notes')).toHaveValue(
     manual,
   );
 });
 
 test('manual URL survives extraction, save and reopen without fetching the URL', async () => {
-  const fetch = mock(preview({ title: 'Synthetic backend role', originalLink: 'https://example.com/model-link' }));
+  const fetch = mock(
+    preview({
+      title: 'Synthetic backend role',
+      originalLink: 'https://example.com/model-link',
+    }),
+  );
   mount();
   const url = 'https://www.itviec.com/it-jobs/synthetic-role?utm_source=manual';
-  fireEvent.change(screen.getByLabelText('Original Job URL (optional)'), { target: { value: url } });
+  fireEvent.click(screen.getByRole('button', { name: /Job URL/ }));
+  fireEvent.change(screen.getByLabelText('Original Job URL (optional)'), {
+    target: { value: url },
+  });
   expect(screen.getByText(/Platform: ITviec/)).toBeVisible();
-  fireEvent.change(screen.getByLabelText('Recruitment post'), { target: { value: post } });
-  await userEvent.click(screen.getByRole('button', { name: 'Extract with AI' }));
+  fireEvent.click(screen.getByRole('button', { name: /Paste JD/ }));
+  fireEvent.change(screen.getByLabelText('Recruitment post'), {
+    target: { value: post },
+  });
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Extract with AI' }),
+  );
   await screen.findByDisplayValue('Synthetic backend role');
-  expect(screen.getByLabelText('Original Job URL (optional)')).toHaveValue(url);
-  await userEvent.click(screen.getByRole('button', { name: 'Confirm and save job' }));
-  await screen.findByRole('heading', { name: 'Job details' });
-  expect(screen.getByRole('link', { name: 'View Original Job' })).toHaveAttribute('href', url);
-  expect(screen.getByLabelText('Original Job URL (optional)')).toHaveValue(url);
-  expect(fetch.mock.calls.every(([request]) => request.startsWith('/api/v1/'))).toBe(true);
+  expect(screen.getByLabelText('Original link')).toHaveValue(url);
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Confirm and save job' }),
+  );
+  await screen.findByRole('heading', { name: 'Job overview' });
+  expect(
+    screen.getByRole('link', { name: 'View Original Job' }),
+  ).toHaveAttribute('href', url);
+  expect(screen.getByLabelText('Original link')).toHaveValue(url);
+  expect(
+    fetch.mock.calls.every(([request]) => request.startsWith('/api/v1/')),
+  ).toBe(true);
 });
 
 test('invalid job URL blocks save with actionable feedback and retains inputs', async () => {
   const fetch = mock(preview({}));
   mount();
-  fireEvent.change(screen.getByLabelText('Original Job URL (optional)'), { target: { value: 'javascript:alert(1)' } });
-  fireEvent.change(screen.getByLabelText(/Job title/), { target: { value: 'Synthetic role' } });
-  await userEvent.click(screen.getByRole('button', { name: 'Confirm and save job' }));
-  expect(screen.getByRole('alert')).toHaveTextContent('Enter a full HTTP(S) job URL');
-  expect(screen.getByLabelText('Original Job URL (optional)')).toHaveValue('javascript:alert(1)');
+  fireEvent.click(screen.getByRole('button', { name: /Job URL/ }));
+  fireEvent.change(screen.getByLabelText('Original Job URL (optional)'), {
+    target: { value: 'javascript:alert(1)' },
+  });
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Continue to Review & Save' }),
+  );
+  fireEvent.change(screen.getByLabelText(/Job title/), {
+    target: { value: 'Synthetic role' },
+  });
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Confirm and save job' }),
+  );
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'Enter a full HTTP(S) job URL',
+  );
+  expect(screen.getByLabelText('Original link')).toHaveValue(
+    'javascript:alert(1)',
+  );
   expect(fetch).not.toHaveBeenCalled();
 });

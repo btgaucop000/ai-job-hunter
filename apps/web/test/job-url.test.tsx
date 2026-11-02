@@ -13,6 +13,10 @@ test.each([
   expect(jobUrlInfo(url)).toEqual({ valid: true, platform });
 });
 
-test.each(['not a URL', 'javascript:alert(1)', 'https://user:secret@itviec.com/job'])('rejects invalid/unsafe links: %s', (url) => {
+test.each([
+  'not a URL',
+  'javascript:alert(1)',
+  'https://user:secret@itviec.com/job',
+])('rejects invalid/unsafe links: %s', (url) => {
   expect(jobUrlInfo(url)).toEqual({ valid: false, platform: null });
 });

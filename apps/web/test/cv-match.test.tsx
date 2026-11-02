@@ -534,3 +534,27 @@ test('preview aligns an expanded target at the top and focuses without a second 
   expect(row).toHaveFocus();
   expect(row).toHaveAttribute('aria-current', 'true');
 });
+
+test('a result arriving after a saved-job revision change stays invalidated and permits a fresh analysis', async () => {
+  let finish!: (response: Response) => void;
+  const pending = new Promise<Response>((resolve) => {
+    finish = resolve;
+  });
+  const fetch = vi.fn(async (url: string) =>
+    url.endsWith('/cv/current')
+      ? Response.json({ fileName: 'synthetic.pdf' })
+      : pending,
+  );
+  vi.stubGlobal('fetch', fetch);
+  const view = render(<CvMatchPanel jobId="synthetic" revision="1" />);
+  await screen.findByText('Saved CV: synthetic.pdf');
+  fireEvent.click(screen.getByRole('button', { name: 'Analyze CV Match' }));
+  expect(screen.getByRole('status')).toBeVisible();
+  view.rerender(<CvMatchPanel jobId="synthetic" revision="2" />);
+  finish(Response.json(result));
+  await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+  expect(screen.queryByLabelText(/Fit score:/)).toBeNull();
+  fetch.mockResolvedValueOnce(Response.json(result));
+  fireEvent.click(screen.getByRole('button', { name: 'Analyze CV Match' }));
+  expect(await screen.findByLabelText(/Fit score: 75\/100/)).toBeVisible();
+});

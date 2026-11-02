@@ -1,4 +1,8 @@
-import { duplicateJob, normalizedUrl, type DiscoveredJob } from '../discovery/discovery.js';
+import {
+  duplicateJob,
+  normalizedUrl,
+  type DiscoveredJob,
+} from '../discovery/discovery.js';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { JobImportService } from './job-import.service.js';
 import type { JobDocument } from './job-import.upload.js';
@@ -20,12 +24,12 @@ export class OpportunitiesService {
   list() {
     return this.rows.find({
       where: { ownerId: LOCAL_OWNER_ID },
-      order: { updatedAt: "DESC", id: "ASC" },
+      order: { updatedAt: 'DESC', id: 'ASC' },
     });
   }
   async get(id: string) {
     const row = await this.rows.findOneBy({ id, ownerId: LOCAL_OWNER_ID });
-    if (!row) throw new NotFoundException("Opportunity not found");
+    if (!row) throw new NotFoundException('Opportunity not found');
     return row;
   }
   async document(id: string): Promise<JobDocument> {
@@ -39,7 +43,7 @@ export class OpportunitiesService {
       },
     });
     if (!row?.documentBytes || !row.documentName || !row.documentType)
-      throw new NotFoundException("JD document not found");
+      throw new NotFoundException('JD document not found');
     return {
       bytes: row.documentBytes,
       fileName: row.documentName,
@@ -78,10 +82,10 @@ export class OpportunitiesService {
           preferredSkills: job.preferredSkills,
           description: job.description,
           originalLink: job.originalLink,
-          source: "Website",
-          status: "SAVED",
-          contactNotes: "",
-          notes: "",
+          source: 'Website',
+          status: 'SAVED',
+          contactNotes: '',
+          notes: '',
           contactDates: [],
           followUpDate: null,
         });
@@ -89,7 +93,7 @@ export class OpportunitiesService {
           rows.create({
             ...fields,
             ownerId: LOCAL_OWNER_ID,
-            jdText: "",
+            jdText: '',
             discovery: job.discovery,
             documentName: null,
             documentType: null,
@@ -105,7 +109,7 @@ export class OpportunitiesService {
   }
   async create(input: unknown, document?: JobDocument) {
     const parsed = document ? await this.imports.parse(document) : null;
-    const fields = validateOpportunity(input, parsed?.source.text ?? "");
+    const fields = validateOpportunity(input, parsed?.source.text ?? '');
     const urlKey = normalizedUrl(fields.originalLink);
     if (urlKey) {
       const existing = await this.list();
@@ -119,9 +123,9 @@ export class OpportunitiesService {
         ...fields,
         description:
           fields.description ||
-          fullDescription(fields.postText, parsed?.source.text ?? ""),
+          fullDescription(fields.postText, parsed?.source.text ?? ''),
         ownerId: LOCAL_OWNER_ID,
-        jdText: parsed?.source.text ?? "",
+        jdText: parsed?.source.text ?? '',
         documentName: document?.fileName ?? null,
         documentType: document?.mediaType ?? null,
         documentBytes: document?.bytes ?? null,
@@ -133,7 +137,7 @@ export class OpportunitiesService {
     const row = await this.get(id);
     if (document && row.documentName)
       throw new BadRequestException(
-        "The original JD is preserved. Create another opportunity for a different document.",
+        'The original JD is preserved. Create another opportunity for a different document.',
       );
     const parsed = document ? await this.imports.parse(document) : null;
     const jdText = parsed?.source.text ?? row.jdText;
@@ -154,7 +158,7 @@ export class OpportunitiesService {
       importReview: row.importReview,
     };
     const editable =
-      input && typeof input === "object" && !Array.isArray(input)
+      input && typeof input === 'object' && !Array.isArray(input)
         ? { ...inherited, ...input }
         : input;
     const fields = validateOpportunity(editable, jdText);

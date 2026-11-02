@@ -23,9 +23,11 @@ test('complete ITviec requirements reach review with sparse mocked AI; education
     'https://itviec.com/it-jobs/synthetic-viettel',
   ).sourceText;
   const ai = {
-    generateStructured: jest.fn(async (_request: unknown) => ({
-      candidates: [],
-    })),
+    generateStructured: jest.fn<(request: unknown) => Promise<unknown>>(
+      async () => ({
+        candidates: [],
+      }),
+    ),
   };
   const result = await new JobImportService(ai as unknown as AiService).extract(
     { record: { postText: source } },

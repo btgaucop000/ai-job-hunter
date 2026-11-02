@@ -94,7 +94,13 @@ export interface OpportunityInput {
   followUpDate: string | null;
 }
 export interface Opportunity extends OpportunityInput {
-  discovery?: { sourceName: string; sourceJobId: string; sourceUrl: string; discoveredAt: string; techStack?: string[] } | null;
+  discovery?: {
+    sourceName: string;
+    sourceJobId: string;
+    sourceUrl: string;
+    discoveredAt: string;
+    techStack?: string[];
+  } | null;
   jdText: string;
   documentName: string | null;
   documentType: string | null;
@@ -169,18 +175,28 @@ export function importUpload(record: unknown, file?: File): FormData {
 }
 
 // Hostname recognition only: this never requests the supplied URL.
-export function jobUrlInfo(value: string): { valid: boolean; platform: string | null } {
+export function jobUrlInfo(value: string): {
+  valid: boolean;
+  platform: string | null;
+} {
   if (!value) return { valid: true, platform: null };
   try {
     const url = new URL(value);
-    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      url.username ||
+      url.password
+    )
       return { valid: false, platform: null };
     const host = url.hostname.toLowerCase();
-    const platform = [
-      ['itviec.com', 'ITviec'],
-      ['topcv.vn', 'TopCV'],
-      ['vietnamworks.com', 'VietnamWorks'],
-    ].find(([domain]) => host === domain || host.endsWith(`.${domain}`))?.[1] ?? null;
+    const platform =
+      [
+        ['itviec.com', 'ITviec'],
+        ['topcv.vn', 'TopCV'],
+        ['vietnamworks.com', 'VietnamWorks'],
+      ].find(
+        ([domain]) => host === domain || host.endsWith(`.${domain}`),
+      )?.[1] ?? null;
     return { valid: true, platform };
   } catch {
     return { valid: false, platform: null };

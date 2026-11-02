@@ -14,7 +14,9 @@ import {
 } from '../support/job-quality.synthetic.js';
 async function extract(source: string, candidates: unknown[] = []) {
   const ai = {
-    generateStructured: jest.fn(async (_request: unknown) => ({ candidates })),
+    generateStructured: jest.fn<(request: unknown) => Promise<unknown>>(
+      async () => ({ candidates }),
+    ),
   };
   const result = await new JobImportService(ai as unknown as AiService).extract(
     { record: { postText: source } },

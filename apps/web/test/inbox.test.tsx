@@ -47,27 +47,23 @@ test('adds a job, sends persistent fields, then loads its detail', async () => {
   );
   vi.stubGlobal('fetch', fetch);
   mount('/jobs/new');
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Continue to Review & Save' }),
+  );
   fireEvent.change(screen.getByLabelText(/Job title/), {
     target: { value: row.title },
   });
   fireEvent.change(screen.getByLabelText(/^Company/), {
     target: { value: row.company },
   });
-  fireEvent.change(screen.getByLabelText('Follow-up date'), {
-    target: { value: '2026-11-02' },
-  });
-  fireEvent.change(screen.getByLabelText('Contact date'), {
-    target: { value: '2026-10-30' },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Record contact date' }));
   fireEvent.click(screen.getByRole('button', { name: 'Confirm and save job' }));
-  await screen.findByRole('heading', { name: 'Job details' });
+  await screen.findByRole('heading', { name: 'Job overview' });
   const sent = JSON.parse(fetch.mock.calls[0]![1]!.body as string);
   expect(sent).toMatchObject({
     title: row.title,
     company: row.company,
-    contactDates: ['2026-10-30'],
-    followUpDate: '2026-11-02',
+    contactDates: [],
+    followUpDate: null,
     status: 'SAVED',
   });
 });
@@ -84,6 +80,7 @@ test('edits notes and follow-up date and keeps input on save failure', async () 
   vi.stubGlobal('fetch', fetch);
   mount(`/jobs/${id}`);
   await screen.findByDisplayValue('Synthetic engineer');
+  fireEvent.click(screen.getByRole('tab', { name: 'Application' }));
   fireEvent.change(screen.getByLabelText('Application notes'), {
     target: { value: 'Synthetic call notes' },
   });
@@ -95,18 +92,21 @@ test('edits notes and follow-up date and keeps input on save failure', async () 
   expect(screen.getByLabelText('Application notes')).toHaveValue(
     'Synthetic call notes',
   );
-  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-  expect(JSON.parse(fetch.mock.calls[1]![1]!.body as string)).toMatchObject({
+  const save = fetch.mock.calls.find(([, init]) => init?.method === 'PUT')!;
+  expect(JSON.parse(save[1]!.body as string)).toMatchObject({
     notes: 'Synthetic call notes',
     followUpDate: '2026-11-03',
   });
 });
 
 test('changes status freely and sends the selected status to the API', async () => {
-  const fetch = vi.fn(async () => Response.json(row));
+  const fetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+    async () => Response.json(row),
+  );
   vi.stubGlobal('fetch', fetch);
   mount(`/jobs/${id}`);
   await screen.findByDisplayValue('Synthetic engineer');
+  fireEvent.click(screen.getByRole('tab', { name: 'Application' }));
   await userEvent.click(
     screen.getByRole('combobox', { name: 'Application status' }),
   );
@@ -115,14 +115,19 @@ test('changes status freely and sends the selected status to the API', async () 
   await screen.findByText('Changes saved.');
   expect(
     JSON.parse(
-      (fetch.mock.calls as unknown as [string, RequestInit][])[1]![1]
+      fetch.mock.calls.find(([, init]) => init?.method === 'PUT')![1]!
         .body as string,
     ).status,
   ).toBe('OFFER');
 });
 
 test('Contact Date survives create save reopen edit save and refresh without recording separately', async () => {
-  let saved = { ...row, contactDates: [] as string[], notes: '', status: 'SAVED' };
+  let saved = {
+    ...row,
+    contactDates: [] as string[],
+    notes: '',
+    status: 'SAVED',
+  };
   const fetch = vi.fn(async (_url: string, init?: RequestInit) => {
     if (init?.method === 'POST' || init?.method === 'PUT')
       saved = { ...saved, ...JSON.parse(init.body as string) };
@@ -130,37 +135,73 @@ test('Contact Date survives create save reopen edit save and refresh without rec
   });
   vi.stubGlobal('fetch', fetch);
   let view = mount('/jobs/new');
-  fireEvent.change(screen.getByLabelText(/Job title/), { target: { value: 'Synthetic date job' } });
-  fireEvent.change(screen.getByLabelText('Contact date'), { target: { value: '2026-10-30' } });
-  fireEvent.change(screen.getByLabelText('Follow-up date'), { target: { value: '2026-11-02' } });
-  fireEvent.change(screen.getByLabelText('Application notes'), { target: { value: 'Synthetic tracking notes' } });
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Continue to Review & Save' }),
+  );
+  fireEvent.change(screen.getByLabelText(/Job title/), {
+    target: { value: 'Synthetic date job' },
+  });
   fireEvent.click(screen.getByRole('button', { name: 'Confirm and save job' }));
-  await screen.findByRole('heading', { name: 'Job details' });
+  await screen.findByRole('heading', { name: 'Job overview' });
+  fireEvent.click(screen.getByRole('tab', { name: 'Application' }));
+  fireEvent.change(screen.getByLabelText('Contact date'), {
+    target: { value: '2026-10-30' },
+  });
+  fireEvent.change(screen.getByLabelText('Follow-up date'), {
+    target: { value: '2026-11-02' },
+  });
+  fireEvent.change(screen.getByLabelText('Application notes'), {
+    target: { value: 'Synthetic tracking notes' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+  await screen.findByText('Changes saved.');
   expect(saved.contactDates).toEqual(['2026-10-30']);
   view.unmount();
   view = mount(`/jobs/${id}`);
-  await waitFor(() => expect(screen.getByLabelText('Contact date')).toHaveValue('2026-10-30'));
+  await waitFor(() =>
+    expect(screen.getByLabelText('Contact date')).toHaveValue('2026-10-30'),
+  );
+  fireEvent.click(screen.getByRole('tab', { name: 'Application' }));
   // An earlier date must stay selected too; no latest-date/timezone substitution.
-  fireEvent.change(screen.getByLabelText('Contact date'), { target: { value: '2026-10-29' } });
+  fireEvent.change(screen.getByLabelText('Contact date'), {
+    target: { value: '2026-10-29' },
+  });
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
   await screen.findByText('Changes saved.');
   expect(saved.contactDates).toEqual(['2026-10-30', '2026-10-29']);
-  expect(saved).toMatchObject({ title: 'Synthetic date job', notes: 'Synthetic tracking notes', followUpDate: '2026-11-02', status: 'SAVED' });
+  expect(saved).toMatchObject({
+    title: 'Synthetic date job',
+    notes: 'Synthetic tracking notes',
+    followUpDate: '2026-11-02',
+    status: 'SAVED',
+  });
   view.unmount();
   mount(`/jobs/${id}`);
-  await waitFor(() => expect(screen.getByLabelText('Contact date')).toHaveValue('2026-10-29'));
-  expect(screen.getByLabelText('Application notes')).toHaveValue('Synthetic tracking notes');
+  await waitFor(() =>
+    expect(screen.getByLabelText('Contact date')).toHaveValue('2026-10-29'),
+  );
+  fireEvent.click(screen.getByRole('tab', { name: 'Application' }));
+  expect(screen.getByLabelText('Application notes')).toHaveValue(
+    'Synthetic tracking notes',
+  );
   expect(screen.getByLabelText('Follow-up date')).toHaveValue('2026-11-02');
 });
 
 test('Contact Date removed from history is not restored by the hydrated picker on save', async () => {
   let saved = { ...row, contactDates: ['2026-10-30'] };
-  vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
-    if (init?.method === 'PUT') saved = { ...saved, ...JSON.parse(init.body as string) };
-    return Response.json(saved);
-  }));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'PUT')
+        saved = { ...saved, ...JSON.parse(init.body as string) };
+      return Response.json(saved);
+    }),
+  );
   mount(`/jobs/${id}`);
-  await waitFor(() => expect(screen.getByLabelText('Contact date')).toHaveValue('2026-10-30'));
+  await waitFor(() =>
+    expect(screen.getByLabelText('Contact date')).toHaveValue('2026-10-30'),
+  );
+  fireEvent.click(screen.getByRole('tab', { name: 'Application' }));
   await userEvent.click(screen.getByRole('button', { name: '2026-10-30' }));
   await userEvent.keyboard('{Delete}');
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));

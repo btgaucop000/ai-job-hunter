@@ -83,7 +83,10 @@ export function diagnosticFromError(
   error: unknown,
 ): PdfWorkerFailureDiagnostic | undefined {
   if (!error || typeof error !== 'object') return undefined;
-  const value = Object.getOwnPropertyDescriptor(error, 'parserDiagnostic')?.value;
+  const value = Object.getOwnPropertyDescriptor(
+    error,
+    'parserDiagnostic',
+  )?.value;
   return sanitizePdfWorkerFailure(value);
 }
 

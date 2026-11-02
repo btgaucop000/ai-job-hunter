@@ -146,20 +146,54 @@ test('parses a synthetic JD PDF without inference and rejects unsupported upload
 });
 
 test('Contact Date save read edit read preserves date-only values and other tracking fields', async () => {
-  const original = { ...input, status: 'APPLIED', notes: 'Synthetic Contact Date tracking', contactDates: ['2026-10-30'], followUpDate: '2026-11-02' };
-  const created = await request(app.getHttpServer()).post('/api/v1/opportunities').set(origin).send(original).expect(201);
+  const original = {
+    ...input,
+    status: 'APPLIED',
+    notes: 'Synthetic Contact Date tracking',
+    contactDates: ['2026-10-30'],
+    followUpDate: '2026-11-02',
+  };
+  const created = await request(app.getHttpServer())
+    .post('/api/v1/opportunities')
+    .set(origin)
+    .send(original)
+    .expect(201);
   const id = created.body.id as string;
   syntheticIds.push(id);
-  const first = await request(app.getHttpServer()).get(`/api/v1/opportunities/${id}`).expect(200);
+  const first = await request(app.getHttpServer())
+    .get(`/api/v1/opportunities/${id}`)
+    .expect(200);
   expect(first.body.contactDates).toEqual(['2026-10-30']);
   const edited = { ...original, contactDates: ['2026-10-30', '2026-10-29'] };
-  await request(app.getHttpServer()).put(`/api/v1/opportunities/${id}`).set(origin).send(edited).expect(200);
-  const read = await request(app.getHttpServer()).get(`/api/v1/opportunities/${id}`).expect(200);
-  expect(read.body).toMatchObject({ contactDates: edited.contactDates, title: input.title, status: 'APPLIED', notes: original.notes, followUpDate: original.followUpDate });
+  await request(app.getHttpServer())
+    .put(`/api/v1/opportunities/${id}`)
+    .set(origin)
+    .send(edited)
+    .expect(200);
+  const read = await request(app.getHttpServer())
+    .get(`/api/v1/opportunities/${id}`)
+    .expect(200);
+  expect(read.body).toMatchObject({
+    contactDates: edited.contactDates,
+    title: input.title,
+    status: 'APPLIED',
+    notes: original.notes,
+    followUpDate: original.followUpDate,
+  });
   const fresh = new DataSource(databaseOptions('test'));
   await fresh.initialize();
   try {
-    const [stored] = await fresh.query('SELECT "contactDates", status, notes, "followUpDate"::text FROM ai_job_hunter.opportunities WHERE id=$1', [id]);
-    expect(stored).toEqual({ contactDates: edited.contactDates, status: 'APPLIED', notes: original.notes, followUpDate: original.followUpDate });
-  } finally { await fresh.destroy(); }
+    const [stored] = await fresh.query(
+      'SELECT "contactDates", status, notes, "followUpDate"::text FROM ai_job_hunter.opportunities WHERE id=$1',
+      [id],
+    );
+    expect(stored).toEqual({
+      contactDates: edited.contactDates,
+      status: 'APPLIED',
+      notes: original.notes,
+      followUpDate: original.followUpDate,
+    });
+  } finally {
+    await fresh.destroy();
+  }
 });

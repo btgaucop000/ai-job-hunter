@@ -2,7 +2,10 @@ import 'reflect-metadata';
 import { expect, jest, test } from '@jest/globals';
 import type { AiService } from '../../src/ai/ai.service.js';
 import { JobImportService } from '../../src/opportunities/job-import.service.js';
-import { mergeCandidates, validateImportReview } from '../../src/opportunities/job-import.contract.js';
+import {
+  mergeCandidates,
+  validateImportReview,
+} from '../../src/opportunities/job-import.contract.js';
 import { alternativeRequirement } from '../../src/extraction/jd-requirements.js';
 
 // Synthetic regression reproducing the supplied complete qualification structure.
@@ -26,15 +29,56 @@ Requirements
 Supplemental skill tags (not requirements): Java Swing`;
 
 test('full JD reaches provider unchanged and sparse model output is recovered into validated review fields', async () => {
-  const ai = { generateStructured: jest.fn(async (_request: unknown) => ({ candidates: [
-    { field: 'skills', value: 'Java', source: 'post', quote: 'Strong experience with Java, Spring, and Spring Boot for back-end development' },
-    { field: 'skills', value: 'Java Swing', source: 'post', quote: 'Supplemental skill tags (not requirements): Java Swing' },
-  ] })) };
-  const result = await new JobImportService(ai as unknown as AiService).extract({ record: { postText: jd } });
-  expect(JSON.stringify(ai.generateStructured.mock.calls[0])).toContain('Toeic 700+');
+  const ai = {
+    generateStructured: jest.fn<(request: unknown) => Promise<unknown>>(
+      async () => ({
+        candidates: [
+          {
+            field: 'skills',
+            value: 'Java',
+            source: 'post',
+            quote:
+              'Strong experience with Java, Spring, and Spring Boot for back-end development',
+          },
+          {
+            field: 'skills',
+            value: 'Java Swing',
+            source: 'post',
+            quote: 'Supplemental skill tags (not requirements): Java Swing',
+          },
+        ],
+      }),
+    ),
+  };
+  const result = await new JobImportService(ai as unknown as AiService).extract(
+    { record: { postText: jd } },
+  );
+  expect(JSON.stringify(ai.generateStructured.mock.calls[0])).toContain(
+    'Toeic 700+',
+  );
   expect(result.error).toBeNull();
-  const skills = result.fields.find(field => field.field === 'skills')!;
-  for (const term of ['Java', 'Spring', 'Spring Boot', 'JavaScript', 'HTML5', 'CSS', 'React, Vue, or Angular', 'RESTful API', 'RDBMS', 'Microservices', 'AWS, Azure, or GCP', 'CI/CD', 'DevOps', 'English', 'Toeic 700+', 'financial services', 'high-traffic', 'global or multicultural']) expect(skills.value).toContain(term);
+  const skills = result.fields.find((field) => field.field === 'skills')!;
+  for (const term of [
+    'Java',
+    'Spring',
+    'Spring Boot',
+    'JavaScript',
+    'HTML5',
+    'CSS',
+    'React, Vue, or Angular',
+    'RESTful API',
+    'RDBMS',
+    'Microservices',
+    'AWS, Azure, or GCP',
+    'CI/CD',
+    'DevOps',
+    'English',
+    'Toeic 700+',
+    'financial services',
+    'high-traffic',
+    'global or multicultural',
+  ])
+    expect(skills.value).toContain(term);
   expect(skills.value.split('\n')).toContain('Java');
   expect(skills.value).not.toContain('Java Swing');
   expect(skills.value.split('\n')).not.toContain('React');
@@ -44,11 +88,33 @@ test('full JD reaches provider unchanged and sparse model output is recovered in
 });
 
 test('Java is not replaced by an alternative clause containing JavaScript', () => {
-  const result = mergeCandidates({ candidates: [{ field: 'skills', value: 'Java', source: 'post', quote: 'Strong experience with Java, Spring, and Spring Boot for back-end development' }] }, jd, '');
-  expect(result.fields.find(field => field.field === 'skills')?.value).toBe('Java');
+  const result = mergeCandidates(
+    {
+      candidates: [
+        {
+          field: 'skills',
+          value: 'Java',
+          source: 'post',
+          quote:
+            'Strong experience with Java, Spring, and Spring Boot for back-end development',
+        },
+      ],
+    },
+    jd,
+    '',
+  );
+  expect(result.fields.find((field) => field.field === 'skills')?.value).toBe(
+    'Java',
+  );
 });
 
 test('parenthetical cloud alternatives remain one downstream requirement', () => {
-  expect(alternativeRequirement('cloud platforms (AWS, Azure, or GCP)')).toBe(true);
-  expect(alternativeRequirement('at least one modern framework (React, Vue, or Angular)')).toBe(true);
+  expect(alternativeRequirement('cloud platforms (AWS, Azure, or GCP)')).toBe(
+    true,
+  );
+  expect(
+    alternativeRequirement(
+      'at least one modern framework (React, Vue, or Angular)',
+    ),
+  ).toBe(true);
 });

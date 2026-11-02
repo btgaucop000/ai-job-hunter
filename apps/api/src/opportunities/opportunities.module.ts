@@ -12,8 +12,19 @@ import { Opportunity } from './opportunity.entity.js';
 import { OpportunitiesService } from './opportunities.service.js';
 import { OpportunitiesController } from './opportunities.controller.js';
 @Module({
-  imports: [AiModule, ExtractionModule, MatchingModule, TypeOrmModule.forFeature([Opportunity, SavedCv])],
-  providers: [OpportunitiesService, JobImportService, JobMatchService, DiscoveryService, GreenhouseSource],
+  imports: [
+    AiModule,
+    ExtractionModule,
+    MatchingModule,
+    TypeOrmModule.forFeature([Opportunity, SavedCv]),
+  ],
+  providers: [
+    OpportunitiesService,
+    JobImportService,
+    JobMatchService,
+    DiscoveryService,
+    GreenhouseSource,
+  ],
   controllers: [OpportunitiesController],
 })
 export class OpportunitiesModule {}

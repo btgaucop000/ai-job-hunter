@@ -54,7 +54,9 @@ export class OpportunityErrors implements ExceptionFilter {
     response.end(
       JSON.stringify({
         statusCode: status,
-        ...(error instanceof CvMatchError ? { errorCode: error.errorCode } : {}),
+        ...(error instanceof CvMatchError
+          ? { errorCode: error.errorCode }
+          : {}),
         ...(error instanceof JobDocumentError
           ? {
               errorCode: error.errorCode,
@@ -72,7 +74,9 @@ export class OpportunityErrors implements ExceptionFilter {
 @Controller('opportunities')
 @UseFilters(OpportunityErrors)
 export class OpportunitiesController {
-  private readonly urlImports = new JobUrlImportService(new PinnedJobPageTransport());
+  private readonly urlImports = new JobUrlImportService(
+    new PinnedJobPageTransport(),
+  );
   constructor(
     private readonly opportunities: OpportunitiesService,
     private readonly imports: JobImportService,
@@ -82,34 +86,50 @@ export class OpportunitiesController {
   @Get() @Header('Cache-Control', 'no-store') list() {
     return this.opportunities.list();
   }
-  @Post('import-url') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  @Post('import-url')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
   importUrl(@Req() req: IncomingMessage, @Body() body: unknown) {
     localWrite(req);
-    const url = body && typeof body === 'object' && !Array.isArray(body)
-      ? (body as Record<string, unknown>).url : undefined;
+    const url =
+      body && typeof body === 'object' && !Array.isArray(body)
+        ? (body as Record<string, unknown>).url
+        : undefined;
     return this.urlImports.preview(url);
   }
-  @Post('import-page') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  @Post('import-page')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
   importPage(@Req() req: IncomingMessage, @Body() body: unknown) {
     localWrite(req);
     return importTopcvPage(body);
   }
-  @Post('discover') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  @Post('discover')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
   discover(@Req() req: IncomingMessage, @Body() body: unknown) {
     localWrite(req);
     return this.discovery.discover(body);
   }
-  @Get('cv/current') @Header('Cache-Control', 'no-store')
+  @Get('cv/current')
+  @Header('Cache-Control', 'no-store')
   cv() {
     return this.matches.cv();
   }
-  @Post('cv/current') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  @Post('cv/current')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
   async saveCv(@Req() req: IncomingMessage) {
     localWrite(req);
     return this.matches.saveCv((await readJobUpload(req)).document);
   }
-  @Post(':id/match') @HttpCode(200) @Header('Cache-Control', 'no-store')
-  match(@Req() req: IncomingMessage, @Param('id', new ParseUUIDPipe()) id: string) {
+  @Post(':id/match')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  match(
+    @Req() req: IncomingMessage,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
     localWrite(req);
     return this.matches.analyze(id);
   }

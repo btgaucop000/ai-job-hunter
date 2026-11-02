@@ -88,16 +88,14 @@ test('reports a failed recovery without changing the parser error', async () => 
   );
   const instance = parser();
   await expect(
-    withPdfParserDiagnosticRequest(
-      '7ef4cc66-c25b-4db2-a846-740165d06d22',
-      () =>
-        instance.parse(
-          pdfInput(
-            pdfFixture(['a'.repeat(limits.textUnits + 1)], {
-              recoverableTextDefect: true,
-            }),
-          ),
+    withPdfParserDiagnosticRequest('7ef4cc66-c25b-4db2-a846-740165d06d22', () =>
+      instance.parse(
+        pdfInput(
+          pdfFixture(['a'.repeat(limits.textUnits + 1)], {
+            recoverableTextDefect: true,
+          }),
         ),
+      ),
     ),
   ).rejects.toMatchObject({ code: 'DOCUMENT_TOO_LARGE' });
   expect(records).toEqual([

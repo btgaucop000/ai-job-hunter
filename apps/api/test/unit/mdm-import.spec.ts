@@ -34,11 +34,13 @@ test('complete numbered JD reaches mocked extraction and produces source-backed 
     'Supplemental skill tags (not requirements): Java',
   );
   const ai = {
-    generateStructured: jest.fn(async (_request: unknown) => ({
-      candidates: ['Java', 'Golang', 'Python', 'MetadataOnlyTag'].map(
-        (value) => ({ field: 'skills', value, source: 'post', quote: value }),
-      ),
-    })),
+    generateStructured: jest.fn<(request: unknown) => Promise<unknown>>(
+      async () => ({
+        candidates: ['Java', 'Golang', 'Python', 'MetadataOnlyTag'].map(
+          (value) => ({ field: 'skills', value, source: 'post', quote: value }),
+        ),
+      }),
+    ),
   };
   const result = await new JobImportService(ai as unknown as AiService).extract(
     { record: { postText: fetched.sourceText } },

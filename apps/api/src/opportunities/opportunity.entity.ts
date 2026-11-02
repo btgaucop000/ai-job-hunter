@@ -56,7 +56,8 @@ export class Opportunity {
   @Column({ type: 'text', nullable: true }) documentType!: string | null;
   @Column({ type: 'bytea', nullable: true, select: false })
   documentBytes!: Buffer | null;
-  @Column({ type: 'jsonb', nullable: true }) discovery!: DiscoveredJob['discovery'] | null;
+  @Column({ type: 'jsonb', nullable: true }) discovery!:
+    DiscoveredJob['discovery'] | null;
   @CreateDateColumn({ type: 'timestamptz' }) createdAt!: Date;
   @UpdateDateColumn({ type: 'timestamptz' }) updatedAt!: Date;
 }

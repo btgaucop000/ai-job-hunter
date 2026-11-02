@@ -130,7 +130,10 @@ export function JobInbox() {
                     </TableCell>
                     <TableCell>{row.company || 'Unknown company'}</TableCell>
                     <TableCell>
-                      {row.discovery?.sourceName ?? [row.source, jobUrlInfo(row.originalLink).platform].filter(Boolean).join(' · ')}
+                      {row.discovery?.sourceName ??
+                        [row.source, jobUrlInfo(row.originalLink).platform]
+                          .filter(Boolean)
+                          .join(' · ')}
                       {row.discovery && (
                         <Typography variant="caption" sx={{ display: 'block' }}>
                           Discovered{' '}

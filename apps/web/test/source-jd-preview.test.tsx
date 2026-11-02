@@ -92,8 +92,8 @@ test('bookmarklet preview uses transferred source text with its known platform a
 });
 
 test('upload calls existing parse-only endpoint once, shows real parsed text, and retains it across cards', async () => {
-  const fetch = vi.fn(async (_url: string, _init?: RequestInit) =>
-    Response.json({ text: raw, warnings: [] }),
+  const fetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+    async () => Response.json({ text: raw, warnings: [] }),
   );
   vi.stubGlobal('fetch', fetch);
   mount();

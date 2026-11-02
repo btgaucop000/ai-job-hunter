@@ -70,13 +70,21 @@ function setup(conflict = false, missing = false) {
       <JobEditor />
     </MemoryRouter>,
   );
-  if (conflict)
+  if (conflict) {
+    pasteSource();
     fireEvent.change(screen.getByLabelText('Recruitment post'), {
       target: { value: 'Location: Hà Nội' },
     });
+  }
   return fetch;
 }
+function pasteSource() {
+  const back = screen.queryByRole('button', { name: 'Back to Import sources' });
+  if (back) fireEvent.click(back);
+  fireEvent.click(screen.getByRole('button', { name: /Paste JD/ }));
+}
 async function fetchJob() {
+  fireEvent.click(screen.getByRole('button', { name: /Job URL/ }));
   fireEvent.change(screen.getByLabelText('Original Job URL (optional)'), {
     target: { value: link },
   });
@@ -359,6 +367,7 @@ test('manual Domain survives a genuine conflict and still requires explicit ackn
       <JobEditor />
     </MemoryRouter>,
   );
+  pasteSource();
   fireEvent.change(screen.getByLabelText('Recruitment post'), {
     target: { value: post },
   });
@@ -429,6 +438,7 @@ test.each([false, true])(
         <JobEditor />
       </MemoryRouter>,
     );
+    pasteSource();
     fireEvent.change(screen.getByLabelText('Recruitment post'), {
       target: { value: 'Synthetic source' },
     });
@@ -444,6 +454,7 @@ test.each([false, true])(
       fireEvent.change(screen.getByLabelText('Domain'), {
         target: { value: 'My manual business domain' },
       });
+    pasteSource();
     fireEvent.change(screen.getByLabelText('Recruitment post'), {
       target: { value: 'Only engineering skills, no business industry' },
     });
@@ -522,6 +533,7 @@ test.each([false, true])(
         <JobEditor />
       </MemoryRouter>,
     );
+    pasteSource();
     fireEvent.change(screen.getByLabelText('Recruitment post'), {
       target: { value: postText },
     });

@@ -78,9 +78,8 @@ test('timeout rejects promptly, ignores late messages and holds slot until termi
   const worker = new FakeWorker();
   const parser = new DocumentParser(() => worker.asWorker());
   const pending = expect(
-    withPdfParserDiagnosticRequest(
-      '7ef4cc66-c25b-4db2-a846-740165d06d22',
-      () => parser.parse(pdfInput()),
+    withPdfParserDiagnosticRequest('7ef4cc66-c25b-4db2-a846-740165d06d22', () =>
+      parser.parse(pdfInput()),
     ),
   ).rejects.toMatchObject({ code: 'PARSING_TIMEOUT' });
   await jest.advanceTimersByTimeAsync(limits.parserTimeoutMs);

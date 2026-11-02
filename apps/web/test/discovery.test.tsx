@@ -2,15 +2,16 @@ import { expect, test, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { DiscoverJobs } from '../src/features/inbox/DiscoverJobs';
 test('on-demand discovery sends editable defaults, summarizes counts and refreshes Inbox', async () => {
-  const fetch = vi.fn(async (_url: string, _init?: RequestInit) =>
-    Response.json({
-      found: 5,
-      imported: 3,
-      duplicatesSkipped: 2,
-      remaining: 0,
-      errors: [],
-      scope: 'Synthetic verified feeds',
-    }),
+  const fetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+    async () =>
+      Response.json({
+        found: 5,
+        imported: 3,
+        duplicatesSkipped: 2,
+        remaining: 0,
+        errors: [],
+        scope: 'Synthetic verified feeds',
+      }),
   );
   vi.stubGlobal('fetch', fetch);
   const onImported = vi.fn();

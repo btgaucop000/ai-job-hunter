@@ -114,7 +114,7 @@ function sourceWindow(markup: string, pageUrl = sourceUrl) {
   let listener: (event: MessageEvent) => void = () => {};
   const win = {
     location: { href: `${pageUrl}?tracking=synthetic-token#unrelated` },
-    open: vi.fn((_url: string, _target: string) => child),
+    open: vi.fn<(url: string, target: string) => typeof child>(() => child),
     addEventListener: vi.fn((_type, callback) => {
       listener = callback;
     }),

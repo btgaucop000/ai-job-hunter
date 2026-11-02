@@ -57,8 +57,10 @@ function failure(
   error: unknown,
   phase: PdfFailurePhase,
   recoveryAttempted: boolean,
-  code: ConstructorParameters<typeof ExtractionError>[0] =
-    error instanceof ExtractionError ? error.code : 'PARSING_FAILED',
+  code: ConstructorParameters<typeof ExtractionError>[0] = error instanceof
+  ExtractionError
+    ? error.code
+    : 'PARSING_FAILED',
   categoryOverride?: PdfFailureCategory,
 ): PdfParserFailure {
   if (error instanceof PdfParserFailure) return error;
@@ -209,12 +211,7 @@ async function parsePdfAttempt(
         'PASSWORD_PROTECTED_DOCUMENT',
       );
     if (resources.failed)
-      throw failure(
-        error,
-        phase,
-        recoveryUsed,
-        'RESOURCE_ACCESS_DENIED',
-      );
+      throw failure(error, phase, recoveryUsed, 'RESOURCE_ACCESS_DENIED');
     if (error instanceof RecoverablePdfTextStreamError) throw error;
     throw failure(error, phase, recoveryUsed);
   } finally {

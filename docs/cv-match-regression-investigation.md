@@ -55,12 +55,13 @@ or a fabricated Python quote after changing the CV.
 
 One bounded read of each configured public feed, with no imports, observed:
 
-| Feed | Public rows | HCMC rows | Current filter eligible | Eligible mobile | Eligible outside HCMC |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Axon | 462 | 21 | 6 | 1 | 0 |
-| Backbase | 63 | 3 | 2 | 0 | 0 |
+| Feed     | Public rows | HCMC rows | Current filter eligible | Eligible mobile | Eligible outside HCMC |
+| -------- | ----------: | --------: | ----------------------: | --------------: | --------------------: |
+| Axon     |         462 |        21 |                       6 |               1 |                     0 |
+| Backbase |          63 |         3 |                       2 |               0 |                     0 |
 
 Feeds:
+
 - https://boards-api.greenhouse.io/v1/boards/axon/jobs?content=true
 - https://boards-api.greenhouse.io/v1/boards/workatbackbase/jobs?content=true
 

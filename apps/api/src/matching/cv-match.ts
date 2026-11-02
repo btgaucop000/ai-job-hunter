@@ -238,9 +238,6 @@ export function validateMatchAssessment(
   // model's shorthand label, to distinguish tooling from production AI.
   let reason: MatchEvidenceReason = 'JD_QUOTE_NOT_VERBATIM';
   const rejectedIndex = proposals.findIndex((item) => {
-    const sourceRequirement =
-      canonical.find((seed) => linksCanonicalRequirement(item, seed))
-        ?.requirement ?? item.jdQuote;
     if (!item.jdQuote.trim()) {
       reason = 'JD_QUOTE_EMPTY';
       return true;
@@ -355,7 +352,8 @@ export function scoreCvMatch(
       const supported = Boolean(
         item.cvQuote.trim() && cv.includes(item.cvQuote),
       );
-      const { cvEvidenceUnverified: _unverified, ...evidence } = item;
+      const evidence = { ...item };
+      delete evidence.cvEvidenceUnverified;
       return {
         ...evidence,
         cvQuote: supported ? item.cvQuote : '',

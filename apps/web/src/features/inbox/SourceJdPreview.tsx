@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Accordion,
   AccordionDetails,
@@ -22,9 +22,11 @@ export function SourceJdPreview({
   error?: string;
 }) {
   const [expanded, setExpanded] = useState(true);
-  useEffect(() => {
+  const [previousText, setPreviousText] = useState(text);
+  if (text !== previousText) {
+    setPreviousText(text);
     if (text) setExpanded(true);
-  }, [text]);
+  }
   return (
     <Accordion
       variant="outlined"

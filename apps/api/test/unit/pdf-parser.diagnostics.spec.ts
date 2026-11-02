@@ -46,9 +46,8 @@ test.each(['127.0.0.1', '::1'] as const)(
   (host) => {
     const sink = jest.fn<(record: PdfParserDiagnosticRecord) => void>();
     configurePdfParserDiagnostics(true, host, sink);
-    withPdfParserDiagnosticRequest(
-      '7ef4cc66-c25b-4db2-a846-740165d06d22',
-      () => emitPdfParserDiagnostic(diagnostic, 'MESSAGE'),
+    withPdfParserDiagnosticRequest('7ef4cc66-c25b-4db2-a846-740165d06d22', () =>
+      emitPdfParserDiagnostic(diagnostic, 'MESSAGE'),
     );
     expect(sink).toHaveBeenCalledWith({
       requestId: '7ef4cc66-c25b-4db2-a846-740165d06d22',

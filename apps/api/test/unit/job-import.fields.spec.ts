@@ -445,39 +445,102 @@ test('mixed HR and office contact clauses cannot authorize the office number', a
 });
 
 test('informal zl in a recruiter post survives email-only model output and excludes JD office contacts', async () => {
-  const post = 'Gửi CV về mail: [recruiter@example.com](mailto:recruiter@example.com)\nHoặc ib zl 0900 123 456 mình gửi JD ạ';
+  const post =
+    'Gửi CV về mail: [recruiter@example.com](mailto:recruiter@example.com)\nHoặc ib zl 0900 123 456 mình gửi JD ạ';
   const jd = 'EXAMPLE COMPANY\nPhone: 028 1234 5678\nFax: 028 1234 5679';
-  const service = new JobImportService(new AiService({
-    generate: async () => JSON.stringify({ candidates: [
-      { field: 'contactNotes', value: 'recruiter@example.com', source: 'post', quote: 'Gửi CV về mail: [recruiter@example.com](mailto:recruiter@example.com)' },
-      { field: 'contactNotes', value: '028 1234 5678', source: 'jd', quote: 'Phone: 028 1234 5678' },
-    ] }),
-  }));
+  const service = new JobImportService(
+    new AiService({
+      generate: async () =>
+        JSON.stringify({
+          candidates: [
+            {
+              field: 'contactNotes',
+              value: 'recruiter@example.com',
+              source: 'post',
+              quote:
+                'Gửi CV về mail: [recruiter@example.com](mailto:recruiter@example.com)',
+            },
+            {
+              field: 'contactNotes',
+              value: '028 1234 5678',
+              source: 'jd',
+              quote: 'Phone: 028 1234 5678',
+            },
+          ],
+        }),
+    }),
+  );
   jest.spyOn(service, 'parse').mockResolvedValue({
-    source: { format: 'docx', text: jd, segments: [{ id: 'synthetic-jd', start: 0, end: jd.length, page: null }] },
-    pageCount: null, warnings: [{ code: 'IMAGE_CONTENT_NOT_INTERPRETED' }],
+    source: {
+      format: 'docx',
+      text: jd,
+      segments: [{ id: 'synthetic-jd', start: 0, end: jd.length, page: null }],
+    },
+    pageCount: null,
+    warnings: [{ code: 'IMAGE_CONTENT_NOT_INTERPRETED' }],
   });
   const response = await service.extract({
     record: { postText: post },
-    document: { bytes: Buffer.from('synthetic fixture'), fileName: 'synthetic.docx', mediaType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+    document: {
+      bytes: Buffer.from('synthetic fixture'),
+      fileName: 'synthetic.docx',
+      mediaType:
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    },
   });
-  const contact = response.fields.find(field => field.field === 'contactNotes')!;
+  const contact = response.fields.find(
+    (field) => field.field === 'contactNotes',
+  )!;
   expect(response.error).toBeNull();
   expect(contact.value).toBe('recruiter@example.com\nZalo: 0900 123 456');
-  expect(contact.candidates.every(c => c.source === 'post')).toBe(true);
-  expect(contact.candidates.some(c => c.quote === 'Hoặc ib zl 0900 123 456 mình gửi JD ạ')).toBe(true);
+  expect(contact.candidates.every((c) => c.source === 'post')).toBe(true);
+  expect(
+    contact.candidates.some(
+      (c) => c.quote === 'Hoặc ib zl 0900 123 456 mình gửi JD ạ',
+    ),
+  ).toBe(true);
   expect(response.jdText).toBe(jd);
-  expect(validateImportReview(response.fields, post, jd)).toEqual(response.fields);
+  expect(validateImportReview(response.fields, post, jd)).toEqual(
+    response.fields,
+  );
 });
 
 test('informal zl does not invent unlabeled contacts and old saved contact text remains valid', () => {
   const post = 'ib zl 0900 123 456';
-  const result = mergeCandidates({ candidates: sourceCandidates(post, '') }, post, '');
-  const old = result.fields.map(f => f.field === 'contactNotes' ? { ...f, value: 'zl 0900 123 456' } : f);
-  expect(validateImportReview(old, post, '').find(f => f.field === 'contactNotes')?.value).toBe('Zalo: 0900 123 456');
+  const result = mergeCandidates(
+    { candidates: sourceCandidates(post, '') },
+    post,
+    '',
+  );
+  const old = result.fields.map((f) =>
+    f.field === 'contactNotes' ? { ...f, value: 'zl 0900 123 456' } : f,
+  );
+  expect(
+    validateImportReview(old, post, '').find((f) => f.field === 'contactNotes')
+      ?.value,
+  ).toBe('Zalo: 0900 123 456');
   const manual = 'Manual contact unchanged: zl 0900 123 456';
   // Review normalization never changes the editable contactNotes value on save.
-  const editable = { title: 'Synthetic', company: '', source: 'Other', status: 'SAVED', originalLink: '', contactNotes: manual, description: '', notes: '', contactDates: [], followUpDate: null, postText: post, importReview: old };
+  const editable = {
+    title: 'Synthetic',
+    company: '',
+    source: 'Other',
+    status: 'SAVED',
+    originalLink: '',
+    contactNotes: manual,
+    description: '',
+    notes: '',
+    contactDates: [],
+    followUpDate: null,
+    postText: post,
+    importReview: old,
+  };
   expect(validateOpportunity(editable).contactNotes).toBe(manual);
-  expect(mergeCandidates({ candidates: sourceCandidates('ib 0900 123 456', '') }, 'ib 0900 123 456', '').fields.find(f => f.field === 'contactNotes')?.value).toBe('');
+  expect(
+    mergeCandidates(
+      { candidates: sourceCandidates('ib 0900 123 456', '') },
+      'ib 0900 123 456',
+      '',
+    ).fields.find((f) => f.field === 'contactNotes')?.value,
+  ).toBe('');
 });

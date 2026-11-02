@@ -3,7 +3,7 @@ import { Stack, TextField } from '@mui/material';
 const categories = ['technical', 'education', 'language', 'other'] as const;
 type Category = (typeof categories)[number];
 type Groups = Record<Category, string>;
-export function groupRequirements(value: string): Groups {
+function groupRequirements(value: string): Groups {
   const groups: Record<Category, string[]> = {
     technical: [],
     education: [],

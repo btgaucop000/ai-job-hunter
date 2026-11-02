@@ -1,4 +1,4 @@
-import { useContext, useRef, type RefObject } from 'react';
+import { useContext, type RefObject } from 'react';
 import {
   Alert,
   Button,
@@ -39,11 +39,7 @@ function RouteGuard({
   dirty: boolean;
   savedNavigation: RefObject<boolean>;
 }) {
-  const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
-  const blocker = useBlocker(
-    () => dirtyRef.current && !savedNavigation.current,
-  );
+  const blocker = useBlocker(() => dirty && !savedNavigation.current);
   return (
     <Dialog
       open={blocker.state === 'blocked'}

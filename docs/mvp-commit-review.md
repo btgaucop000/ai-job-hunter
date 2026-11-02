@@ -28,20 +28,20 @@ Ignored .env, .env.test and .env.gemini.local were neither read nor staged.
 
 ## Verification performed
 
-| Check | Actual result |
-| --- | --- |
-| Frontend focused Vitest run, eight files listed below | 69 passed, 25 failed; five files passed, three failed |
-| CV Match within that run | 14 passed |
-| API focused Jest run, all 53 included changed/new API unit-test files | 990 passed, 1 failed; 52 suites passed, 1 failed |
-| pnpm --filter @ai-job-hunter/web typecheck | Passed |
-| pnpm --filter @ai-job-hunter/api typecheck | Passed |
-| Typechecks against a separate export of the staged source snapshot | Both passed without excluded experimental files |
-| pnpm --filter @ai-job-hunter/api build | Passed |
-| pnpm --filter @ai-job-hunter/web build | Passed; 721.24 kB JS bundle, 221.21 kB gzip; >500 kB warning |
-| Prettier --check on the 197 selected text files before this report | Failed: 36 files need formatting |
-| ESLint on the selected TypeScript/TSX files | Failed: 25 errors, 1 warning |
-| git diff --cached --check excluding the PDF fixture | Passed |
-| git diff --cached --check including the PDF fixture | Reports trailing spaces in valid fixed-width PDF xref entries; fixture bytes preserved |
+| Check                                                                 | Actual result                                                                          |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Frontend focused Vitest run, eight files listed below                 | 69 passed, 25 failed; five files passed, three failed                                  |
+| CV Match within that run                                              | 14 passed                                                                              |
+| API focused Jest run, all 53 included changed/new API unit-test files | 990 passed, 1 failed; 52 suites passed, 1 failed                                       |
+| pnpm --filter @ai-job-hunter/web typecheck                            | Passed                                                                                 |
+| pnpm --filter @ai-job-hunter/api typecheck                            | Passed                                                                                 |
+| Typechecks against a separate export of the staged source snapshot    | Both passed without excluded experimental files                                        |
+| pnpm --filter @ai-job-hunter/api build                                | Passed                                                                                 |
+| pnpm --filter @ai-job-hunter/web build                                | Passed; 721.24 kB JS bundle, 221.21 kB gzip; >500 kB warning                           |
+| Prettier --check on the 197 selected text files before this report    | Failed: 36 files need formatting                                                       |
+| ESLint on the selected TypeScript/TSX files                           | Failed: 25 errors, 1 warning                                                           |
+| git diff --cached --check excluding the PDF fixture                   | Passed                                                                                 |
+| git diff --cached --check including the PDF fixture                   | Reports trailing spaces in valid fixed-width PDF xref entries; fixture bytes preserved |
 
 Frontend command (from apps/web):
 
