@@ -5,6 +5,7 @@ import type { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { databaseOptions } from '../../src/database/database.config.js';
+import { JobDiscovery1793510000000 } from '../../src/database/migrations/1793510000000-JobDiscovery.js';
 import { DatabaseModule } from '../../src/database/database.module.js';
 import { OpportunitiesModule } from '../../src/opportunities/opportunities.module.js';
 import { GreenhouseSource } from '../../src/discovery/greenhouse.source.js';
@@ -53,33 +54,58 @@ afterAll(async () => {
   }
 });
 test('discovery migration reverts reapplies and repeat-runs without changing existing jobs', async () => {
-  const [last] = await database.query(
-    'SELECT name FROM public.typeorm_migrations ORDER BY id DESC LIMIT 1',
+  const history = await database.query(
+    'SELECT * FROM public.typeorm_migrations ORDER BY id',
   );
-  expect(last.name).toBe('JobDiscovery1793510000000');
-  const before = await database.query(
-    'SELECT id, status, notes, "contactDates", "followUpDate"::text FROM ai_job_hunter.opportunities ORDER BY id',
+  expect(history).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ name: 'JobDiscovery1793510000000' }),
+    ]),
   );
-  const [populated] = await database.query(
-    'SELECT count(*)::int AS count FROM ai_job_hunter.opportunities WHERE discovery IS NOT NULL',
-  );
-  expect(populated.count).toBe(0);
+  const runner = database.createQueryRunner();
+  await runner.connect();
   try {
-    await database.undoLastMigration();
+    await runner.startTransaction();
+    // Exercise discovery specifically, even when newer migrations are installed.
+    // Roll back the fixture and DDL together so failures cannot leave schema drift.
+    await runner.query(`INSERT INTO ai_job_hunter.opportunities
+      ("ownerId", title, company, source, status, "originalLink", "contactNotes", description, notes, "contactDates", "followUpDate", "appliedDate", "applicationChannel")
+      VALUES ('00000000-0000-4000-8000-000000000001', 'Synthetic discovery migration preservation', 'Synthetic Discovery Company', 'Other', 'APPLIED', '', '', '', 'Keep tracking notes', '["2026-10-30"]', '2026-11-03', '2026-10-25', 'Referral')`);
+    const snapshot = () =>
+      runner.query(
+        'SELECT id, status, notes, "contactDates", "followUpDate"::text, "appliedDate"::text, "applicationChannel" FROM ai_job_hunter.opportunities ORDER BY id',
+      );
+    const before = await snapshot();
+    const [populated] = await runner.query(
+      'SELECT count(*)::int AS count FROM ai_job_hunter.opportunities WHERE discovery IS NOT NULL',
+    );
+    expect(populated.count).toBe(0);
+    const migration = new JobDiscovery1793510000000();
+    await migration.down(runner);
     expect(
-      await database.query(
+      await runner.query(
         "SELECT column_name FROM information_schema.columns WHERE table_schema='ai_job_hunter' AND table_name='opportunities' AND column_name='discovery'",
       ),
     ).toEqual([]);
+    expect(await snapshot()).toEqual(before);
+    await migration.up(runner);
+    expect(
+      await runner.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema='ai_job_hunter' AND table_name='opportunities' AND column_name='discovery'",
+      ),
+    ).toEqual([{ column_name: 'discovery' }]);
+    expect(await snapshot()).toEqual(before);
   } finally {
-    await database.runMigrations();
+    try {
+      if (runner.isTransactionActive) await runner.rollbackTransaction();
+    } finally {
+      await runner.release();
+    }
   }
   expect(await database.runMigrations()).toEqual([]);
   expect(
-    await database.query(
-      'SELECT id, status, notes, "contactDates", "followUpDate"::text FROM ai_job_hunter.opportunities ORDER BY id',
-    ),
-  ).toEqual(before);
+    await database.query('SELECT * FROM public.typeorm_migrations ORDER BY id'),
+  ).toEqual(history);
 });
 test('on-demand import deduplicates feeds and repeat runs, persists after reconnect, and preserves edits/tracker', async () => {
   await request(app.getHttpServer())

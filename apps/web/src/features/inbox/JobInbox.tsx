@@ -1,3 +1,5 @@
+import { PageHeader } from '../../components/PageHeader';
+import { dueFollowUp, useLocalCalendarDate } from './follow-ups';
 import { DiscoverJobs } from './DiscoverJobs';
 import { useEffect, useState } from 'react';
 import {
@@ -6,15 +8,21 @@ import {
   Button,
   Chip,
   CircularProgress,
+  IconButton,
+  SvgIcon,
+  Tooltip,
+  ToggleButton,
+  ToggleButtonGroup,
   Paper,
   Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
-  TableHead,
   TableRow,
+  TablePagination,
   Typography,
+  Link as MuiLink,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { jobUrlInfo, opportunityRequest } from './opportunities-api';
@@ -23,6 +31,10 @@ const label = (value: string) => value.replaceAll('_', ' ');
 const message = (error: unknown) =>
   error instanceof Error ? error.message : 'Request failed. Retry manually.';
 export function JobInbox() {
+  const [discoveryOpen, setDiscoveryOpen] = useState(false);
+  const today = useLocalCalendarDate();
+  const [dueOnly, setDueOnly] = useState(false);
+  const [page, setPage] = useState(0);
   const [rows, setRows] = useState<Opportunity[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -48,131 +60,349 @@ export function JobInbox() {
       active = false;
     };
   }, [attempt]);
+  const visibleRows = dueOnly
+    ? rows.filter((row) => dueFollowUp(row.followUpDate, row.status, today))
+    : rows;
+  const currentPage = Math.min(
+    page,
+    Math.max(0, Math.ceil(visibleRows.length / 10) - 1),
+  );
+  const pageRows = visibleRows.slice(currentPage * 10, currentPage * 10 + 10);
   return (
-    <Stack spacing={3}>
-      <Stack
-        direction="row"
-        sx={{ justifyContent: 'space-between', alignItems: 'center' }}
-      >
-        <Box>
-          <Typography variant="h4" component="h1">
-            Job Inbox
-          </Typography>
-          <Typography color="text.secondary">
-            Your opportunities, conversations, and next steps.
-          </Typography>
-        </Box>
-        <Button component={Link} to="/jobs/new" variant="contained">
-          Add Job
-        </Button>
-      </Stack>
-      <Alert severity="info">
-        Local single-user workspace. Saved opportunities stay in PostgreSQL.
-        Authentication and multi-user access are not available.
-      </Alert>
-      <DiscoverJobs
-        onImported={() => {
-          setLoading(true);
-          setAttempt((value) => value + 1);
-        }}
+    <Stack
+      spacing={2}
+      sx={{ flex: 1, minHeight: 0, minWidth: 0, overflowY: 'auto' }}
+    >
+      <PageHeader
+        title="Job Inbox"
+        description="Your opportunities, conversations, and next steps."
+        actions={
+          <Button component={Link} to="/jobs/new" variant="contained">
+            Add Job
+          </Button>
+        }
       />
-      {error && (
-        <Alert
-          severity="error"
-          action={
-            <Button
-              onClick={() => {
-                setLoading(true);
-                setAttempt((value) => value + 1);
+      <Box
+        component="section"
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          flexShrink: 0,
+          maxHeight: discoveryOpen ? '30%' : undefined,
+        }}
+      >
+        <Button
+          fullWidth
+          aria-label="Toggle Discover Jobs"
+          aria-expanded={discoveryOpen}
+          aria-controls="discovery-panel"
+          onClick={() => setDiscoveryOpen((open) => !open)}
+          sx={{
+            justifyContent: 'space-between',
+            px: 2,
+            minHeight: 44,
+            flexShrink: 0,
+            color: 'text.secondary',
+            bgcolor: 'action.hover',
+          }}
+        >
+          Discover Jobs
+          <SvgIcon aria-hidden="true" sx={{ fontSize: 20, flexShrink: 0 }}>
+            <path d={discoveryOpen ? 'm7 14 5-5 5 5H7z' : 'm7 10 5 5 5-5H7z'} />
+          </SvgIcon>
+        </Button>
+        <Box
+          id="discovery-panel"
+          hidden={!discoveryOpen}
+          sx={{ overflowY: 'auto', minHeight: 0 }}
+        >
+          <DiscoverJobs
+            onImported={() => {
+              setLoading(true);
+              setAttempt((value) => value + 1);
+            }}
+          />
+        </Box>
+      </Box>
+      <Paper
+        component="section"
+        aria-labelledby="saved-jobs-heading"
+        variant="outlined"
+        sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+      >
+        <Stack
+          spacing={1}
+          sx={{ p: 2, flexShrink: 0, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            sx={{
+              justifyContent: 'space-between',
+              alignItems: { xs: 'flex-start', sm: 'center' },
+            }}
+          >
+            <Typography id="saved-jobs-heading" component="h2" variant="h6">
+              Saved Jobs{!loading && !error ? ` (${rows.length})` : ''}
+            </Typography>
+            <ToggleButtonGroup
+              sx={{ '& .MuiToggleButton-root': { px: 1.5, minHeight: 44 } }}
+              exclusive
+              size="small"
+              value={dueOnly ? 'due' : 'all'}
+              aria-label="Saved jobs filter"
+              onChange={(_, value: string | null) => {
+                if (value === null) return;
+                setDueOnly(value === 'due');
+                setPage(0);
               }}
             >
-              Retry
-            </Button>
-          }
-        >
-          {error}
-        </Alert>
-      )}
-      {loading ? (
-        <CircularProgress aria-label="Loading opportunities" />
-      ) : (
-        !error &&
-        (rows.length ? (
-          <TableContainer component={Paper}>
-            <Table aria-label="Saved opportunities">
-              <TableHead>
-                <TableRow>
-                  {[
-                    'Job title',
-                    'Company',
-                    'Source',
-                    'Status',
-                    'Follow-up date',
-                  ].map((text) => (
-                    <TableCell key={text}>{text}</TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      <Link to={`/jobs/${row.id}`}>{row.title}</Link>
-                      {Boolean(row.discovery?.techStack?.length) && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ display: 'block' }}
-                        >
-                          {row.discovery?.techStack?.join(' · ')}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>{row.company || 'Unknown company'}</TableCell>
-                    <TableCell>
-                      {row.discovery?.sourceName ??
-                        [row.source, jobUrlInfo(row.originalLink).platform]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      {row.discovery && (
-                        <Typography variant="caption" sx={{ display: 'block' }}>
-                          Discovered{' '}
-                          {new Date(
-                            row.discovery.discoveredAt,
-                          ).toLocaleDateString()}
-                        </Typography>
-                      )}
-                      {row.discovery && row.originalLink && (
-                        <Box
-                          component="a"
-                          href={row.originalLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          sx={{ display: 'block', fontSize: '0.8rem' }}
-                        >
-                          Original job / apply
-                        </Box>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Chip size="small" label={label(row.status)} />
-                    </TableCell>
-                    <TableCell>{row.followUpDate ?? '—'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+              <ToggleButton value="all">All jobs</ToggleButton>
+              <ToggleButton value="due">Due follow-ups</ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
+        </Stack>
+        {error && (
+          <Alert
+            severity="error"
+            action={
+              <Button
+                onClick={() => {
+                  setLoading(true);
+                  setAttempt((value) => value + 1);
+                }}
+              >
+                Retry
+              </Button>
+            }
+          >
+            {error}
+          </Alert>
+        )}
+        {loading ? (
+          <Stack direction="row" spacing={1} sx={{ p: 3 }} role="status">
+            <CircularProgress size={20} aria-label="Loading opportunities" />
+            <Typography variant="body2">Loading jobs…</Typography>
+          </Stack>
         ) : (
-          <Paper variant="outlined" sx={{ p: 4 }}>
-            <Typography variant="h6">No saved opportunities yet</Typography>
-            <Typography>
-              Add a job from a website, recruiter conversation, or email to
-              start tracking it.
-            </Typography>
-          </Paper>
-        ))
-      )}
+          !error && (
+            <TableContainer
+              tabIndex={0}
+              role="region"
+              aria-label="Scrollable saved jobs"
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                overflow: 'auto',
+                scrollbarGutter: 'stable',
+                overflowAnchor: 'none',
+              }}
+            >
+              <Table
+                size="small"
+                aria-label="Saved opportunities"
+                sx={{
+                  tableLayout: 'fixed',
+                  '& tr:last-child td': { borderBottom: 0 },
+                  '& td, & th': {
+                    overflowWrap: 'anywhere',
+                    verticalAlign: 'top',
+                    py: 1,
+                    px: 2,
+                  },
+                }}
+              >
+                <TableBody>
+                  {pageRows.map((row) => {
+                    const urgency = dueFollowUp(
+                      row.followUpDate,
+                      row.status,
+                      today,
+                    );
+                    const source =
+                      row.discovery?.sourceName ??
+                      [row.source, jobUrlInfo(row.originalLink).platform]
+                        .filter(Boolean)
+                        .join(' · ');
+                    return (
+                      <TableRow key={row.id} hover>
+                        <TableCell>
+                          <Box
+                            sx={{
+                              display: 'grid',
+                              gridTemplateColumns: {
+                                xs: 'minmax(0, 1fr) auto',
+                                sm: 'minmax(0, 1fr) minmax(0, 12rem) auto',
+                              },
+                              columnGap: 2,
+                              rowGap: 1,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Box sx={{ minWidth: 0 }}>
+                              <MuiLink
+                                component={Link}
+                                to={`/jobs/${row.id}`}
+                                underline="hover"
+                                color="text.primary"
+                                sx={{
+                                  fontWeight: 500,
+                                  fontSize: '1rem',
+                                  overflowWrap: 'anywhere',
+                                }}
+                              >
+                                {row.title}
+                              </MuiLink>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ mt: 0.5 }}
+                              >
+                                {row.company || 'Unknown company'} · {source}
+                              </Typography>
+                            </Box>
+                            <Stack
+                              spacing={0.5}
+                              sx={{
+                                gridColumn: { xs: 1, sm: 2 },
+                                alignItems: {
+                                  xs: 'flex-start',
+                                  sm: 'flex-end',
+                                },
+                              }}
+                            >
+                              <Chip
+                                size="small"
+                                variant="outlined"
+                                label={label(row.status)}
+                                sx={{
+                                  typography: 'caption',
+                                  maxWidth: '100%',
+                                  height: 'auto',
+                                  minHeight: 24,
+                                  '& .MuiChip-label': {
+                                    whiteSpace: 'normal',
+                                    py: 0.5,
+                                  },
+                                }}
+                              />
+                              {row.followUpDate &&
+                                (urgency ? (
+                                  <MuiLink
+                                    component={Link}
+                                    to={`/jobs/${row.id}?tab=application`}
+                                    aria-label={`${urgency}: open Application for ${row.title}`}
+                                    title={row.followUpDate}
+                                    color={
+                                      urgency === 'Overdue'
+                                        ? 'warning.dark'
+                                        : 'text.primary'
+                                    }
+                                    underline="hover"
+                                    sx={{
+                                      typography: 'caption',
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {urgency}
+                                  </MuiLink>
+                                ) : (
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    aria-label={`Follow-up ${row.followUpDate}`}
+                                  >
+                                    {row.followUpDate}
+                                  </Typography>
+                                ))}
+                            </Stack>
+                            {row.originalLink &&
+                              jobUrlInfo(row.originalLink).valid && (
+                                <Tooltip title="Open original job / apply">
+                                  <IconButton
+                                    component="a"
+                                    href={row.originalLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label={`Original job / apply for ${row.title}`}
+                                    size="small"
+                                    sx={{
+                                      width: 44,
+                                      height: 44,
+                                      color: 'text.secondary',
+                                      gridColumn: { xs: 2, sm: 3 },
+                                      gridRow: { xs: '1 / 3', sm: 1 },
+                                    }}
+                                  >
+                                    <SvgIcon sx={{ fontSize: 20 }}>
+                                      <path d="M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14V3zM5 5h6v2H5v12h12v-6h2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" />
+                                    </SvgIcon>
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {!visibleRows.length && (
+                    <TableRow>
+                      <TableCell sx={{ py: 4 }}>
+                        <Typography variant="h6">
+                          {dueOnly
+                            ? 'No due follow-ups'
+                            : 'No saved opportunities yet'}
+                        </Typography>
+                        <Typography>
+                          {dueOnly
+                            ? 'No active jobs have a follow-up due today or earlier. Clear the filter to see all jobs.'
+                            : 'Add a job from a website, recruiter conversation, or email to start tracking it.'}
+                        </Typography>
+                        {dueOnly ? (
+                          <Button
+                            onClick={() => {
+                              setDueOnly(false);
+                              setPage(0);
+                            }}
+                          >
+                            Clear filter
+                          </Button>
+                        ) : (
+                          <Button component={Link} to="/jobs/new">
+                            Add Job
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )
+        )}
+        {!loading && !error && (
+          <TablePagination
+            component="div"
+            aria-label="Job Inbox pagination"
+            count={visibleRows.length}
+            page={currentPage}
+            rowsPerPage={10}
+            rowsPerPageOptions={[]}
+            onPageChange={(_, nextPage) => setPage(nextPage)}
+            labelDisplayedRows={({ from, to, count }) =>
+              `${from}–${to} of ${count} jobs`
+            }
+            sx={{
+              flexShrink: 0,
+              borderTop: 1,
+              borderColor: 'divider',
+              '& .MuiTablePagination-toolbar': { px: 2, flexWrap: 'wrap' },
+              '& .MuiTablePagination-displayedRows': { mr: 'auto' },
+              '& .MuiTablePagination-spacer': { display: 'none' },
+            }}
+          />
+        )}
+      </Paper>
     </Stack>
   );
 }

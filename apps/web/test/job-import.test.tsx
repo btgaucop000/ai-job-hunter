@@ -468,7 +468,7 @@ test('extraction keeps manual field edits, description and tracking information'
   fireEvent.change(screen.getByLabelText('Job description'), {
     target: { value: 'Manual description' },
   });
-  fireEvent.change(screen.getByLabelText('Follow-up date'), {
+  fireEvent.change(screen.getByLabelText('Next follow-up date'), {
     target: { value: '2026-11-02' },
   });
   await userEvent.click(
@@ -482,7 +482,9 @@ test('extraction keeps manual field edits, description and tracking information'
   expect(screen.getByLabelText('Job description')).toHaveValue(
     'Manual description',
   );
-  expect(screen.getByLabelText('Follow-up date')).toHaveValue('2026-11-02');
+  expect(screen.getByLabelText('Next follow-up date')).toHaveValue(
+    '2026-11-02',
+  );
 });
 
 test('a saved manually cleared field stays empty when extracting again', async () => {

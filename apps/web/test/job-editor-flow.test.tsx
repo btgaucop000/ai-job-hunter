@@ -133,10 +133,10 @@ test('detail defaults to overview, match stays mounted, application and JD edits
   fireEvent.change(screen.getByLabelText('Application notes'), {
     target: { value: 'Synthetic note' },
   });
-  fireEvent.change(screen.getByLabelText('Contact date'), {
+  fireEvent.change(screen.getByLabelText('Last HR contact date'), {
     target: { value: '2026-11-02' },
   });
-  fireEvent.change(screen.getByLabelText('Follow-up date'), {
+  fireEvent.change(screen.getByLabelText('Next follow-up date'), {
     target: { value: '2026-11-09' },
   });
   fireEvent.mouseDown(screen.getByLabelText('Application status'));
@@ -150,7 +150,7 @@ test('detail defaults to overview, match stays mounted, application and JD edits
     'Synthetic note',
   );
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-  expect(await screen.findByText('Changes saved.')).toBeVisible();
+  expect(await screen.findByText('Changes saved')).toBeVisible();
   const save = fetch.mock.calls.find(([, init]) => init?.method === 'PUT')!;
   expect(JSON.parse(save[1]!.body as string)).toMatchObject({
     status: 'APPLIED',

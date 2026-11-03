@@ -173,7 +173,7 @@ test('manual title/location/contact/URL and tracker edits survive extraction', a
     ['Location', 'My location'],
     ['Recruiter / contact notes', 'My contact'],
     ['Original Job URL (optional)', 'https://example.com/my-link'],
-    ['Follow-up date', '2026-11-05'],
+    ['Next follow-up date', '2026-11-05'],
   ])
     fireEvent.change(screen.getByLabelText(label!), { target: { value } });
   fireEvent.change(screen.getByLabelText(/Job title/), {

@@ -268,11 +268,11 @@ test('existing Edit JD sources remain available and card selection does not mark
   );
   select('Upload JD');
   select('Job URL');
-  expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+  expect(screen.getByText('Unsaved changes')).not.toBeVisible();
   select('Paste JD');
   expect(screen.getByLabelText('Recruitment post')).toHaveValue(
     'Saved synthetic source',
   );
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-  await waitFor(() => expect(screen.getByText('Changes saved.')).toBeVisible());
+  await waitFor(() => expect(screen.getByText('Changes saved')).toBeVisible());
 });

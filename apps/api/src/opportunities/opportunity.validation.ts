@@ -24,6 +24,8 @@ export interface OpportunityInput {
   description: string;
   notes: string;
   contactDates: string[];
+  appliedDate: string | null;
+  applicationChannel: string | null;
   followUpDate: string | null;
 }
 export function validDate(value: unknown): value is string {
@@ -48,6 +50,8 @@ export function validateOpportunity(
     return fail();
   const original = value as Record<string, unknown>;
   const row = {
+    appliedDate: null,
+    applicationChannel: null,
     company: '',
     agency: '',
     location: '',
@@ -86,6 +90,8 @@ export function validateOpportunity(
     'notes',
     'contactDates',
     'followUpDate',
+    'appliedDate',
+    'applicationChannel',
   ];
   if (
     Object.keys(row).some((key) => !fields.includes(key)) ||
@@ -133,6 +139,10 @@ export function validateOpportunity(
     }
   }
   if (
+    (row.appliedDate !== null && !validDate(row.appliedDate)) ||
+    (row.applicationChannel !== null &&
+      (typeof row.applicationChannel !== 'string' ||
+        row.applicationChannel.length > 200)) ||
     !Array.isArray(row.contactDates) ||
     row.contactDates.length > 100 ||
     !row.contactDates.every(validDate) ||
@@ -142,6 +152,10 @@ export function validateOpportunity(
     return fail();
   return {
     ...row,
+    applicationChannel:
+      typeof row.applicationChannel === 'string'
+        ? row.applicationChannel.trim() || null
+        : null,
     importReview: validateImportReview(
       row.importReview,
       row.postText as string,

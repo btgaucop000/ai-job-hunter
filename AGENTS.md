@@ -27,8 +27,33 @@
 
 ## Quality and communication
 
+- For frontend UI work, follow [docs/ux-guidelines.md](docs/ux-guidelines.md); preserve screen-specific behavior and implement only the approved UX checkpoint.
+
 - Use strict TypeScript, explicit module boundaries, and readable code.
 - Run formatting, lint, type checks, and builds for scaffold/configuration changes. Add meaningful Jest, Vitest, and PostgreSQL integration tests as behavior is introduced.
 - Verify migrations in TypeScript development and compiled JavaScript execution, including apply, revert, reapply, and repeat-run behavior.
 - Never report unexecuted checks as passing. Report blockers and remaining risks precisely.
 - Explain significant technical choices and alternatives in `docs/architecture.md`; keep README commands accurate for the implemented checkpoint.
+
+## Development Workflow — Fast Iteration
+
+Prioritize shipping a working product over exhaustive verification.
+
+For small, localized changes:
+
+- Run only directly relevant focused tests.
+- Run typecheck only for the affected package when appropriate.
+- Do not automatically run full backend/frontend test suites, database integration suites, full builds, lint, or formatting checks.
+- Do not create extra tests unless they cover a meaningful regression.
+- Do not perform broad audits or unrelated refactoring.
+- Do not repeatedly investigate already verified components.
+- Keep final reports concise: Change → Verification → Remaining Issue.
+- Target a short feedback loop; do not sacrifice correctness for an arbitrary time limit.
+
+For changes involving migrations, security boundaries, authentication, or significant data integrity risks, use proportionate broader verification.
+
+Full verification should be reserved for release checkpoints or explicitly requested work.
+
+Never report unrun checks as passed.
+
+Preserve existing work and Git state. Do not commit or push without approval.

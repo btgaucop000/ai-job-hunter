@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import {
   Alert,
+  Box,
   Button,
   CircularProgress,
   MenuItem,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -53,22 +53,26 @@ export function DiscoverJobs({ onImported }: { onImported: () => void }) {
     }
   }
   return (
-    <Paper
-      component="section"
-      aria-label="Discover Jobs"
-      variant="outlined"
-      sx={{ p: 2 }}
-    >
+    <Box component="section" aria-label="Discover Jobs" sx={{ p: 2 }}>
       <Stack spacing={2}>
-        <Typography variant="h6">Discover Jobs</Typography>
         <Typography variant="body2" color="text.secondary">
-          Search Axon and Backbase public career feeds. Any selected stack can
-          match. Location, work mode and seniority rank relevance; unknown
-          values stay eligible. Discover imports new jobs directly into this
-          Inbox.
+          Import from Axon and Backbase public feeds. Any selected stack
+          matches; other preferences rank results, including jobs with unknown
+          values.
         </Typography>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: 'minmax(0, 1fr)',
+              sm: 'repeat(2, minmax(0, 1fr))',
+              lg: 'repeat(4, minmax(0, 1fr))',
+            },
+            gap: 2,
+          }}
+        >
           <TextField
+            size="small"
             select
             fullWidth
             label="Discovery location"
@@ -83,6 +87,7 @@ export function DiscoverJobs({ onImported }: { onImported: () => void }) {
             ))}
           </TextField>
           <TextField
+            size="small"
             select
             fullWidth
             label="Tech stack (any)"
@@ -104,6 +109,7 @@ export function DiscoverJobs({ onImported }: { onImported: () => void }) {
             ))}
           </TextField>
           <TextField
+            size="small"
             select
             fullWidth
             label="Discovery work mode"
@@ -118,6 +124,7 @@ export function DiscoverJobs({ onImported }: { onImported: () => void }) {
             ))}
           </TextField>
           <TextField
+            size="small"
             select
             fullWidth
             label="Discovery seniority"
@@ -131,12 +138,13 @@ export function DiscoverJobs({ onImported }: { onImported: () => void }) {
               </MenuItem>
             ))}
           </TextField>
-        </Stack>
+        </Box>
         <Button
+          size="small"
           variant="outlined"
           disabled={busy || !stacks.length}
           onClick={() => void discover()}
-          sx={{ alignSelf: 'flex-start' }}
+          sx={{ alignSelf: { xs: 'stretch', sm: 'flex-end' } }}
         >
           Discover Jobs
         </Button>
@@ -167,6 +175,6 @@ export function DiscoverJobs({ onImported }: { onImported: () => void }) {
           </Stack>
         )}
       </Stack>
-    </Paper>
+    </Box>
   );
 }
