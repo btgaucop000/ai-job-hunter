@@ -1,3 +1,4 @@
+import { PageHeader } from '../../components/PageHeader';
 import { useEffect, useRef } from 'react';
 import { Alert, Box, CircularProgress, Stack, Typography } from '@mui/material';
 import { AnalysisForm } from './AnalysisForm';
@@ -16,15 +17,10 @@ export function Dashboard() {
   }, [state.status]);
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" component="h1">
-          CV & Review
-        </Typography>
-        <Typography>
-          Existing CV upload, document parsing, partial extraction, and fact
-          review.
-        </Typography>
-      </Box>
+      <PageHeader
+        title="CV & Review"
+        description="Existing CV upload, document parsing, partial extraction, and fact review."
+      />
       <Box component="details" role="region" aria-label="CV/JD analysis">
         <summary>Existing CV/JD extraction and fact review</summary>
         <Typography color="text.secondary">

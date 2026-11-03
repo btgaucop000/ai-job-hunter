@@ -91,6 +91,8 @@ export interface OpportunityInput {
   description: string;
   notes: string;
   contactDates: string[];
+  appliedDate: string | null;
+  applicationChannel: string | null;
   followUpDate: string | null;
 }
 export interface Opportunity extends OpportunityInput {
@@ -131,6 +133,8 @@ export const emptyOpportunity = (): OpportunityInput => ({
   description: '',
   notes: '',
   contactDates: [],
+  appliedDate: null,
+  applicationChannel: null,
   followUpDate: null,
 });
 export async function opportunityRequest<T>(

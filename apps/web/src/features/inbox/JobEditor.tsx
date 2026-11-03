@@ -20,9 +20,12 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Divider,
   FormControlLabel,
   MenuItem,
   Paper,
+  Portal,
+  Snackbar,
   Stack,
   Tabs,
   Tab,
@@ -32,7 +35,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   emptyOpportunity,
   fieldLabels,
@@ -53,6 +56,9 @@ const message = (error: unknown) =>
   error instanceof Error
     ? error.message
     : 'Request failed. Retry or enter fields manually.';
+const latestContactDate = (dates: string[]) =>
+  dates.reduce((latest, date) => (date > latest ? date : latest), '');
+
 export function JobEditor({
   onViewportLayoutChange,
 }: {
@@ -60,7 +66,17 @@ export function JobEditor({
 }) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [view, setView] = useState('overview');
+  const location = useLocation();
+  const requestedView =
+    new URLSearchParams(location.search).get('tab') === 'application'
+      ? 'application'
+      : 'overview';
+  const [entryKey, setEntryKey] = useState(location.key);
+  const [view, setView] = useState(requestedView);
+  if (entryKey !== location.key) {
+    setEntryKey(location.key);
+    setView(requestedView);
+  }
   const [step, setStep] = useState(0);
   const [importMethod, setImportMethod] = useState<ImportMethod>('url');
   const usesViewport = !id || view === 'edit';
@@ -98,7 +114,11 @@ export function JobEditor({
   const [jdText, setJdText] = useState('');
   const [discovery, setDiscovery] = useState<Opportunity['discovery']>(null);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [notification, setNotification] = useState<{
+    severity: 'success' | 'error';
+    text: string;
+  } | null>(null);
+  const saving = useRef(false);
   const [notice, setNotice] = useState('');
   const [contactDate, setContactDate] = useState('');
   useEffect(() => {
@@ -131,7 +151,7 @@ export function JobEditor({
           if (editable.description) editedFields.current.add('description');
           baseline.current = JSON.stringify(editable);
           setForm(editable);
-          setContactDate(editable.contactDates.at(-1) ?? '');
+          setContactDate(latestContactDate(editable.contactDates));
           setJdText(row.jdText ?? '');
           setDiscovery(row.discovery);
           setDocumentName(row.documentName ?? null);
@@ -195,14 +215,14 @@ export function JobEditor({
     if (importFields.includes(key as ImportFieldName) || key === 'description')
       editedFields.current.add(key);
     setForm((row) => ({ ...row, [key]: value }));
-    setSuccess('');
+    setNotification(null);
   };
   const sourcesChanged = () => {
     setForm((row) => ({ ...row, importReview: [] }));
     setNotice(
       'Sources changed. Extract again or review the current fields manually before saving.',
     );
-    setSuccess('');
+    setNotification(null);
   };
   const conflicts = form.importReview.filter(
     (field) => field.status === 'CONFLICT' && !field.reviewed,
@@ -217,7 +237,7 @@ export function JobEditor({
       return;
     setExtracting(true);
     setError('');
-    setSuccess('');
+    setNotification(null);
     setNotice('');
     try {
       const result = await opportunityRequest<ImportPreview>(
@@ -322,7 +342,7 @@ export function JobEditor({
     setBusy(true);
     setError('');
     setNotice('');
-    setSuccess('');
+    setNotification(null);
     try {
       const result = await opportunityRequest<UrlJobPreview>('/import-url', {
         method: 'POST',
@@ -343,34 +363,52 @@ export function JobEditor({
     }
   }
   async function save() {
+    if (saving.current) return;
+    const reportSaveError = (text: string) => {
+      if (id) {
+        setNotification({
+          severity: 'error',
+          text: `${text} Your inputs are retained; you can edit fields manually.`,
+        });
+      } else {
+        setError(text);
+      }
+    };
     if (!form.title.trim()) {
-      setError('Enter a job title before saving.');
+      reportSaveError('Enter a job title before saving.');
       if (id) setView('edit');
       else setStep(1);
       return;
     }
     if (!jobUrlInfo(form.originalLink).valid) {
-      setError(
+      reportSaveError(
         'Enter a full HTTP(S) job URL without credentials, or leave it blank.',
       );
       return;
     }
     if (conflicts.length) {
-      setError('Review every conflicting field before saving.');
+      reportSaveError('Review every conflicting field before saving.');
       return;
     }
+    saving.current = true;
     setBusy(true);
     setError('');
-    setSuccess('');
+    setNotification(null);
     try {
       const payload = {
         ...form,
-        contactDates: contactDate
-          ? [
-              ...form.contactDates.filter((date) => date !== contactDate),
-              contactDate,
-            ]
-          : form.contactDates,
+        // Replace only the previously displayed latest entry; hidden history survives.
+        contactDates:
+          contactDate === latestContactDate(form.contactDates)
+            ? form.contactDates
+            : [
+                ...new Set([
+                  ...form.contactDates.filter(
+                    (date) => date !== latestContactDate(form.contactDates),
+                  ),
+                  ...(contactDate ? [contactDate] : []),
+                ]),
+              ],
       };
       const record = JSON.stringify(payload);
       const row = await opportunityRequest<Opportunity>(id ? `/${id}` : '', {
@@ -384,18 +422,19 @@ export function JobEditor({
           contactDates: row.contactDates,
         });
         setForm((current) => ({ ...current, contactDates: row.contactDates }));
-        setContactDate(row.contactDates.at(-1) ?? '');
+        setContactDate(latestContactDate(row.contactDates));
         setJdText(row.jdText ?? '');
         setDocumentName(row.documentName ?? null);
         setFile(undefined);
-        setSuccess('Changes saved.');
+        setNotification({ severity: 'success', text: 'Changes saved' });
       } else {
         savedNavigation.current = true;
         navigate(`/jobs/${row.id}`, { replace: true });
       }
     } catch (error) {
-      setError(message(error));
+      reportSaveError(message(error));
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   }
@@ -451,7 +490,7 @@ export function JobEditor({
   const dirty =
     JSON.stringify(form) !== baseline.current ||
     Boolean(file) ||
-    Boolean(contactDate && contactDate !== form.contactDates.at(-1));
+    contactDate !== latestContactDate(form.contactDates);
   const disabled = busy || extracting || parsing || loadFailed;
   if (loading) return <CircularProgress aria-label="Loading job" />;
   return (
@@ -463,7 +502,7 @@ export function JobEditor({
       <JobActionLayout
         scrollable={usesViewport}
         scrollKey={id ? view : String(step)}
-        feedbackKey={error || success}
+        feedbackKey={error}
         active={id ? view === 'edit' : step === 1}
         actions={
           <Stack
@@ -471,14 +510,13 @@ export function JobEditor({
             direction={{ xs: 'column', sm: 'row' }}
             sx={{
               display: id
-                ? ['edit', 'application'].includes(view)
+                ? view === 'edit'
                   ? undefined
                   : 'none'
                 : step === 1
                   ? undefined
                   : 'none',
               bgcolor: 'background.paper',
-              py: id && view === 'application' ? 2 : 0,
               '& > .MuiButton-root': { flex: 1, minWidth: 0 },
             }}
           >
@@ -530,9 +568,16 @@ export function JobEditor({
                 ].map((value, index) => (
                   <Chip key={index} label={value} size="small" />
                 ))}
+                <Chip
+                  label="Unsaved changes"
+                  size="small"
+                  color="warning"
+                  aria-hidden={!dirty}
+                  sx={{ visibility: dirty ? 'visible' : 'hidden' }}
+                />
               </Stack>
             )}
-            {dirty && (
+            {!id && dirty && (
               <Chip
                 label="Unsaved changes"
                 size="small"
@@ -676,7 +721,6 @@ export function JobEditor({
               {error} Your inputs are retained; you can edit fields manually.
             </Alert>
           )}
-          {success && <Alert severity="success">{success}</Alert>}
           {id && !loading && !loadFailed && (
             <Box
               role="tabpanel"
@@ -1165,101 +1209,152 @@ export function JobEditor({
                   />
                 </Stack>
               </Stack>
-              <Stack
+              <Paper
                 role="tabpanel"
                 id="job-panel-2"
                 aria-labelledby="job-tab-2"
-                spacing={2}
+                variant="outlined"
                 sx={{
                   display: id && view === 'application' ? undefined : 'none',
+                  p: { xs: 2, sm: 3 },
+                  minWidth: 0,
                 }}
               >
-                <Typography variant="h6" component="h2">
-                  Application
-                </Typography>
-                <TextField
-                  select
-                  label="Application status"
-                  value={form.status}
-                  onChange={(e) =>
-                    change(
-                      'status',
-                      e.target.value as OpportunityInput['status'],
-                    )
-                  }
-                  helperText="Choose any status; steps can be skipped."
-                >
-                  {statuses.map((value) => (
-                    <MenuItem key={value} value={value}>
-                      {value.replaceAll('_', ' ')}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <TextField
-                  label="Application notes"
-                  multiline
-                  minRows={3}
-                  value={form.notes}
-                  onChange={(e) => change('notes', e.target.value)}
-                  slotProps={{ htmlInput: { maxLength: 20000 } }}
-                />
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <TextField
-                    label="Contact date"
-                    type="date"
-                    value={contactDate}
-                    onChange={(e) => {
-                      setContactDate(e.target.value);
-                      setSuccess('');
-                    }}
-                    slotProps={{ inputLabel: { shrink: true } }}
-                  />
-                  <Button
-                    type="button"
-                    disabled={!contactDate || form.contactDates.length >= 100}
-                    onClick={() => {
-                      change('contactDates', [
-                        ...form.contactDates.filter(
-                          (date) => date !== contactDate,
-                        ),
-                        contactDate,
-                      ]);
-                      setContactDate('');
-                    }}
-                  >
-                    Record contact date
-                  </Button>
-                </Stack>
-                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                  {form.contactDates.map((date) => (
-                    <Chip
-                      key={date}
-                      label={date}
-                      onDelete={() => {
-                        if (date === contactDate) setContactDate('');
-                        change(
-                          'contactDates',
-                          form.contactDates.filter((value) => value !== date),
-                        );
+                <Stack spacing={2} divider={<Divider />}>
+                  <Stack spacing={2}>
+                    <Typography variant="h6" component="h2">
+                      Application details
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {
+                          xs: 'minmax(0, 1fr)',
+                          sm: 'repeat(2, minmax(0, 1fr))',
+                        },
+                        gap: 2,
                       }}
+                    >
+                      <TextField
+                        select
+                        size="small"
+                        label="Application status"
+                        value={form.status}
+                        onChange={(e) =>
+                          change(
+                            'status',
+                            e.target.value as OpportunityInput['status'],
+                          )
+                        }
+                      >
+                        {statuses.map((value) => (
+                          <MenuItem key={value} value={value}>
+                            {value.replaceAll('_', ' ')}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                      <TextField
+                        size="small"
+                        label="Applied date"
+                        type="date"
+                        value={form.appliedDate ?? ''}
+                        onChange={(e) =>
+                          change('appliedDate', e.target.value || null)
+                        }
+                        helperText="Actual submission date; leave blank if unknown."
+                        slotProps={{ inputLabel: { shrink: true } }}
+                      />
+                      <TextField
+                        size="small"
+                        label="Application channel"
+                        value={form.applicationChannel ?? ''}
+                        onChange={(e) =>
+                          change('applicationChannel', e.target.value || null)
+                        }
+                        helperText="How you applied, separate from job source."
+                        slotProps={{ htmlInput: { maxLength: 200 } }}
+                      />
+                    </Box>
+                  </Stack>
+                  <Stack spacing={2}>
+                    <Typography variant="h6" component="h2">
+                      Recruiter contact &amp; follow-up
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {
+                          xs: 'minmax(0, 1fr)',
+                          sm: 'repeat(2, minmax(0, 1fr))',
+                        },
+                        gap: 2,
+                      }}
+                    >
+                      <TextField
+                        size="small"
+                        label="Last HR contact date"
+                        helperText="When HR last contacted you. Earlier dates are retained."
+                        type="date"
+                        value={contactDate}
+                        onChange={(e) => {
+                          setContactDate(e.target.value);
+                          setNotification(null);
+                        }}
+                        slotProps={{ inputLabel: { shrink: true } }}
+                      />
+                      <TextField
+                        size="small"
+                        label="Next follow-up date"
+                        helperText="When you plan to contact HR; independent of actual contact."
+                        type="date"
+                        value={form.followUpDate ?? ''}
+                        onChange={(e) =>
+                          change('followUpDate', e.target.value || null)
+                        }
+                        slotProps={{ inputLabel: { shrink: true } }}
+                      />
+                    </Box>
+                  </Stack>
+                  <Stack spacing={2}>
+                    <Typography variant="h6" component="h2">
+                      Notes
+                    </Typography>
+                    <TextField
+                      size="small"
+                      label="Application notes"
+                      multiline
+                      minRows={3}
+                      value={form.notes}
+                      onChange={(e) => change('notes', e.target.value)}
+                      slotProps={{ htmlInput: { maxLength: 20000 } }}
                     />
-                  ))}
+                  </Stack>
+                  <Stack spacing={2}>
+                    {conflicts.length > 0 && (
+                      <Alert severity="warning">
+                        Review {conflicts.length} conflicting field(s) before
+                        saving.
+                        <Button onClick={() => setView('edit')}>
+                          Review conflicts in Edit JD
+                        </Button>
+                      </Alert>
+                    )}
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disabled={disabled || conflicts.length > 0}
+                      sx={{ alignSelf: { xs: 'stretch', sm: 'flex-end' } }}
+                    >
+                      {busy ? 'Saving…' : 'Save changes'}
+                    </Button>
+                  </Stack>
                 </Stack>
-                <TextField
-                  label="Follow-up date"
-                  type="date"
-                  value={form.followUpDate ?? ''}
-                  onChange={(e) =>
-                    change('followUpDate', e.target.value || null)
-                  }
-                  slotProps={{ inputLabel: { shrink: true } }}
-                />
-              </Stack>
+              </Paper>
               <Stack
                 spacing={2}
                 sx={{
                   display: id
-                    ? ['edit', 'application'].includes(view)
+                    ? view === 'edit'
                       ? undefined
                       : 'none'
                     : step === 1
@@ -1288,6 +1383,36 @@ export function JobEditor({
           </Box>
         </Stack>
       </JobActionLayout>
+      <Portal>
+        <Snackbar
+          open={notification !== null}
+          autoHideDuration={notification?.severity === 'success' ? 3000 : null}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          onClose={(_, reason) => {
+            if (reason !== 'clickaway') setNotification(null);
+          }}
+          sx={{
+            top: { xs: 'max(16px, env(safe-area-inset-top))', sm: 'auto' },
+            bottom: { xs: 'auto', sm: 24 },
+            left: { xs: 16, sm: 'auto' },
+            right: { xs: 16, sm: 24 },
+            maxWidth: { sm: 'min(32rem, calc(100vw - 48px))' },
+          }}
+        >
+          <Alert
+            severity={notification?.severity ?? 'success'}
+            onClose={() => setNotification(null)}
+            sx={{
+              width: '100%',
+              overflowWrap: 'anywhere',
+              maxHeight: 'calc(100dvh - 32px)',
+              overflowY: 'auto',
+            }}
+          >
+            {notification?.text}
+          </Alert>
+        </Snackbar>
+      </Portal>
     </Stack>
   );
 }

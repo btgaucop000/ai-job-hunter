@@ -1,3 +1,4 @@
+import { ApplicationDetails1793600000000 } from './migrations/1793600000000-ApplicationDetails.js';
 import { JobDiscovery1793510000000 } from './migrations/1793510000000-JobDiscovery.js';
 import { SavedCv } from '../matching/saved-cv.entity.js';
 import { SavedCv1793500000000 } from './migrations/1793500000000-SavedCv.js';
@@ -59,6 +60,7 @@ export function databaseOptions(
       CompleteJobImportFields1793490000000,
       SavedCv1793500000000,
       JobDiscovery1793510000000,
+      ApplicationDetails1793600000000,
     ],
     synchronize: false,
     migrationsRun: false,

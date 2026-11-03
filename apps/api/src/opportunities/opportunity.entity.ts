@@ -37,6 +37,9 @@ export class Opportunity {
   @Column({ type: 'text' }) description!: string;
   @Column({ type: 'text' }) notes!: string;
   @Column({ type: 'jsonb' }) contactDates!: string[];
+  @Column({ type: 'date', nullable: true }) appliedDate!: string | null;
+  @Column({ type: 'varchar', length: 200, nullable: true })
+  applicationChannel!: string | null;
   @Column({ type: 'date', nullable: true }) followUpDate!: string | null;
   @Column({ type: 'text', default: '' }) agency!: string;
   @Column({ type: 'text', default: '' }) location!: string;

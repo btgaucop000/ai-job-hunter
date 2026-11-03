@@ -101,7 +101,7 @@ test('shell constraints apply to Edit JD, release for other detail tabs, and sav
     target: { value: 'Reviewed synthetic JD' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-  expect(await screen.findByText('Changes saved.')).toBeVisible();
+  expect(await screen.findByText('Changes saved')).toBeVisible();
   fireEvent.click(screen.getByRole('tab', { name: 'Application' }));
   await waitFor(() => expect(shell().style.height).toBe(''));
   expect(

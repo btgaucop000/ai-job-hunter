@@ -143,6 +143,8 @@ export class OpportunitiesService {
     const jdText = parsed?.source.text ?? row.jdText;
     // Older tracker clients may omit new import fields; preserve the saved sources.
     const inherited = {
+      appliedDate: row.appliedDate,
+      applicationChannel: row.applicationChannel,
       company: row.company,
       agency: row.agency,
       location: row.location,

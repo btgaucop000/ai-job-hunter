@@ -198,3 +198,76 @@ test('Contact Date save read edit read preserves date-only values and other trac
     await fresh.destroy();
   }
 });
+
+test('application details persist, preserve omitted fields, edit and clear', async () => {
+  const created = await request(app.getHttpServer())
+    .post('/api/v1/opportunities')
+    .set(origin)
+    .send({
+      ...input,
+      originalLink: '',
+      appliedDate: '2024-02-29',
+      applicationChannel: 'Referral',
+    })
+    .expect(201);
+  const id = created.body.id as string;
+  syntheticIds.push(id);
+  expect(created.body).toMatchObject({
+    appliedDate: '2024-02-29',
+    applicationChannel: 'Referral',
+    source: 'Zalo',
+    status: 'SAVED',
+  });
+  await request(app.getHttpServer())
+    .put(`/api/v1/opportunities/${id}`)
+    .set(origin)
+    .send({ ...input, originalLink: '', notes: 'Legacy client edit' })
+    .expect(200);
+  const reopened = await request(app.getHttpServer())
+    .get(`/api/v1/opportunities/${id}`)
+    .expect(200);
+  expect(reopened.body).toMatchObject({
+    appliedDate: '2024-02-29',
+    applicationChannel: 'Referral',
+  });
+  const edited = {
+    ...input,
+    originalLink: '',
+    appliedDate: '2026-10-30',
+    applicationChannel: 'TopCV',
+  };
+  await request(app.getHttpServer())
+    .put(`/api/v1/opportunities/${id}`)
+    .set(origin)
+    .send(edited)
+    .expect(200);
+  const fresh = new DataSource(databaseOptions('test'));
+  await fresh.initialize();
+  try {
+    const [stored] = await fresh.query(
+      'SELECT "appliedDate"::text, "applicationChannel" FROM ai_job_hunter.opportunities WHERE id=$1',
+      [id],
+    );
+    expect(stored).toEqual({
+      appliedDate: edited.appliedDate,
+      applicationChannel: edited.applicationChannel,
+    });
+  } finally {
+    await fresh.destroy();
+  }
+  await request(app.getHttpServer())
+    .put(`/api/v1/opportunities/${id}`)
+    .set(origin)
+    .send({ ...edited, appliedDate: null, applicationChannel: null })
+    .expect(200);
+  const cleared = await request(app.getHttpServer())
+    .get(`/api/v1/opportunities/${id}`)
+    .expect(200);
+  expect(cleared.body).toMatchObject({
+    appliedDate: null,
+    applicationChannel: null,
+    status: 'SAVED',
+    contactDates: [],
+    followUpDate: null,
+  });
+});

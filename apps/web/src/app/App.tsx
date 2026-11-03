@@ -1,3 +1,4 @@
+import { PageHeader } from '../components/PageHeader';
 import { JobInbox } from '../features/inbox/JobInbox';
 import { JobEditor } from '../features/inbox/JobEditor';
 import { lazy, Suspense, useState } from 'react';
@@ -36,9 +37,7 @@ const navigation = [
 function ComingSoon({ title }: { title: string }) {
   return (
     <Stack spacing={2}>
-      <Typography variant="h4" component="h1">
-        {title}
-      </Typography>
+      <PageHeader title={title} />
       <Paper variant="outlined" sx={{ p: 4 }}>
         <Typography variant="h6" component="h2" gutterBottom>
           Coming soon
@@ -51,10 +50,13 @@ function ComingSoon({ title }: { title: string }) {
   );
 }
 export function App() {
+  const dashboardMatch = useMatch('/dashboard');
+  const jobsMatch = useMatch('/jobs');
+  const inbox = Boolean(dashboardMatch || jobsMatch);
   const newJob = Boolean(useMatch('/jobs/new'));
   const jobDetails = Boolean(useMatch('/jobs/:id'));
   const [editorViewport, setEditorViewport] = useState(false);
-  const bounded = newJob || (jobDetails && editorViewport);
+  const bounded = inbox || newJob || (jobDetails && editorViewport);
   return (
     <Box
       sx={{
@@ -119,28 +121,32 @@ export function App() {
           }),
         }}
       >
-        <Stack
+        <Container
           component="header"
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={2}
-          sx={{
-            px: { xs: 3, md: 5 },
-            py: 2,
-            justifyContent: 'space-between',
-            flexShrink: 0,
-          }}
+          maxWidth="lg"
+          sx={{ px: { xs: 2, sm: 3 }, py: 2, flexShrink: 0 }}
         >
-          <Typography variant="subtitle1">
-            Make your next move count.
-          </Typography>
-          <ApiReadiness />
-        </Stack>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            sx={{
+              justifyContent: 'space-between',
+              flexShrink: 0,
+            }}
+          >
+            <Typography variant="subtitle1">
+              Make your next move count.
+            </Typography>
+            <ApiReadiness />
+          </Stack>
+        </Container>
         <Divider sx={{ flexShrink: 0 }} />
         <Container
           component="main"
           maxWidth="lg"
           sx={{
-            py: { xs: 3, md: 5 },
+            px: { xs: 2, sm: 3 },
+            py: 3,
             ...(bounded && {
               flex: 1,
               minHeight: 0,
