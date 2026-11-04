@@ -58,6 +58,15 @@ Never report unrun checks as passed.
 
 Preserve existing work and Git state. Do not commit or push without approval.
 
+### Pre-Push CI Parity
+
+- Before pushing PR-bound changes, run `pnpm format:check`, `pnpm lint`, `pnpm typecheck` (backend and frontend), and relevant focused tests through `pnpm --filter @ai-job-hunter/api test` or `pnpm --filter @ai-job-hunter/web test` with the appropriate test selectors. These pre-push checks apply even when the fast iteration guidance above allows deferring them during development.
+- Fix the actual cause of any failed check before pushing; do not suppress lint rules or weaken tests.
+- Run database integration tests (`pnpm test:integration`) or Playwright only when the changed behavior warrants them; follow the database isolation and browser smoke testing rules.
+- Reuse checks already passed against the same code revision; do not rerun them unnecessarily.
+- Do not introduce Git hooks, dependencies, or new CI infrastructure for these checks.
+- Report PASS / FAIL / BLOCKED results before pushing, identifying any checks not run and why. Commit and push approval is still required.
+
 ### Browser Smoke Testing
 
 For user-visible frontend changes:
