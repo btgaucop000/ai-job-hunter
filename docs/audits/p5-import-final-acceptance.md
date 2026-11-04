@@ -90,11 +90,14 @@ Web:
 - `apps/web/test/source-jd-preview.test.tsx`
 - `apps/web/test/url-import-extraction.test.tsx`
 - `apps/web/test/url-import.test.tsx`
+- `apps/web/test/topcv-bookmarklet.test.tsx` (final CI follow-up)
+- `apps/web/test/unsaved-job-guard.test.tsx` (final CI timeout adjustment only)
 
 Documentation:
 
 - `docs/architecture.md`
 - `docs/audits/p5-import-final-acceptance.md` (new in P5.4c)
+- `docs/audits/p5-itviec-metadata-extraction.md` (new in P5.4e; audit only)
 
 ## Remaining limits
 
@@ -102,3 +105,14 @@ Lookup retains the existing linear scan of owned URL metadata. The advisory resu
 can become outdated after checking; transactional server-side enforcement remains
 authoritative. Live external-site imports and the full application test suite
 were outside this targeted acceptance. No remaining in-scope blocker was found.
+
+## Final CI follow-up
+
+The first remote CI runs passed all 1,439 backend unit tests but exposed advisory
+lookup requests in the bookmarklet tests' global request counts. That test file
+now isolates the independently tested duplicate notice, matching the other import
+regressions. The push run also timed out one B01 StrictMode keyboard scenario at
+the default five-second test deadline; its bounded traversal now has a ten-second
+test budget. All focus, keyboard, dialog and draft-retention assertions remain
+unchanged, and no application focus behavior was modified. These are test-only CI
+corrections; CI must pass again on the follow-up commit before merge.

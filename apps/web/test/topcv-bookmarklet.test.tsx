@@ -716,3 +716,8 @@ test.each([{ missing: true }, { hidden: true }])(
     );
   },
 );
+
+// Bookmarklet request counts exclude the independently tested advisory lookup.
+vi.mock('../src/features/inbox/DuplicateJobNotice', () => ({
+  DuplicateJobNotice: () => null,
+}));
