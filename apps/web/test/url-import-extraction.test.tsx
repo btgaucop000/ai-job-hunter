@@ -588,3 +588,8 @@ test.each([false, true])(
     ).toMatchObject({ status: 'SUPPORTED', reviewed: false });
   },
 );
+
+// Keep import orchestration assertions independent of the advisory lookup timer.
+vi.mock('../src/features/inbox/DuplicateJobNotice', () => ({
+  DuplicateJobNotice: () => null,
+}));

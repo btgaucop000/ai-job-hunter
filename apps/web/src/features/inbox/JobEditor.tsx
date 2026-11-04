@@ -1,3 +1,4 @@
+import { DuplicateJobNotice } from './DuplicateJobNotice';
 import { useNotify } from '../../components/useNotify';
 import { SourceJdPreview } from './SourceJdPreview';
 import { ImportMethodCards, type ImportMethod } from './ImportMethodCards';
@@ -98,6 +99,7 @@ export function JobEditor({
   const formSnapshot = useRef(form);
   formSnapshot.current = form;
   const urlFetchRunning = useRef(false);
+  const sourceGeneration = useRef(0);
   const fetchedJob = useRef<UrlJobPreview | null>(null);
   const editedFields = useRef(new Set<keyof OpportunityInput>());
   const [loading, setLoading] = useState(Boolean(id));
@@ -112,6 +114,7 @@ export function JobEditor({
   const parseGeneration = useRef(0);
   useEffect(
     () => () => {
+      sourceGeneration.current++;
       parseGeneration.current++;
       parseRequest.current?.abort();
     },
@@ -166,6 +169,7 @@ export function JobEditor({
     return receiveTopcvPage(
       window,
       (payload) => {
+        const generation = ++sourceGeneration.current;
         setBusy(true);
         setError('');
         setSourceErrors((errors) => ({ ...errors, bookmarklet: '' }));
@@ -174,10 +178,12 @@ export function JobEditor({
           body: JSON.stringify(payload),
         })
           .then((result) => {
+            if (generation !== sourceGeneration.current) return;
             const next = applyUrlJobPreview(
               formSnapshot.current,
               result,
               editedFields.current,
+              fetchedJob.current,
             );
             fetchedJob.current = result;
             setImportMethod('bookmarklet');
@@ -187,13 +193,16 @@ export function JobEditor({
             );
           })
           .catch((error) => {
+            if (generation !== sourceGeneration.current) return;
             setError(message(error));
             setSourceErrors((errors) => ({
               ...errors,
               bookmarklet: message(error),
             }));
           })
-          .finally(() => setBusy(false));
+          .finally(() => {
+            if (generation === sourceGeneration.current) setBusy(false);
+          });
       },
       (error) => setError(error),
     );
@@ -202,6 +211,11 @@ export function JobEditor({
     key: K,
     value: OpportunityInput[K],
   ) => {
+    if (key === 'originalLink' && urlFetchRunning.current) {
+      sourceGeneration.current++;
+      urlFetchRunning.current = false;
+      setBusy(false);
+    }
     if (importFields.includes(key as ImportFieldName) || key === 'description')
       editedFields.current.add(key);
     setForm((row) => ({ ...row, [key]: value }));
@@ -323,6 +337,16 @@ export function JobEditor({
       !canFetchJobUrl(form.originalLink)
     )
       return;
+    if (
+      fetchedJob.current &&
+      fetchedJob.current.originalLink !== form.originalLink &&
+      !window.confirm(
+        'Replace the previously fetched job with this URL? Manually edited fields and separately entered text will be kept.',
+      )
+    )
+      return;
+    const generation = ++sourceGeneration.current;
+    const requestedUrl = form.originalLink;
     urlFetchRunning.current = true;
     setSourceErrors((errors) => ({ ...errors, url: '' }));
     setBusy(true);
@@ -333,18 +357,31 @@ export function JobEditor({
         method: 'POST',
         body: JSON.stringify({ url: form.originalLink }),
       });
-      const next = applyUrlJobPreview(form, result, editedFields.current);
+      if (
+        generation !== sourceGeneration.current ||
+        formSnapshot.current.originalLink !== requestedUrl
+      )
+        return;
+      const next = applyUrlJobPreview(
+        formSnapshot.current,
+        result,
+        editedFields.current,
+        fetchedJob.current,
+      );
       fetchedJob.current = result;
       setForm(next);
       setNotice(
         `${result.expired ? 'This listing is expired. ' : ''}JD loaded from ${result.platform}. Review it, then use Extract with AI when ready.`,
       );
     } catch (error) {
+      if (generation !== sourceGeneration.current) return;
       setError(message(error));
       setSourceErrors((errors) => ({ ...errors, url: message(error) }));
     } finally {
-      urlFetchRunning.current = false;
-      setBusy(false);
+      if (generation === sourceGeneration.current) {
+        urlFetchRunning.current = false;
+        setBusy(false);
+      }
     }
   }
   async function save() {
@@ -422,6 +459,8 @@ export function JobEditor({
   }
   async function attach(document: File) {
     if (id) return;
+    setFile(undefined);
+    setJdText('');
     if (
       !/\.(pdf|docx)$/i.test(document.name) ||
       !document.size ||
@@ -430,8 +469,6 @@ export function JobEditor({
       setError('Use a PDF or DOCX up to 5 MiB, or paste text instead.');
       return;
     }
-    setFile(document);
-    setJdText('');
     setError('');
     sourcesChanged();
     setSourceErrors((errors) => ({ ...errors, upload: '' }));
@@ -458,6 +495,7 @@ export function JobEditor({
         throw new Error(
           'No readable document text found. Paste the JD or choose another supported document.',
         );
+      setFile(document);
       setJdText(parsed.text);
       if (parsed.warnings?.length)
         setNotice(
@@ -549,9 +587,26 @@ export function JobEditor({
           )}
           <ImportMethodCards
             value={importMethod}
-            onChange={setImportMethod}
+            onChange={(method) => {
+              if (method === importMethod) return;
+              sourceGeneration.current++;
+              urlFetchRunning.current = false;
+              setBusy(false);
+              parseGeneration.current++;
+              parseRequest.current?.abort();
+              setParsing(false);
+              if (importMethod === 'upload') {
+                setSourceErrors((errors) => ({ ...errors, upload: '' }));
+                setFile(undefined);
+                setJdText('');
+                sourcesChanged();
+              }
+              setError('');
+              setNotice('');
+              setImportMethod(method);
+            }}
             panelId="job-import-panel"
-            disabled={disabled}
+            disabled={extracting || loadFailed || saving.current}
           />
           <Box
             id="job-import-panel"
@@ -699,7 +754,8 @@ export function JobEditor({
           </TextField>
           {(form.postText.trim() || file) && (
             <Typography variant="body2" color="text.secondary">
-              Source content is available. Switching methods keeps your inputs.
+              Source text is retained when switching methods. Leaving Upload JD
+              removes the selected document.
             </Typography>
           )}
           <Button
@@ -987,6 +1043,7 @@ export function JobEditor({
             </Box>
           )}
 
+          {!id && <DuplicateJobNotice url={form.originalLink} />}
           {error && (
             <Alert severity="error">
               {error} Your inputs are retained; you can edit fields manually.
@@ -1021,7 +1078,7 @@ export function JobEditor({
           >
             <Stack
               component="fieldset"
-              disabled={disabled}
+              disabled={extracting || loadFailed || saving.current}
               spacing={3}
               sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}
             >

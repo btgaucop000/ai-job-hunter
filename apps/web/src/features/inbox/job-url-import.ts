@@ -1,4 +1,4 @@
-import type { OpportunityInput } from './opportunities-api';
+import { importFields, type OpportunityInput } from './opportunities-api';
 
 export function canFetchJobUrl(value: string): boolean {
   try {
@@ -56,8 +56,17 @@ export function applyUrlJobPreview(
   form: OpportunityInput,
   preview: UrlJobPreview,
   edited: ReadonlySet<keyof OpportunityInput>,
+  previous?: UrlJobPreview | null,
 ): OpportunityInput {
-  const postText = [form.postText, preview.sourceText]
+  let retainedText = form.postText;
+  if (previous) {
+    if (!retainedText.includes(previous.sourceText))
+      throw new Error(
+        'The imported source text was edited. Keep your edits, or restore the previous source text before fetching again.',
+      );
+    retainedText = retainedText.replace(previous.sourceText, '').trim();
+  }
+  const postText = [retainedText, preview.sourceText]
     .filter(Boolean)
     .join('\n\n');
   if (postText.length > 12000)
@@ -65,6 +74,9 @@ export function applyUrlJobPreview(
       'Combined sources exceed the paste limit. Your existing inputs are unchanged; paste the relevant JD content manually.',
     );
   const next = { ...form, postText, importReview: [] };
+  const replacing = previous && previous.originalLink !== preview.originalLink;
+  if (replacing)
+    for (const field of importFields) if (!edited.has(field)) next[field] = '';
   for (const field of [
     'title',
     'company',
@@ -75,7 +87,12 @@ export function applyUrlJobPreview(
     'experience',
     'workMode',
   ] as const)
-    if (!edited.has(field) && !form[field] && preview[field])
-      next[field] = preview[field]!;
+    if (
+      !edited.has(field) &&
+      (!form[field] ||
+        replacing ||
+        (previous && form[field] === previous[field]))
+    )
+      next[field] = preview[field] ?? '';
   return next;
 }

@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from './render';
+import { act, fireEvent, render, screen, waitFor } from './render';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { JobEditor } from '../src/features/inbox/JobEditor';
@@ -106,6 +106,7 @@ test('click imports fixture content into review, preserves edits, warns about ex
     expired: true,
   };
   const fetch = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path.includes('/duplicate-url?')) return Response.json({ match: null });
     if (path.endsWith('/import-url')) return Response.json(result);
     return Response.json({
       ...JSON.parse(init?.body as string),
@@ -151,8 +152,10 @@ test('click imports fixture content into review, preserves edits, warns about ex
   await userEvent.click(
     screen.getByRole('button', { name: 'Confirm and save job' }),
   );
-  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-  expect(JSON.parse(fetch.mock.calls[1]![1]!.body as string)).toMatchObject({
+  const saveCalls = () =>
+    fetch.mock.calls.filter(([path]) => path === '/api/v1/opportunities');
+  await waitFor(() => expect(saveCalls()).toHaveLength(1));
+  expect(JSON.parse(saveCalls()[0]![1]!.body as string)).toMatchObject({
     originalLink: link,
     company: result.company,
     title: 'My edited title',
@@ -201,3 +204,187 @@ test('busy fetch prevents overlap and blocked response preserves manual inputs',
   fireEvent.click(screen.getByRole('button', { name: /Job URL/ }));
   expect(screen.getByRole('button', { name: 'Fetch from URL' })).toBeEnabled();
 });
+
+test('repeat preview replaces tracked source without duplication; replacement preserves manual fields and separate text', () => {
+  const original = { ...emptyOpportunity(), postText: 'Separate post' };
+  const first = applyUrlJobPreview(original, preview, new Set());
+  expect(applyUrlJobPreview(first, preview, new Set(), preview)).toEqual(first);
+  const second = {
+    ...preview,
+    title: 'Job B',
+    company: 'Company B',
+    description: 'Description B',
+    sourceText: 'Source B',
+    originalLink: 'https://itviec.com/it-jobs/b',
+  };
+  const next = applyUrlJobPreview(
+    { ...first, title: 'Manual title' },
+    second,
+    new Set(['title']),
+    preview,
+  );
+  expect(next).toMatchObject({
+    title: 'Manual title',
+    company: 'Company B',
+    description: 'Description B',
+    postText: 'Separate post\n\nSource B',
+    originalLink: second.originalLink,
+  });
+  expect(() =>
+    applyUrlJobPreview(
+      { ...first, postText: 'Manually rewritten source' },
+      second,
+      new Set(),
+      preview,
+    ),
+  ).toThrow('source text was edited');
+});
+
+test('failed fetch retains draft and retry is idempotent; different URL requires replacement approval', async () => {
+  const first = { ...preview, originalLink: 'https://itviec.com/it-jobs/a' };
+  const second = {
+    ...first,
+    title: 'Job B',
+    description: 'Description B',
+    sourceText: 'Source B',
+    originalLink: 'https://itviec.com/it-jobs/b',
+  };
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json(first))
+    .mockResolvedValueOnce(
+      Response.json({ message: 'Retry fetch' }, { status: 400 }),
+    )
+    .mockResolvedValueOnce(Response.json(first))
+    .mockResolvedValueOnce(Response.json(second));
+  vi.stubGlobal('fetch', fetch);
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  render(
+    <MemoryRouter>
+      <JobEditor />
+    </MemoryRouter>,
+  );
+  const url = screen.getByLabelText('Original Job URL (optional)');
+  const run = async () => {
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Fetch from URL' }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Fetch from URL' }),
+      ).toBeEnabled(),
+    );
+  };
+  fireEvent.change(url, { target: { value: first.originalLink } });
+  await run();
+  await run();
+  expect(screen.getByLabelText('Job description')).toHaveValue(
+    first.description,
+  );
+  await run();
+  fireEvent.change(url, { target: { value: second.originalLink } });
+  await run();
+  expect(fetch).toHaveBeenCalledTimes(3);
+  confirm.mockReturnValue(true);
+  await run();
+  expect(screen.getByLabelText('Job description')).toHaveValue(
+    second.description,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /Paste JD/ }));
+  expect(screen.getByLabelText('Recruitment post')).toHaveValue('Source B');
+});
+
+test.each(['method', 'url'])(
+  'late URL response is ignored after changing %s',
+  async (target) => {
+    let release!: (response: Response) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            release = resolve;
+          }),
+      ),
+    );
+    render(
+      <MemoryRouter>
+        <JobEditor />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText('Original Job URL (optional)'), {
+      target: { value: 'https://itviec.com/it-jobs/a' },
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Fetch from URL' }),
+    );
+    if (target === 'method') {
+      expect(screen.getByRole('button', { name: /Paste JD/ })).toBeEnabled();
+      await userEvent.click(screen.getByRole('button', { name: /Paste JD/ }));
+    } else
+      fireEvent.change(screen.getByLabelText('Original Job URL (optional)'), {
+        target: { value: 'https://itviec.com/it-jobs/b' },
+      });
+    fireEvent.change(screen.getByLabelText(/Job title/), {
+      target: { value: 'Manual while pending' },
+    });
+    await act(async () => release(Response.json(preview)));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Extract with AI' }),
+      ).toBeDisabled(),
+    );
+    expect(screen.getByLabelText(/Job title/)).toHaveValue(
+      'Manual while pending',
+    );
+    expect(screen.getByLabelText('Job description')).toHaveValue('');
+  },
+);
+
+test('successful pending fetch preserves edits made after the request began', async () => {
+  let release!: (response: Response) => void;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = resolve;
+        }),
+    ),
+  );
+  render(
+    <MemoryRouter>
+      <JobEditor />
+    </MemoryRouter>,
+  );
+  const originalLink = 'https://itviec.com/it-jobs/a';
+  fireEvent.change(screen.getByLabelText('Original Job URL (optional)'), {
+    target: { value: originalLink },
+  });
+  await userEvent.click(screen.getByRole('button', { name: 'Fetch from URL' }));
+  fireEvent.change(screen.getByLabelText(/Job title/), {
+    target: { value: 'Title edited while fetching' },
+  });
+  fireEvent.change(screen.getByLabelText('Job description'), {
+    target: { value: 'Description edited while fetching' },
+  });
+  fireEvent.change(screen.getByLabelText('Recruiter / contact notes'), {
+    target: { value: 'Contact edited while fetching' },
+  });
+  await act(async () => release(Response.json({ ...preview, originalLink })));
+  expect(screen.getByLabelText(/Job title/)).toHaveValue(
+    'Title edited while fetching',
+  );
+  expect(screen.getByLabelText('Job description')).toHaveValue(
+    'Description edited while fetching',
+  );
+  expect(screen.getByLabelText('Recruiter / contact notes')).toHaveValue(
+    'Contact edited while fetching',
+  );
+  expect(screen.getByLabelText('Company')).toHaveValue(preview.company);
+});
+
+// Isolate source-import requests from the separately tested duplicate lookup timer.
+vi.mock('../src/features/inbox/DuplicateJobNotice', () => ({
+  DuplicateJobNotice: () => null,
+}));

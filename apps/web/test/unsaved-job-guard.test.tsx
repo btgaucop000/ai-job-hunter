@@ -225,6 +225,8 @@ test.each(['{Enter}', ' '])(
       screen.getByRole('textbox', { name: 'Application notes' }),
     ).toHaveValue('Unsaved Application notes');
   },
+  // Full StrictMode keyboard traversal can exceed 5s on hosted CI.
+  10000,
 );
 
 test('Stay shows the same outline for programmatic focus and removes it when focus leaves', async () => {
