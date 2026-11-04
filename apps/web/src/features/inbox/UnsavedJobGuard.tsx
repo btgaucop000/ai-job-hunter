@@ -1,4 +1,4 @@
-import { useContext, type RefObject } from 'react';
+import { useContext, useRef, type FocusEvent, type RefObject } from 'react';
 import {
   Alert,
   Button,
@@ -40,10 +40,25 @@ function RouteGuard({
   savedNavigation: RefObject<boolean>;
 }) {
   const blocker = useBlocker(() => dirty && !savedNavigation.current);
+  const stay = useRef<HTMLButtonElement>(null);
+  function handleDialogFocus(event: FocusEvent<HTMLElement>) {
+    const button = stay.current;
+    // Let Modal/FocusTrap establish and record initial surface focus first.
+    // Then hand that focus to Stay. Descendant actions never trigger this handoff.
+    if (
+      blocker.state === 'blocked' &&
+      button &&
+      event.target !== button &&
+      event.target.contains(button)
+    ) {
+      button.focus({ preventScroll: true });
+    }
+  }
   return (
     <Dialog
       open={blocker.state === 'blocked'}
       aria-labelledby="unsaved-job-title"
+      onFocus={handleDialogFocus}
     >
       <DialogTitle id="unsaved-job-title">Leave unsaved changes?</DialogTitle>
       <DialogContent>
@@ -53,11 +68,22 @@ function RouteGuard({
         </Alert>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => blocker.state === 'blocked' && blocker.reset()}>
+        <Button
+          ref={stay}
+          variant="outlined"
+          sx={(theme) => ({
+            '&:focus': {
+              outline: `2px solid ${theme.palette.primary.main}`,
+              outlineOffset: 2,
+            },
+          })}
+          onClick={() => blocker.state === 'blocked' && blocker.reset()}
+        >
           Stay and edit
         </Button>
         <Button
-          color="warning"
+          color="error"
+          variant="outlined"
           onClick={() => blocker.state === 'blocked' && blocker.proceed()}
         >
           Discard and leave

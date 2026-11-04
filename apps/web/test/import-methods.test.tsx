@@ -1,13 +1,6 @@
 import { useState } from 'react';
 import { expect, test, vi } from 'vitest';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from './render';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import {
@@ -255,24 +248,4 @@ test('validated bookmark transfer selects Bookmarklet and keeps the original URL
     payload.sourceUrl,
   );
   expect(fetch).toHaveBeenCalledTimes(1);
-});
-
-test('existing Edit JD sources remain available and card selection does not mark the job dirty', async () => {
-  api();
-  mount(`/jobs/${id}`);
-  await screen.findByRole('heading', { name: 'Saved synthetic engineer' });
-  fireEvent.click(screen.getByRole('tab', { name: 'Edit JD' }));
-  select('Paste JD');
-  expect(screen.getByLabelText('Recruitment post')).toHaveValue(
-    'Saved synthetic source',
-  );
-  select('Upload JD');
-  select('Job URL');
-  expect(screen.getByText('Unsaved changes')).not.toBeVisible();
-  select('Paste JD');
-  expect(screen.getByLabelText('Recruitment post')).toHaveValue(
-    'Saved synthetic source',
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-  await waitFor(() => expect(screen.getByText('Changes saved')).toBeVisible());
 });

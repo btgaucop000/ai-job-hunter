@@ -1,4 +1,5 @@
 import { PageHeader } from '../components/PageHeader';
+import { DiscoverJobsPage } from '../features/inbox/DiscoverJobsPage';
 import { JobInbox } from '../features/inbox/JobInbox';
 import { JobEditor } from '../features/inbox/JobEditor';
 import { lazy, Suspense, useState } from 'react';
@@ -28,6 +29,7 @@ const UiAcceptancePreview = import.meta.env.DEV
 
 const navigation = [
   { label: 'Job Inbox', path: '/dashboard' },
+  { label: 'Discover Jobs', path: '/discover' },
   { label: 'CV & Review', path: '/cv' },
   { label: 'Candidates', path: '/candidates' },
   { label: 'Jobs', path: '/jobs' },
@@ -53,10 +55,16 @@ export function App() {
   const dashboardMatch = useMatch('/dashboard');
   const jobsMatch = useMatch('/jobs');
   const inbox = Boolean(dashboardMatch || jobsMatch);
+  const discoveryPage = Boolean(useMatch('/discover'));
+  const [discoveryViewport, setDiscoveryViewport] = useState(false);
   const newJob = Boolean(useMatch('/jobs/new'));
   const jobDetails = Boolean(useMatch('/jobs/:id'));
   const [editorViewport, setEditorViewport] = useState(false);
-  const bounded = inbox || newJob || (jobDetails && editorViewport);
+  const bounded =
+    inbox ||
+    newJob ||
+    (jobDetails && editorViewport) ||
+    (discoveryPage && discoveryViewport);
   return (
     <Box
       sx={{
@@ -158,6 +166,14 @@ export function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<JobInbox />} />
+            <Route
+              path="/discover"
+              element={
+                <DiscoverJobsPage
+                  onViewportLayoutChange={setDiscoveryViewport}
+                />
+              }
+            />
             <Route path="/cv" element={<Dashboard />} />
             <Route path="/jobs" element={<JobInbox />} />
             <Route
@@ -189,7 +205,10 @@ export function App() {
             )}
             {navigation
               .filter(
-                (item) => !['/dashboard', '/cv', '/jobs'].includes(item.path),
+                (item) =>
+                  !['/dashboard', '/discover', '/cv', '/jobs'].includes(
+                    item.path,
+                  ),
               )
               .map(({ label, path }) => (
                 <Route

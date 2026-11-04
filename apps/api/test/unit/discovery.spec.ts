@@ -157,7 +157,8 @@ test('source failure is reported while the other feed can still import', async (
     read: jest
       .fn<(value: { name: string }) => Promise<unknown>>()
       .mockRejectedValueOnce(new Error('private internal error'))
-      .mockResolvedValueOnce({ jobs: [raw] }),
+      .mockResolvedValueOnce({ jobs: [raw] })
+      .mockResolvedValue({ jobs: [] }),
   };
   const jobs = {
     importDiscovered: jest
@@ -222,4 +223,127 @@ test('technology mentions do not silently become mandatory skills', () => {
     workMode: '',
     discovery: { techStack: ['Java', 'Spring Boot', 'React'] },
   });
+});
+
+test('four live boards retain raw/normalized counts, distinct eligibility and cached fetch times', async () => {
+  const original = globalThis.fetch;
+  const fetch = jest
+    .fn<typeof globalThis.fetch>()
+    .mockImplementation(async () =>
+      Response.json({
+        jobs: [raw, raw, { ...raw, id: 101, content: 'Rust only' }, {}],
+      }),
+    );
+  globalThis.fetch = fetch;
+  try {
+    const service = new DiscoveryService(
+      new GreenhouseSource(),
+      {} as OpportunitiesService,
+    );
+    const live = await service.scan(filters);
+    expect(live).toMatchObject({
+      fetched: 16,
+      normalized: 12,
+      eligible: 4,
+      sourceFailures: 0,
+    });
+    expect(live.jobs).toHaveLength(4);
+    expect(live.warnings).toHaveLength(4);
+    expect(live.errors).toEqual(live.warnings);
+    expect(live.sources.map((s) => s.sourceKey)).toEqual(
+      DISCOVERY_SOURCES.map((s) => s.key),
+    );
+    for (const source of live.sources) {
+      expect(source).toMatchObject({
+        status: 'success',
+        fetched: 4,
+        normalized: 3,
+        invalid: 1,
+        cacheHit: false,
+        failure: null,
+      });
+      expect(source.fetchedAt).toEqual(expect.any(String));
+    }
+    const cached = await service.scan(filters);
+    expect(cached.sources).toEqual(
+      live.sources.map((s) => ({ ...s, cacheHit: true })),
+    );
+    expect(fetch).toHaveBeenCalledTimes(4);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('malformed envelopes and unavailable sources have unknown counts and safe distinct failures', async () => {
+  const original = globalThis.fetch;
+  const fetch = jest
+    .fn<typeof globalThis.fetch>()
+    .mockResolvedValueOnce(Response.json({ jobs: 'private invalid envelope' }))
+    .mockRejectedValueOnce(new Error('private connection string'))
+    .mockResolvedValueOnce(Response.json({ jobs: [] }))
+    .mockResolvedValueOnce(Response.json({ jobs: [raw, {}] }));
+  globalThis.fetch = fetch;
+  try {
+    const service = new DiscoveryService(
+      new GreenhouseSource(),
+      {} as OpportunitiesService,
+    );
+    const result = await service.scan(filters);
+    expect(result).toMatchObject({
+      fetched: 2,
+      normalized: 1,
+      eligible: 1,
+      sourceFailures: 2,
+    });
+    expect(result.warnings).toHaveLength(1);
+    expect(result.errors).toHaveLength(3);
+    expect(result.sources[0]).toMatchObject({
+      status: 'failed',
+      fetched: null,
+      normalized: null,
+      invalid: null,
+      failure: { code: 'INVALID_FEED' },
+    });
+    expect(result.sources[1]).toMatchObject({
+      status: 'failed',
+      fetched: null,
+      fetchedAt: null,
+      failure: { code: 'SOURCE_UNAVAILABLE' },
+    });
+    expect(result.sources[2]).toMatchObject({ status: 'success', fetched: 0 });
+    expect(JSON.stringify(result)).not.toContain('private');
+    const cached = await service.scan(filters);
+    expect(cached.sources[0]).toMatchObject({
+      cacheHit: true,
+      status: 'failed',
+      fetched: null,
+    });
+    expect(cached.sources[0]!.fetchedAt).toBe(result.sources[0]!.fetchedAt);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('all sources failed reports no available source counts and no eligible jobs', async () => {
+  const source = {
+    read: async () => {
+      throw new Error('private');
+    },
+  };
+  const result = await new DiscoveryService(
+    source as unknown as GreenhouseSource,
+    {} as OpportunitiesService,
+  ).scan(filters);
+  expect(result).toMatchObject({
+    fetched: 0,
+    normalized: 0,
+    eligible: 0,
+    jobs: [],
+    sourceFailures: 4,
+    warnings: [],
+  });
+  expect(result.sources).toHaveLength(4);
+  expect(
+    result.sources.every((s) => s.status === 'failed' && s.fetched === null),
+  ).toBe(true);
 });

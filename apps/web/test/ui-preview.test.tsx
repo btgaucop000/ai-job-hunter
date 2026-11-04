@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen } from './render';
 import userEvent from '@testing-library/user-event';
 import UiAcceptancePreview from '../src/features/dashboard/UiAcceptancePreview';
 

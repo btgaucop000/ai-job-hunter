@@ -6,7 +6,6 @@ import { OpportunitiesController } from '../../src/opportunities/opportunities.c
 import type { OpportunitiesService } from '../../src/opportunities/opportunities.service.js';
 import type { JobImportService } from '../../src/opportunities/job-import.service.js';
 import type { JobMatchService } from '../../src/matching/job-match.service.js';
-import type { DiscoveryService } from '../../src/discovery/discovery.service.js';
 import { permittedLiveJobUrl } from '../../src/opportunities/job-url.transport.js';
 const job = {
   '@type': 'JobPosting',
@@ -124,7 +123,6 @@ test('import-page route accepts local app only, never TopCV-origin direct reques
     {} as OpportunitiesService,
     {} as JobImportService,
     {} as JobMatchService,
-    {} as DiscoveryService,
   );
   const request = (origin: string) =>
     ({

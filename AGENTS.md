@@ -57,3 +57,16 @@ Full verification should be reserved for release checkpoints or explicitly reque
 Never report unrun checks as passed.
 
 Preserve existing work and Git state. Do not commit or push without approval.
+
+### Browser Smoke Testing
+
+For user-visible frontend changes:
+
+1. Run focused automated tests and frontend typecheck.
+2. Run one scoped Chromium browser smoke pass through Playwright MCP when available.
+3. Check relevant interactions, keyboard behavior, responsive layout and console errors.
+4. Fix confirmed in-scope issues and recheck only affected scenarios.
+5. Report PASS / FAIL / BLOCKED with brief evidence.
+6. If browser tooling is unavailable, report the blocker and do not claim browser acceptance.
+7. Avoid full E2E suites, unnecessary screenshots, private CV/Ollama processing and destructive mutations.
+8. Stop for review only after the scoped verification pass or a clearly reported blocker.

@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from './render';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { JobEditor } from '../src/features/inbox/JobEditor';
@@ -87,7 +87,7 @@ function mock(result: ImportPreview) {
         warnings: [],
       });
     if (url.endsWith('/extract')) return Response.json(result);
-    if (init?.method === 'POST') {
+    if (init?.method === 'POST' || init?.method === 'PUT') {
       const record =
         typeof init.body === 'string'
           ? JSON.parse(init.body)
@@ -487,7 +487,7 @@ test('extraction keeps manual field edits, description and tracking information'
   );
 });
 
-test('a saved manually cleared field stays empty when extracting again', async () => {
+test('a saved manually cleared field stays empty in manual Edit JD', async () => {
   const result = (
     await import('./fixtures/smart-import-complete.synthetic.json')
   ).default as ImportPreview;
@@ -518,14 +518,13 @@ test('a saved manually cleared field stays empty when extracting again', async (
   await screen.findByDisplayValue('AI Developer');
   fireEvent.click(screen.getByRole('tab', { name: 'Edit JD' }));
   expect(screen.getByLabelText('Company')).toHaveValue('');
-  await userEvent.click(
-    screen.getByRole('button', { name: 'Extract with AI' }),
-  );
-  await screen.findByText(/Manually edited values are kept/);
+  expect(
+    screen.queryByRole('button', { name: 'Extract with AI' }),
+  ).not.toBeInTheDocument();
   expect(screen.getByLabelText('Company')).toHaveValue('');
 });
 
-test('all contact methods display, save and reload while manual contacts survive extraction', async () => {
+test('all contact methods display, save and reload for manual Edit JD', async () => {
   const contacts = 'recruiter@example.com\nZalo: 0900 123 456';
   const result = preview({
     title: 'Synthetic contact preservation',
@@ -569,13 +568,8 @@ test('all contact methods display, save and reload while manual contacts survive
   fireEvent.change(screen.getByLabelText('Recruiter / contact notes'), {
     target: { value: manual },
   });
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
-  const back = screen.queryByRole('button', { name: 'Back to Import sources' });
-  if (back) fireEvent.click(back);
-  await userEvent.click(
-    screen.getByRole('button', { name: 'Extract with AI' }),
-  );
-  await screen.findByText(/Manually edited values are kept/);
+  await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+  await screen.findByText('Changes saved');
   expect(screen.getByLabelText('Recruiter / contact notes')).toHaveValue(
     manual,
   );

@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, within } from './render';
 import userEvent from '@testing-library/user-event';
 import {
   createMemoryRouter,
@@ -11,6 +11,7 @@ import { App } from '../src/app/App';
 import { ThemeProvider } from '@mui/material/styles';
 import { theme } from '../src/app/theme';
 import { emptyOpportunity } from '../src/features/inbox/opportunities-api';
+import type { DiscoverySummary } from '../src/features/inbox/discovery-api';
 
 function Location() {
   return <output aria-label="Current route">{useLocation().pathname}</output>;
@@ -136,4 +137,109 @@ test('keeps CV review accessible and discovery off the inbox', async () => {
   expect(
     screen.queryByRole('button', { name: 'Use CV to find jobs' }),
   ).not.toBeInTheDocument();
+});
+
+test('Discover Jobs supports direct links, navigation, retained results and history', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => {
+      if (url.endsWith('/health/ready')) return Response.json({ status: 'ok' });
+      if (url.endsWith('/runs')) {
+        return Response.json({
+          fetched: 1,
+          normalized: 1,
+          eligible: 1,
+          sources: [
+            {
+              sourceKey: 'greenhouse:synthetic',
+              sourceName: 'Synthetic board · Greenhouse',
+              status: 'success',
+              fetched: 1,
+              normalized: 1,
+              invalid: 0,
+              cacheHit: false,
+              fetchedAt: '2026-11-04T03:00:00Z',
+              failure: null,
+            },
+          ],
+          sourceFailures: 0,
+          warnings: [],
+          found: 1,
+          added: 1,
+          refreshed: 0,
+          remaining: 0,
+          errors: [],
+          scannedAt: '2026-11-04T03:00:00Z',
+          scope: 'Synthetic feeds',
+        } satisfies DiscoverySummary);
+      }
+      if (url.includes('/discovery/candidates'))
+        return Response.json({
+          items: [],
+          total: 0,
+          totalPages: 0,
+          page: 1,
+          pageSize: 10,
+        });
+      return Response.json([
+        {
+          ...emptyOpportunity(),
+          id: 'synthetic-job',
+          title: 'Existing synthetic job',
+        },
+      ]);
+    }),
+  );
+  const router = createMemoryRouter([{ path: '*', element: <App /> }], {
+    initialEntries: ['/discover'],
+  });
+  render(
+    <ThemeProvider theme={theme}>
+      <RouterProvider router={router} />
+    </ThemeProvider>,
+  );
+  const user = userEvent.setup();
+  const navigation = screen.getByRole('navigation', {
+    name: 'Main navigation',
+  });
+  expect(
+    within(navigation).getByRole('link', { name: 'Discover Jobs' }),
+  ).toHaveAttribute('aria-current', 'page');
+  expect(
+    screen.getByRole('button', { name: 'Edit preferences' }),
+  ).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Discover Jobs' }));
+  const notification = await screen.findByText(
+    '1 eligible · 1 added · 0 known · 0 over limit',
+  );
+  expect(notification.closest('[role="status"]')).toHaveAttribute(
+    'aria-live',
+    'polite',
+  );
+  await user.click(screen.getByRole('button', { name: 'Run details' }));
+  const viewInbox = await screen.findByRole('link', { name: 'View Job Inbox' });
+  expect(router.state.location.pathname).toBe('/discover');
+
+  await user.click(viewInbox);
+  expect(router.state.location.pathname).toBe('/dashboard');
+  expect(
+    await screen.findByRole('link', { name: 'Existing synthetic job' }),
+  ).toBeVisible();
+  expect(screen.queryByLabelText('Discovery location')).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Toggle Discover Jobs' }),
+  ).not.toBeInTheDocument();
+  await act(async () => {
+    await router.navigate(-1);
+  });
+  expect(router.state.location.pathname).toBe('/discover');
+  expect(
+    screen.getByRole('button', { name: 'Edit preferences' }),
+  ).toBeVisible();
+  await user.click(within(navigation).getByRole('link', { name: 'Job Inbox' }));
+  await user.click(
+    within(navigation).getByRole('link', { name: 'Discover Jobs' }),
+  );
+  expect(router.state.location.pathname).toBe('/discover');
+  expect(screen.getByRole('heading', { name: 'Discover Jobs' })).toBeVisible();
 });

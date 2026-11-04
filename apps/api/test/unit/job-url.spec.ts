@@ -1,3 +1,4 @@
+import { transactionalRepository } from '../support/transactional-repository.mock.js';
 import 'reflect-metadata';
 import { expect, jest, test } from '@jest/globals';
 import type { Repository } from 'typeorm';
@@ -26,7 +27,7 @@ test('duplicate URL create preserves every existing field and never saves', asyn
   const save = jest.fn();
   const rows = { find: jest.fn(async () => [existing]), save };
   const service = new OpportunitiesService(
-    rows as unknown as Repository<Opportunity>,
+    transactionalRepository(rows) as unknown as Repository<Opportunity>,
     {} as JobImportService,
   );
   await expect(service.create(fields)).rejects.toThrow('already saved');
@@ -47,9 +48,10 @@ test.each([
       return stored;
     }),
     findOneBy: jest.fn(async () => stored),
+    findOneByOrFail: jest.fn(async () => stored),
   };
   const service = new OpportunitiesService(
-    rows as unknown as Repository<Opportunity>,
+    transactionalRepository(rows) as unknown as Repository<Opportunity>,
     {} as JobImportService,
   );
   const created = await service.create({ ...fields, originalLink: url });

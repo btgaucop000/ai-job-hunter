@@ -1,16 +1,16 @@
 import { jdRequirementLines } from '../extraction/jd-requirements.js';
 import { Injectable } from '@nestjs/common';
 import { supportedStacks, type DiscoveredJob } from './discovery.js';
-export const DISCOVERY_SOURCES = [
-  {
-    name: 'Axon · Greenhouse',
-    url: 'https://boards-api.greenhouse.io/v1/boards/axon/jobs?content=true',
-  },
-  {
-    name: 'Backbase · Greenhouse',
-    url: 'https://boards-api.greenhouse.io/v1/boards/workatbackbase/jobs?content=true',
-  },
-] as const;
+import {
+  DISCOVERY_SOURCES,
+  greenhouseSourceKey,
+} from './greenhouse-registry.js';
+export { DISCOVERY_SOURCES } from './greenhouse-registry.js';
+export function discoverySourceKey(
+  discovery: DiscoveredJob['discovery'],
+): string | undefined {
+  return greenhouseSourceKey(discovery.sourceUrl);
+}
 type Source = { name: string; url: string };
 const object = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -158,20 +158,36 @@ export function normalizeGreenhouse(
       },
     });
   }
-  return { jobs, invalid };
+  return { jobs, invalid, fetched: data.jobs.length };
+}
+export interface SourceReadMetadata {
+  cacheHit: boolean;
+  fetchedAt: string | null;
 }
 @Injectable()
 export class GreenhouseSource {
-  private cache = new Map<string, { until: number; payload: unknown }>();
+  private cache = new Map<
+    string,
+    { until: number; payload: unknown; fetchedAt: string }
+  >();
   private blocked = new Map<string, number>();
-  async read(source: Source): Promise<unknown> {
+  async read(source: Source, metadata?: SourceReadMetadata): Promise<unknown> {
+    if (
+      !DISCOVERY_SOURCES.some((item) => item.enabled && item.url === source.url)
+    )
+      throw new Error('Unsupported source');
     const cached = this.cache.get(source.url);
-    if (cached && cached.until > Date.now()) return cached.payload;
+    if (cached && cached.until > Date.now()) {
+      if (metadata)
+        Object.assign(metadata, {
+          cacheHit: true,
+          fetchedAt: cached.fetchedAt,
+        });
+      return cached.payload;
+    }
     if ((this.blocked.get(source.url) ?? 0) > Date.now())
       throw new Error('Source cooldown');
     // Fixed allowlist: no caller-controlled destinations and no redirects.
-    if (!DISCOVERY_SOURCES.some((item) => item.url === source.url))
-      throw new Error('Unsupported source');
     this.blocked.set(source.url, Date.now() + 300000);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
@@ -217,7 +233,13 @@ export class GreenhouseSource {
       const payload: unknown = JSON.parse(
         new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)),
       );
-      this.cache.set(source.url, { until: Date.now() + 300000, payload });
+      const fetchedAt = new Date().toISOString();
+      this.cache.set(source.url, {
+        until: Date.now() + 300000,
+        payload,
+        fetchedAt,
+      });
+      if (metadata) Object.assign(metadata, { cacheHit: false, fetchedAt });
       return payload;
     } finally {
       clearTimeout(timer);

@@ -1,12 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from './render';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { JobInbox } from '../src/features/inbox/JobInbox';
 import { JobEditor } from '../src/features/inbox/JobEditor';
@@ -275,6 +269,7 @@ test.each([
     expect(screen.getByLabelText('Last HR contact date')).toHaveValue(value);
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     await screen.findByText(/Could not save or load opportunities/);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(saved.contactDates).toEqual(dates);
     expect(screen.getByLabelText('Last HR contact date')).toHaveValue(value);
     fail = false;
@@ -348,6 +343,7 @@ test('application details set, reopen, edit, survive failure and clear independe
   });
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
   await screen.findByText(/Could not save or load opportunities/);
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }));
   expect(screen.getByLabelText('Applied date')).toHaveValue('2026-10-30');
   expect(screen.getByLabelText('Application channel')).toHaveValue('TopCV');
   fail = false;
@@ -444,14 +440,16 @@ test('dirty chip stays in metadata and save success is a dismissible notificatio
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     });
-    expect(screen.getByRole('alert')).toHaveTextContent('Changes saved');
-    expect(screen.getByRole('alert').closest('.MuiSnackbar-root')).toHaveStyle({
-      position: 'fixed',
-    });
-    expect(screen.getByRole('alert').closest('#job-editor-form')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Changes saved');
+    expect(screen.getByRole('status').closest('.MuiSnackbar-root')).toHaveStyle(
+      {
+        position: 'fixed',
+      },
+    );
+    expect(screen.getByRole('status').closest('#job-editor-form')).toBeNull();
     expect(chip).not.toBeVisible();
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(3500);
     });
     expect(screen.queryByText('Changes saved')).not.toBeInTheDocument();
   } finally {
@@ -463,7 +461,9 @@ test('dirty chip stays in metadata and save success is a dismissible notificatio
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
   await screen.findByText('Changes saved');
   await userEvent.click(screen.getByRole('button', { name: 'Close' }));
-  expect(screen.queryByText('Changes saved')).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.queryByText('Changes saved')).not.toBeInTheDocument(),
+  );
 });
 
 test('save failure persists until dismissed, preserves edits and blocks duplicate submissions', async () => {
@@ -515,4 +515,20 @@ test('save failure persists until dismissed, preserves edits and blocks duplicat
   expect(notes).toHaveValue('Keep this edit');
   expect(screen.getByText('Unsaved changes')).toBeVisible();
   expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
+});
+
+test('empty Inbox keeps primary Add and outlined task navigation alternatives', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json([])),
+  );
+  mount('/dashboard');
+  await screen.findByText('No saved opportunities yet');
+  expect(screen.getByRole('link', { name: 'Discover Jobs' })).toHaveClass(
+    'MuiButton-outlined',
+  );
+  const add = screen.getAllByRole('link', { name: 'Add Job' });
+  expect(add).toHaveLength(2);
+  expect(add[0]).toHaveClass('MuiButton-contained');
+  expect(add[1]).toHaveClass('MuiButton-outlined');
 });

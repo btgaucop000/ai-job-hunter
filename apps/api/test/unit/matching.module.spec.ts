@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { Opportunity } from '../../src/opportunities/opportunity.entity.js';
 import { SavedCv } from '../../src/matching/saved-cv.entity.js';
+import { DiscoveryCandidate } from '../../src/discovery/discovery-candidate.entity.js';
 import { AppModule } from '../../src/app.module.js';
 import { DatabaseModule } from '../../src/database/database.module.js';
 import { AI_PROVIDER } from '../../src/ai/ai-provider.js';
@@ -142,6 +143,8 @@ test('AppModule compiles with matching registered and no AI or extraction invoca
     .overrideProvider(getRepositoryToken(Opportunity))
     .useValue(Object.freeze({}))
     .overrideProvider(getRepositoryToken(SavedCv))
+    .useValue(Object.freeze({}))
+    .overrideProvider(getRepositoryToken(DiscoveryCandidate))
     .useValue(Object.freeze({}))
     .overrideProvider(AI_CONFIG)
     .useValue(aiConfig({}))

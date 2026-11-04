@@ -1,6 +1,5 @@
-import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from './render';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { JobInbox } from '../src/features/inbox/JobInbox';
 import { JobEditor } from '../src/features/inbox/JobEditor';
@@ -239,52 +238,21 @@ test('keeps the table and filter focus when filtering to no results', async () =
   expect(fetch).toHaveBeenCalledTimes(1);
 });
 
-test('discovery starts collapsed, opens by keyboard and preserves inputs across collapse', async () => {
-  const user = userEvent.setup();
-  const { fetch } = mount([makeJob('Saved job', null)]);
-  await screen.findByText('Saved job');
-  const summary = screen.getByRole('button', { name: 'Toggle Discover Jobs' });
-  expect(summary).toHaveAttribute('aria-expanded', 'false');
-  expect(screen.getByLabelText('Discovery location')).not.toBeVisible();
-  summary.focus();
-  await user.keyboard('{Enter}');
-  expect(summary).toHaveAttribute('aria-expanded', 'true');
-  await user.click(screen.getByLabelText('Discovery location'));
-  await user.click(screen.getByRole('option', { name: 'Vietnam' }));
-  await user.click(summary);
-  expect(summary).toHaveAttribute('aria-expanded', 'false');
-  await user.click(summary);
-  expect(screen.getByLabelText('Discovery location')).toHaveTextContent(
-    'Vietnam',
-  );
-  expect(fetch).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole('heading', { name: 'Saved Jobs (1)' })).toBeVisible();
-});
-
-test('saved-job controls are grouped with bottom pagination and discovery still refreshes imports', async () => {
-  let imported = false;
-  const fetch = vi.fn(async (url: string) => {
-    if (url.endsWith('/discover')) {
-      imported = true;
-      return Response.json({
-        found: 1,
-        imported: 1,
-        duplicatesSkipped: 0,
-        remaining: 0,
-        errors: [],
-        scope: 'Synthetic feeds',
-      });
-    }
-    return Response.json(imported ? [makeJob('Imported job', null)] : []);
-  });
-  vi.stubGlobal('fetch', fetch);
-  render(
-    <MemoryRouter>
-      <JobInbox />
-    </MemoryRouter>,
-  );
+test('Inbox has no discovery panel and keeps grouped controls and bottom pagination', async () => {
+  const { fetch } = mount([]);
   await screen.findByText('No saved opportunities yet');
+  expect(
+    screen.queryByRole('button', { name: 'Toggle Discover Jobs' }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Discovery location')).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Discover Jobs' })).toHaveAttribute(
+    'href',
+    '/discover',
+  );
   const section = screen.getByRole('region', { name: 'Saved Jobs (0)' });
+  expect(
+    within(section).getByRole('link', { name: 'Add Job' }),
+  ).toHaveAttribute('href', '/jobs/new');
   expect(
     within(section).getByRole('button', { name: 'All jobs' }),
   ).toHaveAttribute('aria-pressed', 'true');
@@ -294,17 +262,7 @@ test('saved-job controls are grouped with bottom pagination and discovery still 
     table.compareDocumentPosition(pagination) &
       Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  await userEvent.click(
-    screen.getByRole('button', { name: 'Toggle Discover Jobs' }),
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'Discover Jobs' }));
-  await screen.findByText('Imported job');
-  expect(screen.getByRole('heading', { name: 'Saved Jobs (1)' })).toBeVisible();
-  expect(fetch.mock.calls.map(([url]) => url)).toEqual([
-    '/api/v1/opportunities',
-    '/api/v1/opportunities/discover',
-    '/api/v1/opportunities',
-  ]);
+  expect(fetch).toHaveBeenCalledTimes(1);
 });
 
 test('keeps original links accessible for manual jobs and clears an empty filter locally', async () => {

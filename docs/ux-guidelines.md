@@ -70,7 +70,14 @@ horizontal table overflow inside its container, not on the page. Preserve semant
 headings, field labels, keyboard access, focus visibility and status announcements.
 Check narrow screens and 200% zoom; do not hide required actions or clip content.
 Preserve the editor's existing single field-scroll region and separate action row.
-Application and CV Match retain their existing document scrolling.
+Application keeps its header, tabs and provenance above a bounded desktop form
+scroller with a separate Save footer. Narrow or short viewports use natural page
+scrolling when there is insufficient form space. CV Match uses document scrolling.
+
+For MVP, Edit JD is manual editing of saved job details and Job description.
+Source import and AI extraction belong to Add Job only. Preserve original source
+text/documents and evidence; manual edits must not clear conflict acknowledgements
+except to reset acknowledgement of a conflicting field that was edited again.
 
 ## Motion and layout stability
 
@@ -89,3 +96,22 @@ scroll ownership and evidence presentation. Preserve existing local overrides
 until the owning screen is reviewed. Do not add global overrides just to remove
 one repeated sx expression. Extract a component only when repeated structure and
 behavior justify it; use MUI primitives directly otherwise.
+
+## Semantic contrast and destructive actions
+
+Keep the primary teal and warning orange fills. Normal-sized text must reach
+at least 4.5:1 against its actual background. Filled warning Chips use
+`palette.grey[900]` text on the existing `palette.warning.main` fill through a
+narrow theme override; other Chip variants and warning Alerts retain their own
+semantic treatments. Verify the foreground/background pair for each component
+and variant rather than assuming every warning surface shares the same colors.
+Do not use warning orange as normal text on white merely because it is a
+semantic token.
+
+Use explicit error semantics for destructive actions such as “Discard and leave.”
+In the existing unsaved-change confirmation, keep “Stay and edit” first,
+outlined primary and initially focused; keep Discard last as outlined error.
+Ensure Stay receives focus as the dialog becomes visible, and retain native
+button Enter/Space activation, focus trapping and focus return. Preserve the guard and its
+Stay/Discard behavior. Reversible review actions such as Dismiss do not become
+destructive solely for visual consistency.

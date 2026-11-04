@@ -33,6 +33,16 @@ export const theme = createTheme({
         sizeLarge: { minHeight: 44 },
       },
     },
+    MuiChip: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          // Keep the warning fill; only filled warning indicators need dark text.
+          '&.MuiChip-filled.MuiChip-colorWarning': {
+            color: theme.palette.grey[900],
+          },
+        }),
+      },
+    },
     MuiToggleButton: {
       styleOverrides: { root: { textTransform: 'none' } },
     },

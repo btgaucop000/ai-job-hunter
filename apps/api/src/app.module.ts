@@ -1,3 +1,4 @@
+import { DiscoveryQueueModule } from './discovery/discovery-queue.module.js';
 import { OpportunitiesModule } from './opportunities/opportunities.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
 import { AnalysisModule } from './analysis/analysis.module.js';
@@ -11,6 +12,7 @@ import { MatchingModule } from './matching/matching.module.js';
   imports: [
     DatabaseModule,
     OpportunitiesModule,
+    DiscoveryQueueModule,
     JobsModule,
     HealthModule,
     ExtractionModule,
