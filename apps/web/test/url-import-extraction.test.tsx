@@ -57,7 +57,11 @@ function setup(conflict = false, missing = false) {
     })),
   };
   const fetch = vi.fn(async (path: string, init?: RequestInit) => {
-    if (path.endsWith('/import-url')) return Response.json(fetched);
+    if (path.endsWith('/import-url'))
+      return Response.json({
+        ...fetched,
+        domain: 'IT Services and IT Consulting; Financial Services',
+      });
     if (path.endsWith('/extract')) return Response.json(result);
     return Response.json({
       ...JSON.parse(init!.body as string),
@@ -120,6 +124,7 @@ test.each([false, true])(
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
     expect(JSON.parse(fetch.mock.calls[2]![1]!.body as string)).toMatchObject({
       title,
+      domain: 'IT Services and IT Consulting; Financial Services',
       location,
       company: fetched.company,
       originalLink: link,

@@ -15,6 +15,7 @@ export function requirementLines(text: string): {
   let section: 'skills' | 'preferredSkills' | null = null;
   let structured = false;
   let excludedSection = false;
+  let taxonomy = false;
   return text
     .split(/\r?\n/u)
     .flatMap<ReturnType<typeof requirementLines>[number]>((raw) => {
@@ -42,9 +43,7 @@ export function requirementLines(text: string): {
       ) {
         excludedSection = false;
         section = 'skills';
-        structured =
-          /^\d+\./u.test(line) ||
-          /^(?:your skills and experience|yêu cầu)/iu.test(clean);
+        structured = true;
         return [{ line, kind: null, structured, excluded: true }];
       }
       if (
@@ -55,6 +54,19 @@ export function requirementLines(text: string): {
         excludedSection = false;
         section = null;
         structured = true;
+        return [{ line, kind: null, structured, excluded: true }];
+      }
+      if (clean === 'ITviec Job Domain:') taxonomy = true;
+      if (clean === 'End ITviec Job Domain') taxonomy = false;
+      if (
+        taxonomy ||
+        /^(?:ITviec Job (?:Expertise|Domain):|End ITviec Job Domain$)/u.test(
+          clean,
+        )
+      ) {
+        section = null;
+        structured = false;
+        excludedSection = true;
         return [{ line, kind: null, structured, excluded: true }];
       }
       if (nonSkillHeading.test(clean)) {
@@ -136,9 +148,7 @@ export function requirementLines(text: string): {
               : inlineRequired || competence
                 ? ('skills' as const)
                 : section,
-          structured:
-            structuredLine &&
-            !/\d+\s*(?:năm|years?).*(?:kinh nghiệm|experience)/iu.test(clause),
+          structured: structuredLine,
         };
       });
     });

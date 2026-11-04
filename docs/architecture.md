@@ -56,6 +56,29 @@ Server-side URL fetching is restricted and bounded; open-page import validates
 its supported payload, origin, and nonce handshake. Importing or saving a job
 does not submit an application or send messages.
 
+ITviec Fetch preserves the verified server-rendered job-header taxonomy in
+response-only `sourceMetadata` arrays. Existing xmldom tooling parses a balanced,
+scoped header fragment, avoiding unrelated page XML/SVG and excluding tooltip
+content. Skills remain supplemental tags; expertise remains source classification.
+Explicit domains map to the existing Domain string with `; ` separators and a
+bounded, verbatim source block. Deterministic recovery treats each block entry as
+atomic evidence, preserving commas/conjunctions and genuine source conflicts.
+Add Job protects fetched domains against omitted AI proposals and respects manual
+edits and source replacement. Generic JSON-LD industry is not a domain fallback.
+No taxonomy entity, migration or new dependency is required; unknown page layouts
+remain absent rather than being inferred from navigation or analytics.
+
+Explicit qualification headings in Add Job extraction consistently enable
+source-clause recovery. Mandatory and preferred qualifications preserve knowledge
+levels, delivered-project constraints, education and AND/OR alternatives; plain
+technology lists keep the existing safe splitting rules. The existing proposal
+normalizer replaces fragments with the recovered clauses from their source row,
+so generic keywords do not duplicate complete requirements. Plus-years experience
+is normalized separately while the accompanying qualification remains evidence.
+This applies to new suggestions; historical/manual evidence is not retroactively
+rewritten. The pinned model profile, single-generation budget and strict evidence
+gates remain unchanged. CV Match still consumes the existing saved text fields.
+
 ## Persistence and configuration
 
 PostgreSQL runs in Docker. The development Compose project uses a persistent

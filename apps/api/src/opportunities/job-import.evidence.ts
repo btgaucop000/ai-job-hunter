@@ -542,7 +542,7 @@ export function sourceCandidates(post: string, jd: string): ImportCandidate[] {
       for (const mode of workModeEvidence(line))
         add('workMode', mode.value, source, line);
       const experience =
-        /(?:từ|tối thiểu|ít nhất|minimum|at least)\s*\d+\s*(?:năm|years?)/iu.exec(
+        /(?:từ|tối thiểu|ít nhất|minimum|at least)\s*\d+\s*\+?\s*(?:năm|years?)/iu.exec(
           line,
         );
       if (experience && /\bKN\b|kinh nghiệm|experience|years?/iu.test(line))
@@ -563,7 +563,9 @@ export function sourceCandidates(post: string, jd: string): ImportCandidate[] {
       if (disclosure || negotiation)
         add('salary', disclosure?.[1] ?? negotiation![1]!, source, line);
       const rangeExperience =
-        /(?<!\d)(?:\d+\s*[-–]\s*)?\d+\s*years? of experience/iu.exec(line);
+        /(?<!\d)(?:\d+\s*[-–]\s*)?\d+\s*\+?\s*years? of experience/iu.exec(
+          line,
+        );
       if (rangeExperience)
         add(
           'experience',

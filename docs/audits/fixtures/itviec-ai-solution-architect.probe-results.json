@@ -1,0 +1,897 @@
+{
+  "provenance": "OFFLINE MOCKED RESPONSES: not observed Ollama output",
+  "sourceCharacters": 4704,
+  "sourceSha256": "701b740fd3ced70c209421c15ef025ed244e9b67bd84580a6b14e77f80f5dad6",
+  "headingClassification": [
+    {
+      "excluded": false,
+      "line": "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience.",
+      "kind": "skills",
+      "structured": false
+    },
+    {
+      "excluded": false,
+      "line": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience.",
+      "kind": "skills",
+      "structured": false
+    },
+    {
+      "excluded": false,
+      "line": "Strong English communication, facilitation, presentation, and technical documentation skills.",
+      "kind": "skills",
+      "structured": false
+    },
+    {
+      "excluded": false,
+      "line": "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage.",
+      "kind": "skills",
+      "structured": false
+    },
+    {
+      "excluded": false,
+      "line": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations.",
+      "kind": "skills",
+      "structured": false
+    },
+    {
+      "excluded": false,
+      "line": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices.",
+      "kind": "skills",
+      "structured": false
+    },
+    {
+      "excluded": false,
+      "line": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs.",
+      "kind": "skills",
+      "structured": false
+    },
+    {
+      "excluded": false,
+      "line": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development.",
+      "kind": "skills",
+      "structured": false
+    },
+    {
+      "excluded": false,
+      "line": "Client-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication.",
+      "kind": "skills",
+      "structured": false
+    },
+    {
+      "excluded": false,
+      "line": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation.",
+      "kind": "preferredSkills",
+      "structured": true
+    },
+    {
+      "excluded": false,
+      "line": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence.",
+      "kind": "preferredSkills",
+      "structured": true
+    },
+    {
+      "excluded": false,
+      "line": "Experience designing technical training, engineering standards, or reusable solution accelerators.",
+      "kind": "preferredSkills",
+      "structured": true
+    },
+    {
+      "excluded": false,
+      "line": "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications.",
+      "kind": "preferredSkills",
+      "structured": true
+    }
+  ],
+  "deterministicRecovery": [
+    {
+      "field": "skills",
+      "value": "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage.",
+      "source": "post",
+      "quote": "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage."
+    },
+    {
+      "field": "skills",
+      "value": "CI/CD",
+      "source": "post",
+      "quote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices."
+    },
+    {
+      "field": "skills",
+      "value": "AI evaluation",
+      "source": "post",
+      "quote": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs."
+    },
+    {
+      "field": "skills",
+      "value": "observability",
+      "source": "post",
+      "quote": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs."
+    },
+    {
+      "field": "skills",
+      "value": "security",
+      "source": "post",
+      "quote": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs."
+    },
+    {
+      "field": "skills",
+      "value": "privacy",
+      "source": "post",
+      "quote": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs."
+    },
+    {
+      "field": "skills",
+      "value": "performance",
+      "source": "post",
+      "quote": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs."
+    },
+    {
+      "field": "skills",
+      "value": "cost trade-offs",
+      "source": "post",
+      "quote": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs."
+    },
+    {
+      "field": "preferredSkills",
+      "value": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation",
+      "source": "post",
+      "quote": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation."
+    },
+    {
+      "field": "preferredSkills",
+      "value": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence",
+      "source": "post",
+      "quote": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence."
+    },
+    {
+      "field": "preferredSkills",
+      "value": "Experience designing technical training, engineering standards, or reusable solution accelerators",
+      "source": "post",
+      "quote": "Experience designing technical training, engineering standards, or reusable solution accelerators."
+    },
+    {
+      "field": "preferredSkills",
+      "value": "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications",
+      "source": "post",
+      "quote": "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications."
+    }
+  ],
+  "probes": {
+    "omitted_model": {
+      "rawMockResponse": {
+        "candidates": []
+      },
+      "independentlyNormalizedMock": [],
+      "values": {
+        "title": "AI Solution Architect",
+        "company": "ITviec Recruitment Consulting",
+        "agency": "",
+        "contactNotes": "",
+        "location": "City, Not Available, Hồ Chí Minh, VN",
+        "workMode": "",
+        "employmentType": "",
+        "seniority": "",
+        "skills": "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage.\nCI/CD\nAI evaluation\nobservability\nsecurity\nprivacy\nperformance\ncost trade-offs",
+        "preferredSkills": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation\nMulti-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence\nExperience designing technical training, engineering standards, or reusable solution accelerators\nSpec-driven development, AI governance frameworks, or relevant cloud and AI certifications",
+        "experience": "",
+        "domain": "Banking; IT Services and IT Consulting; Software Products and Web Services; Financial Services",
+        "salary": "4,000 - 5,000 USD per MONTH",
+        "originalLink": ""
+      },
+      "rejected": 0,
+      "evidenceRoundTrip": "PASS",
+      "lexicalCoverage": [
+        {
+          "id": "M1",
+          "present": [],
+          "missing": [
+            "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience"
+          ]
+        },
+        {
+          "id": "M2",
+          "present": [],
+          "missing": [
+            "6+ years of experience in software engineering, solution architecture, or a related technical role",
+            "recent hands-on Generative AI experience"
+          ]
+        },
+        {
+          "id": "M3",
+          "present": [],
+          "missing": [
+            "English communication",
+            "facilitation",
+            "presentation",
+            "technical documentation skills"
+          ]
+        },
+        {
+          "id": "M4",
+          "present": [
+            "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M5",
+          "present": ["RAG"],
+          "missing": [
+            "vector search",
+            "agentic workflows",
+            "tool calling",
+            "model selection",
+            "AI system limitations"
+          ]
+        },
+        {
+          "id": "M6",
+          "present": [],
+          "missing": [
+            "cloud-based architectures",
+            "APIs",
+            "integrations",
+            "data flows",
+            "CI/CD practices"
+          ]
+        },
+        {
+          "id": "M7",
+          "present": [
+            "AI evaluation",
+            "observability",
+            "security",
+            "privacy",
+            "performance",
+            "cost trade-offs"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M8",
+          "present": [],
+          "missing": [
+            "AI coding tools",
+            "coach engineers in practical AI-assisted software development"
+          ]
+        },
+        {
+          "id": "M9",
+          "present": [],
+          "missing": [
+            "discovery",
+            "requirement translation",
+            "architecture presentations",
+            "stakeholder communication"
+          ]
+        },
+        {
+          "id": "P1",
+          "present": [
+            "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation"
+          ],
+          "missing": []
+        },
+        {
+          "id": "P2",
+          "present": [
+            "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence"
+          ],
+          "missing": []
+        },
+        {
+          "id": "P3",
+          "present": [
+            "Experience designing technical training, engineering standards, or reusable solution accelerators"
+          ],
+          "missing": []
+        },
+        {
+          "id": "P4",
+          "present": [
+            "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications"
+          ],
+          "missing": []
+        }
+      ]
+    },
+    "complete_clauses": {
+      "rawMockResponse": {
+        "candidates": [
+          {
+            "field": "skills",
+            "value": "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience.",
+            "source": "post",
+            "quote": "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience."
+          },
+          {
+            "field": "skills",
+            "value": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience.",
+            "source": "post",
+            "quote": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience."
+          },
+          {
+            "field": "skills",
+            "value": "Strong English communication, facilitation, presentation, and technical documentation skills.",
+            "source": "post",
+            "quote": "Strong English communication, facilitation, presentation, and technical documentation skills."
+          },
+          {
+            "field": "skills",
+            "value": "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage.",
+            "source": "post",
+            "quote": "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage."
+          },
+          {
+            "field": "skills",
+            "value": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations.",
+            "source": "post",
+            "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations."
+          },
+          {
+            "field": "skills",
+            "value": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices.",
+            "source": "post",
+            "quote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices."
+          },
+          {
+            "field": "skills",
+            "value": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs.",
+            "source": "post",
+            "quote": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs."
+          },
+          {
+            "field": "skills",
+            "value": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development.",
+            "source": "post",
+            "quote": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development."
+          },
+          {
+            "field": "skills",
+            "value": "Client-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication.",
+            "source": "post",
+            "quote": "Client-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication."
+          },
+          {
+            "field": "preferredSkills",
+            "value": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation.",
+            "source": "post",
+            "quote": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation."
+          },
+          {
+            "field": "preferredSkills",
+            "value": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence.",
+            "source": "post",
+            "quote": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence."
+          },
+          {
+            "field": "preferredSkills",
+            "value": "Experience designing technical training, engineering standards, or reusable solution accelerators.",
+            "source": "post",
+            "quote": "Experience designing technical training, engineering standards, or reusable solution accelerators."
+          },
+          {
+            "field": "preferredSkills",
+            "value": "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications.",
+            "source": "post",
+            "quote": "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications."
+          },
+          {
+            "field": "experience",
+            "value": "6+ years",
+            "source": "post",
+            "quote": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience."
+          }
+        ]
+      },
+      "independentlyNormalizedMock": [
+        {
+          "field": "skills",
+          "value": "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience.",
+          "source": "post",
+          "quote": "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience."
+        },
+        {
+          "field": "skills",
+          "value": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience.",
+          "source": "post",
+          "quote": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience."
+        },
+        {
+          "field": "experience",
+          "value": "6+ years",
+          "source": "post",
+          "quote": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience."
+        },
+        {
+          "field": "skills",
+          "value": "Strong English communication, facilitation, presentation, and technical documentation skills.",
+          "source": "post",
+          "quote": "Strong English communication, facilitation, presentation, and technical documentation skills."
+        },
+        {
+          "field": "skills",
+          "value": "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage.",
+          "source": "post",
+          "quote": "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage."
+        },
+        {
+          "field": "skills",
+          "value": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations.",
+          "source": "post",
+          "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations."
+        },
+        {
+          "field": "skills",
+          "value": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices.",
+          "source": "post",
+          "quote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices."
+        },
+        {
+          "field": "skills",
+          "value": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs.",
+          "source": "post",
+          "quote": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs."
+        },
+        {
+          "field": "skills",
+          "value": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development.",
+          "source": "post",
+          "quote": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development."
+        },
+        {
+          "field": "skills",
+          "value": "Client-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication.",
+          "source": "post",
+          "quote": "Client-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication."
+        },
+        {
+          "field": "preferredSkills",
+          "value": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation",
+          "source": "post",
+          "quote": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation."
+        },
+        {
+          "field": "preferredSkills",
+          "value": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence",
+          "source": "post",
+          "quote": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence."
+        },
+        {
+          "field": "preferredSkills",
+          "value": "Experience designing technical training, engineering standards, or reusable solution accelerators",
+          "source": "post",
+          "quote": "Experience designing technical training, engineering standards, or reusable solution accelerators."
+        },
+        {
+          "field": "preferredSkills",
+          "value": "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications",
+          "source": "post",
+          "quote": "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications."
+        }
+      ],
+      "values": {
+        "title": "AI Solution Architect",
+        "company": "ITviec Recruitment Consulting",
+        "agency": "",
+        "contactNotes": "",
+        "location": "City, Not Available, Hồ Chí Minh, VN",
+        "workMode": "",
+        "employmentType": "",
+        "seniority": "",
+        "skills": "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience.\n6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience.\nStrong English communication, facilitation, presentation, and technical documentation skills.\nPersonally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage.\nWorking knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations.\nExperience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices.\nCI/CD\nUnderstanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs.\nAI evaluation\nobservability\nsecurity\nprivacy\nperformance\ncost trade-offs\nExperience using AI coding tools and the ability to coach engineers in practical AI-assisted software development.\nClient-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication.",
+        "preferredSkills": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation\nMulti-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence\nExperience designing technical training, engineering standards, or reusable solution accelerators\nSpec-driven development, AI governance frameworks, or relevant cloud and AI certifications",
+        "experience": "Minimum 6 years",
+        "domain": "Banking; IT Services and IT Consulting; Software Products and Web Services; Financial Services",
+        "salary": "4,000 - 5,000 USD per MONTH",
+        "originalLink": ""
+      },
+      "rejected": 0,
+      "evidenceRoundTrip": "PASS",
+      "lexicalCoverage": [
+        {
+          "id": "M1",
+          "present": [
+            "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M2",
+          "present": [
+            "6+ years of experience in software engineering, solution architecture, or a related technical role",
+            "recent hands-on Generative AI experience"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M3",
+          "present": [
+            "English communication",
+            "facilitation",
+            "presentation",
+            "technical documentation skills"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M4",
+          "present": [
+            "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M5",
+          "present": [
+            "RAG",
+            "vector search",
+            "agentic workflows",
+            "tool calling",
+            "model selection",
+            "AI system limitations"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M6",
+          "present": [
+            "cloud-based architectures",
+            "APIs",
+            "integrations",
+            "data flows",
+            "CI/CD practices"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M7",
+          "present": [
+            "AI evaluation",
+            "observability",
+            "security",
+            "privacy",
+            "performance",
+            "cost trade-offs"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M8",
+          "present": [
+            "AI coding tools",
+            "coach engineers in practical AI-assisted software development"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M9",
+          "present": [
+            "discovery",
+            "requirement translation",
+            "architecture presentations",
+            "stakeholder communication"
+          ],
+          "missing": []
+        },
+        {
+          "id": "P1",
+          "present": [
+            "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation"
+          ],
+          "missing": []
+        },
+        {
+          "id": "P2",
+          "present": [
+            "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence"
+          ],
+          "missing": []
+        },
+        {
+          "id": "P3",
+          "present": [
+            "Experience designing technical training, engineering standards, or reusable solution accelerators"
+          ],
+          "missing": []
+        },
+        {
+          "id": "P4",
+          "present": [
+            "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications"
+          ],
+          "missing": []
+        }
+      ]
+    },
+    "literal_atoms_and_invalid_controls": {
+      "rawMockResponse": {
+        "candidates": [
+          {
+            "field": "skills",
+            "value": "vector search",
+            "source": "post",
+            "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations."
+          },
+          {
+            "field": "skills",
+            "value": "tool calling",
+            "source": "post",
+            "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations."
+          },
+          {
+            "field": "skills",
+            "value": "model selection",
+            "source": "post",
+            "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations."
+          },
+          {
+            "field": "skills",
+            "value": "cloud-based architectures",
+            "source": "post",
+            "quote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices."
+          },
+          {
+            "field": "skills",
+            "value": "APIs",
+            "source": "post",
+            "quote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices."
+          },
+          {
+            "field": "skills",
+            "value": "AI coding tools",
+            "source": "post",
+            "quote": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development."
+          },
+          {
+            "field": "skills",
+            "value": "coach engineers",
+            "source": "post",
+            "quote": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development."
+          },
+          {
+            "field": "skills",
+            "value": "English communication",
+            "source": "post",
+            "quote": "Strong English communication, facilitation, presentation, and technical documentation skills."
+          },
+          {
+            "field": "preferredSkills",
+            "value": "MCP",
+            "source": "post",
+            "quote": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence."
+          },
+          {
+            "field": "skills",
+            "value": "Kubernetes",
+            "source": "post",
+            "quote": "Supplemental skill tags (not requirements): LLM; Kubernetes; RAG; English"
+          },
+          {
+            "field": "skills",
+            "value": "cloud architecture",
+            "source": "post",
+            "quote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices."
+          },
+          {
+            "field": "skills",
+            "value": "vector search",
+            "source": "jd",
+            "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations."
+          }
+        ]
+      },
+      "independentlyNormalizedMock": [
+        {
+          "field": "skills",
+          "value": "vector search",
+          "source": "jd",
+          "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations."
+        },
+        {
+          "field": "skills",
+          "value": "English communication",
+          "source": "post",
+          "quote": "Strong English communication, facilitation, presentation, and technical documentation skills."
+        },
+        {
+          "field": "skills",
+          "value": "vector search",
+          "source": "post",
+          "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations."
+        },
+        {
+          "field": "skills",
+          "value": "tool calling",
+          "source": "post",
+          "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations."
+        },
+        {
+          "field": "skills",
+          "value": "model selection",
+          "source": "post",
+          "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations."
+        },
+        {
+          "field": "skills",
+          "value": "cloud-based architectures",
+          "source": "post",
+          "quote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices."
+        },
+        {
+          "field": "skills",
+          "value": "APIs",
+          "source": "post",
+          "quote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices."
+        },
+        {
+          "field": "skills",
+          "value": "cloud architecture",
+          "source": "post",
+          "quote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices."
+        },
+        {
+          "field": "skills",
+          "value": "AI coding tools",
+          "source": "post",
+          "quote": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development."
+        },
+        {
+          "field": "skills",
+          "value": "coach engineers",
+          "source": "post",
+          "quote": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development."
+        },
+        {
+          "field": "preferredSkills",
+          "value": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence",
+          "source": "post",
+          "quote": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence."
+        },
+        {
+          "field": "skills",
+          "value": "Kubernetes",
+          "source": "post",
+          "quote": "Supplemental skill tags (not requirements): LLM; Kubernetes; RAG; English"
+        }
+      ],
+      "values": {
+        "title": "AI Solution Architect",
+        "company": "ITviec Recruitment Consulting",
+        "agency": "",
+        "contactNotes": "",
+        "location": "City, Not Available, Hồ Chí Minh, VN",
+        "workMode": "",
+        "employmentType": "",
+        "seniority": "",
+        "skills": "English communication\nPersonally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage.\nvector search\ntool calling\nmodel selection\ncloud-based architectures\nAPIs\nCI/CD\nAI evaluation\nobservability\nsecurity\nprivacy\nperformance\ncost trade-offs\nAI coding tools\ncoach engineers",
+        "preferredSkills": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation\nMulti-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence\nExperience designing technical training, engineering standards, or reusable solution accelerators\nSpec-driven development, AI governance frameworks, or relevant cloud and AI certifications",
+        "experience": "",
+        "domain": "Banking; IT Services and IT Consulting; Software Products and Web Services; Financial Services",
+        "salary": "4,000 - 5,000 USD per MONTH",
+        "originalLink": ""
+      },
+      "rejected": 3,
+      "evidenceRoundTrip": "PASS",
+      "lexicalCoverage": [
+        {
+          "id": "M1",
+          "present": [],
+          "missing": [
+            "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience"
+          ]
+        },
+        {
+          "id": "M2",
+          "present": [],
+          "missing": [
+            "6+ years of experience in software engineering, solution architecture, or a related technical role",
+            "recent hands-on Generative AI experience"
+          ]
+        },
+        {
+          "id": "M3",
+          "present": ["English communication"],
+          "missing": [
+            "facilitation",
+            "presentation",
+            "technical documentation skills"
+          ]
+        },
+        {
+          "id": "M4",
+          "present": [
+            "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M5",
+          "present": [
+            "RAG",
+            "vector search",
+            "tool calling",
+            "model selection"
+          ],
+          "missing": ["agentic workflows", "AI system limitations"]
+        },
+        {
+          "id": "M6",
+          "present": ["cloud-based architectures", "APIs"],
+          "missing": ["integrations", "data flows", "CI/CD practices"]
+        },
+        {
+          "id": "M7",
+          "present": [
+            "AI evaluation",
+            "observability",
+            "security",
+            "privacy",
+            "performance",
+            "cost trade-offs"
+          ],
+          "missing": []
+        },
+        {
+          "id": "M8",
+          "present": ["AI coding tools"],
+          "missing": [
+            "coach engineers in practical AI-assisted software development"
+          ]
+        },
+        {
+          "id": "M9",
+          "present": [],
+          "missing": [
+            "discovery",
+            "requirement translation",
+            "architecture presentations",
+            "stakeholder communication"
+          ]
+        },
+        {
+          "id": "P1",
+          "present": [
+            "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation"
+          ],
+          "missing": []
+        },
+        {
+          "id": "P2",
+          "present": [
+            "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence"
+          ],
+          "missing": []
+        },
+        {
+          "id": "P3",
+          "present": [
+            "Experience designing technical training, engineering standards, or reusable solution accelerators"
+          ],
+          "missing": []
+        },
+        {
+          "id": "P4",
+          "present": [
+            "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications"
+          ],
+          "missing": []
+        }
+      ]
+    }
+  },
+  "prompt": {
+    "characters": 8939,
+    "sourceIncludedVerbatim": true,
+    "sourceField": "post",
+    "jdField": "",
+    "schemaMaxCandidates": 60,
+    "tokenUsage": "NOT_MEASURED_NO_MODEL_CALL"
+  },
+  "providerFailure": {
+    "errorCode": "EXTRACTION_FAILED",
+    "required": "",
+    "preferred": ""
+  },
+  "sourceExperienceCandidates": []
+}

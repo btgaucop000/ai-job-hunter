@@ -34,8 +34,10 @@ test('early-onboarding preference in a job title does not classify Java as prefe
   expect(skillSourceKind(source, 'Java')).toBe('skills');
   const result = extract();
   expect(
-    result.fields.find((field) => field.field === 'skills')?.value.split('\n'),
-  ).toContain('Java');
+    result.fields.find((field) => field.field === 'skills')?.value,
+  ).toContain(
+    'Có ít nhất 03 năm kinh nghiệm với vị trí Java Developer OR vị trí tương đương',
+  );
   expect(
     result.fields
       .find((field) => field.field === 'preferredSkills')
@@ -44,7 +46,9 @@ test('early-onboarding preference in a job title does not classify Java as prefe
   expect(
     result.fields
       .find((field) => field.field === 'skills')
-      ?.candidates.find((candidate) => candidate.value === 'Java')?.quote,
+      ?.candidates.find((candidate) =>
+        candidate.value.includes('Java Developer'),
+      )?.quote,
   ).toBe(role);
   expect(validateImportReview(result.fields, source, '')).toEqual(
     result.fields,
@@ -57,7 +61,9 @@ test('misclassified model Java from title is relinked to required role experienc
   const fields = Object.fromEntries(
     result.fields.map((field) => [field.field, field.value]),
   );
-  expect(fields.skills!.split('\n')).toContain('Java');
+  expect(fields.skills).toContain(
+    'Có ít nhất 03 năm kinh nghiệm với vị trí Java Developer OR vị trí tương đương',
+  );
   expect(fields.skills!.split('\n')).toContain(alternative);
   expect(fields.preferredSkills!.split('\n')).not.toContain('Java');
   for (const term of ['viễn thông', 'container', 'K8S', 'Microservice'])
@@ -68,7 +74,9 @@ test('misclassified model Java from title is relinked to required role experienc
   expect(
     result.fields
       .find((field) => field.field === 'skills')
-      ?.candidates.find((candidate) => candidate.value === 'Java')?.quote,
+      ?.candidates.find((candidate) =>
+        candidate.value.includes('Java Developer'),
+      )?.quote,
   ).toBe(role);
   expect(validateImportReview(result.fields, source, '')).toEqual(
     result.fields,

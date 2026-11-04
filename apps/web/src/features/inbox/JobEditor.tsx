@@ -268,8 +268,8 @@ export function JobEditor({
               // supporting evidence remains. Intentional edits stay protected.
               if (!value.trim()) {
                 if (
-                  key === 'workMode' &&
-                  fetchedJob.current?.workMode &&
+                  ['workMode', 'domain'].includes(key) &&
+                  fetchedJob.current?.[key as 'workMode' | 'domain'] &&
                   row.postText.includes(fetchedJob.current.sourceText)
                 )
                   return false;
@@ -299,6 +299,7 @@ export function JobEditor({
                   'salary',
                   'experience',
                   'workMode',
+                  'domain',
                 ].includes(key) &&
                 row[key as ImportFieldName]
               );

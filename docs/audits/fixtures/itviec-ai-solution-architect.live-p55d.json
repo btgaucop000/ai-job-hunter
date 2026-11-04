@@ -1,0 +1,251 @@
+{
+  "provenance": "One live local Ollama call using only the fixed public ITviec JD; no private documents, CVs or job writes.",
+  "sourceUrl": "https://itviec.com/it-jobs/ai-solution-architect-itviec-recruitment-consulting-0525",
+  "model": "qwen3:4b",
+  "generations": 1,
+  "elapsedMs": 24282,
+  "rawEnvelope": {
+    "model": "qwen3:4b",
+    "done": true,
+    "done_reason": "stop",
+    "prompt_eval_count": 1826,
+    "eval_count": 1137,
+    "response": "{\n  \"candidates\": [\n    {\n      \"field\": \"title\",\n      \"value\": \"AI Solution Architect\",\n      \"source\": \"post\",\n      \"quote\": \"Job title: AI Solution Architect\"\n    },\n    {\n      \"field\": \"company\",\n      \"value\": \"ITviec Recruitment Consulting\",\n      \"source\": \"post\",\n      \"quote\": \"Company: ITviec Recruitment Consulting\"\n    },\n    {\n      \"field\": \"agency\",\n      \"value\": \"ITviec Recruitment Consulting\",\n      \"source\": \"post\",\n      \"quote\": \"Company: ITviec Recruitment Consulting\"\n    },\n    {\n      \"field\": \"contactNotes\",\n      \"value\": \"N/A\",\n      \"source\": \"post\",\n      \"quote\": \"N/A\"\n    },\n    {\n      \"field\": \"location\",\n      \"value\": \"Hồ Chí Minh, VN\",\n      \"source\": \"post\",\n      \"quote\": \"Location: City, Not Available, Hồ Chí Minh, VN\"\n    },\n    {\n      \"field\": \"workMode\",\n      \"value\": \"N/A\",\n      \"source\": \"post\",\n      \"quote\": \"N/A\"\n    },\n    {\n      \"field\": \"employmentType\",\n      \"value\": \"N/A\",\n      \"source\": \"post\",\n      \"quote\": \"N/A\"\n    },\n    {\n      \"field\": \"seniority\",\n      \"value\": \"N/A\",\n      \"source\": \"post\",\n      \"quote\": \"N/A\"\n    },\n    {\n      \"field\": \"experience\",\n      \"value\": \"6+ years\",\n      \"source\": \"post\",\n      \"quote\": \"6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience.\"\n    },\n    {\n      \"field\": \"skills\",\n      \"value\": \"Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience. Strong English communication, facilitation, presentation, and technical documentation skills. Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage. Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations. Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices. Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs. Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development. Client-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication.\",\n      \"source\": \"post\",\n      \"quote\": \"Must Have \\nBachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience. \\n6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience. \\nStrong English communication, facilitation, presentation, and technical documentation skills. \\nPersonally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage. \\nWorking knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations.\\nExperience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices. \\nUnderstanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs. \\nExperience using AI coding tools and the ability to coach engineers in practical AI-assisted software development. \\nClient-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication.\"\n    },\n    {\n      \"field\": \"preferredSkills\",\n      \"value\": \"Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation. Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence. Experience designing technical training, engineering standards, or reusable solution accelerators. Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications.\",\n      \"source\": \"post\",\n      \"quote\": \"Nice to Have \\nExperience with technical presales, proposals, RFP/RFI responses, or delivery estimation. \\nMulti-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence. \\nExperience designing technical training, engineering standards, or reusable solution accelerators. \\nSpec-driven development, AI governance frameworks, or relevant cloud and AI certifications.\"\n    },\n    {\n      \"field\": \"domain\",\n      \"value\": \"Banking\",\n      \"source\": \"post\",\n      \"quote\": \"ITviec Job Domain: Banking\"\n    },\n    {\n      \"field\": \"salary\",\n      \"value\": \"4,000 - 5,000 USD per MONTH\",\n      \"source\": \"post\",\n      \"quote\": \"Salary: 4,000 - 5,000 USD per MONTH\"\n    },\n    {\n      \"field\": \"originalLink\",\n      \"value\": \"https://itviec.com/it-jobs/ai-solution-architect-itviec-recruitment-consulting-0525\",\n      \"source\": \"post\",\n      \"quote\": \"Original URL: https://itviec.com/it-jobs/ai-solution-architect-itviec-recruitment-consulting-0525\"\n    }\n  ]\n}"
+  },
+  "rawCandidates": [
+    {
+      "field": "title",
+      "value": "AI Solution Architect",
+      "source": "post",
+      "quote": "Job title: AI Solution Architect"
+    },
+    {
+      "field": "company",
+      "value": "ITviec Recruitment Consulting",
+      "source": "post",
+      "quote": "Company: ITviec Recruitment Consulting"
+    },
+    {
+      "field": "agency",
+      "value": "ITviec Recruitment Consulting",
+      "source": "post",
+      "quote": "Company: ITviec Recruitment Consulting"
+    },
+    {
+      "field": "contactNotes",
+      "value": "N/A",
+      "source": "post",
+      "quote": "N/A"
+    },
+    {
+      "field": "location",
+      "value": "Hồ Chí Minh, VN",
+      "source": "post",
+      "quote": "Location: City, Not Available, Hồ Chí Minh, VN"
+    },
+    {
+      "field": "workMode",
+      "value": "N/A",
+      "source": "post",
+      "quote": "N/A"
+    },
+    {
+      "field": "employmentType",
+      "value": "N/A",
+      "source": "post",
+      "quote": "N/A"
+    },
+    {
+      "field": "seniority",
+      "value": "N/A",
+      "source": "post",
+      "quote": "N/A"
+    },
+    {
+      "field": "experience",
+      "value": "6+ years",
+      "source": "post",
+      "quote": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience."
+    },
+    {
+      "field": "skills",
+      "value": "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience. Strong English communication, facilitation, presentation, and technical documentation skills. Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage. Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations. Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices. Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs. Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development. Client-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication.",
+      "source": "post",
+      "quote": "Must Have \nBachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience. \n6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience. \nStrong English communication, facilitation, presentation, and technical documentation skills. \nPersonally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage. \nWorking knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations.\nExperience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices. \nUnderstanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs. \nExperience using AI coding tools and the ability to coach engineers in practical AI-assisted software development. \nClient-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication."
+    },
+    {
+      "field": "preferredSkills",
+      "value": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation. Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence. Experience designing technical training, engineering standards, or reusable solution accelerators. Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications.",
+      "source": "post",
+      "quote": "Nice to Have \nExperience with technical presales, proposals, RFP/RFI responses, or delivery estimation. \nMulti-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence. \nExperience designing technical training, engineering standards, or reusable solution accelerators. \nSpec-driven development, AI governance frameworks, or relevant cloud and AI certifications."
+    },
+    {
+      "field": "domain",
+      "value": "Banking",
+      "source": "post",
+      "quote": "ITviec Job Domain: Banking"
+    },
+    {
+      "field": "salary",
+      "value": "4,000 - 5,000 USD per MONTH",
+      "source": "post",
+      "quote": "Salary: 4,000 - 5,000 USD per MONTH"
+    },
+    {
+      "field": "originalLink",
+      "value": "https://itviec.com/it-jobs/ai-solution-architect-itviec-recruitment-consulting-0525",
+      "source": "post",
+      "quote": "Original URL: https://itviec.com/it-jobs/ai-solution-architect-itviec-recruitment-consulting-0525"
+    }
+  ],
+  "errorCode": null,
+  "normalizedFields": [
+    {
+      "field": "skills",
+      "value": "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience\n6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience\nStrong English communication, facilitation, presentation, and technical documentation skills\nPersonally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage.\nWorking knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations\nExperience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices\nUnderstanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs\nExperience using AI coding tools and the ability to coach engineers in practical AI-assisted software development\nClient-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "skills",
+          "value": "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience",
+          "source": "post",
+          "quote": "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience."
+        },
+        {
+          "field": "skills",
+          "value": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience",
+          "source": "post",
+          "quote": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience."
+        },
+        {
+          "field": "skills",
+          "value": "Strong English communication, facilitation, presentation, and technical documentation skills",
+          "source": "post",
+          "quote": "Strong English communication, facilitation, presentation, and technical documentation skills."
+        },
+        {
+          "field": "skills",
+          "value": "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage.",
+          "source": "post",
+          "quote": "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage."
+        },
+        {
+          "field": "skills",
+          "value": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations",
+          "source": "post",
+          "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations."
+        },
+        {
+          "field": "skills",
+          "value": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices",
+          "source": "post",
+          "quote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices."
+        },
+        {
+          "field": "skills",
+          "value": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs",
+          "source": "post",
+          "quote": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs."
+        },
+        {
+          "field": "skills",
+          "value": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development",
+          "source": "post",
+          "quote": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development."
+        },
+        {
+          "field": "skills",
+          "value": "Client-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication",
+          "source": "post",
+          "quote": "Client-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication."
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "preferredSkills",
+      "value": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation\nMulti-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence\nExperience designing technical training, engineering standards, or reusable solution accelerators\nSpec-driven development, AI governance frameworks, or relevant cloud and AI certifications",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "preferredSkills",
+          "value": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation",
+          "source": "post",
+          "quote": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation."
+        },
+        {
+          "field": "preferredSkills",
+          "value": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence",
+          "source": "post",
+          "quote": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence."
+        },
+        {
+          "field": "preferredSkills",
+          "value": "Experience designing technical training, engineering standards, or reusable solution accelerators",
+          "source": "post",
+          "quote": "Experience designing technical training, engineering standards, or reusable solution accelerators."
+        },
+        {
+          "field": "preferredSkills",
+          "value": "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications",
+          "source": "post",
+          "quote": "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications."
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "experience",
+      "value": "Minimum 6 years",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "experience",
+          "value": "6+ years",
+          "source": "post",
+          "quote": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience."
+        }
+      ],
+      "reviewed": false
+    },
+    {
+      "field": "domain",
+      "value": "Banking; IT Services and IT Consulting; Software Products and Web Services; Financial Services",
+      "status": "SUPPORTED",
+      "candidates": [
+        {
+          "field": "domain",
+          "value": "Banking",
+          "source": "post",
+          "quote": "ITviec Job Domain:\nBanking"
+        },
+        {
+          "field": "domain",
+          "value": "Banking",
+          "source": "post",
+          "quote": "ITviec Job Domain:\nBanking\nIT Services and IT Consulting\nSoftware Products and Web Services\nFinancial Services\nEnd ITviec Job Domain"
+        },
+        {
+          "field": "domain",
+          "value": "IT Services and IT Consulting",
+          "source": "post",
+          "quote": "ITviec Job Domain:\nBanking\nIT Services and IT Consulting\nSoftware Products and Web Services\nFinancial Services\nEnd ITviec Job Domain"
+        },
+        {
+          "field": "domain",
+          "value": "Software Products and Web Services",
+          "source": "post",
+          "quote": "ITviec Job Domain:\nBanking\nIT Services and IT Consulting\nSoftware Products and Web Services\nFinancial Services\nEnd ITviec Job Domain"
+        },
+        {
+          "field": "domain",
+          "value": "Financial Services",
+          "source": "post",
+          "quote": "ITviec Job Domain:\nBanking\nIT Services and IT Consulting\nSoftware Products and Web Services\nFinancial Services\nEnd ITviec Job Domain"
+        }
+      ],
+      "reviewed": false
+    }
+  ],
+  "rejected": 5
+}

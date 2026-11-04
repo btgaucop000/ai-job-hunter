@@ -38,6 +38,12 @@ export interface UrlJobPreview {
   sourceText: string;
   validThrough: string | null;
   expired: boolean;
+  domain?: string;
+  sourceMetadata?: {
+    skills: string[];
+    jobExpertise: string[];
+    jobDomains: string[];
+  };
   salary?: string;
   experience?: string;
   workMode?: string;
@@ -86,6 +92,7 @@ export function applyUrlJobPreview(
     'salary',
     'experience',
     'workMode',
+    'domain',
   ] as const)
     if (
       !edited.has(field) &&
