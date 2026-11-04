@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { alpha } from '@mui/material/styles';
 import {
   Alert,
@@ -42,20 +42,27 @@ export function DiscoveryQueue({
   const [data, setData] = useState<{ key: string; value: QueuePage } | null>(
     null,
   );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
+  const request = useMemo(
+    () => ({ key, revision, refresh }),
+    [key, revision, refresh],
+  );
+  const [completed, setCompleted] = useState<{
+    request: typeof request;
+    error: string;
+  } | null>(null);
+  const loading = completed?.request !== request;
+  const error = loading ? '' : completed.error;
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    setLoading(true);
-    setError('');
     discoveryRequest<QueuePage>(`/candidates?filter=${filter}&page=${page}`, {
       signal: controller.signal,
     })
       .then((value) => {
         if (!active) return;
         setData({ key, value });
+        setCompleted({ request, error: '' });
         if (value.page !== page)
           setParams(
             (current) => {
@@ -69,20 +76,19 @@ export function DiscoveryQueue({
       })
       .catch((reason: unknown) => {
         if (active)
-          setError(
-            reason instanceof Error
-              ? reason.message
-              : 'Could not load the queue. Retry.',
-          );
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+          setCompleted({
+            request,
+            error:
+              reason instanceof Error
+                ? reason.message
+                : 'Could not load the queue. Retry.',
+          });
       });
     return () => {
       active = false;
       controller.abort();
     };
-  }, [filter, page, key, revision, refresh, setParams]);
+  }, [filter, page, key, request, setParams]);
   const visible = data?.key === key ? data.value : null;
   function navigate(nextFilter: QueueFilter, nextPage: number) {
     setParams((current) => {

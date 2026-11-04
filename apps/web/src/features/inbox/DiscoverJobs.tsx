@@ -1,4 +1,4 @@
-import { useNotify } from '../../components/Notifications';
+import { useNotify } from '../../components/useNotify';
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {

@@ -1,4 +1,4 @@
-import { useNotify } from '../../components/Notifications';
+import { useNotify } from '../../components/useNotify';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -48,8 +48,6 @@ export function DiscoveryCandidateReview({
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    setLoading(true);
-    setError('');
     discoveryRequest<CandidateDetail>(`/candidates/${encodeURIComponent(id)}`, {
       signal: controller.signal,
     })
@@ -175,7 +173,11 @@ export function DiscoveryCandidateReview({
             {!loading && !candidate && (
               <Button
                 variant="outlined"
-                onClick={() => setAttempt((value) => value + 1)}
+                onClick={() => {
+                  setLoading(true);
+                  setError('');
+                  setAttempt((value) => value + 1);
+                }}
               >
                 Retry candidate
               </Button>

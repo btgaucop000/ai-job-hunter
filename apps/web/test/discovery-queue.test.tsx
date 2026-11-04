@@ -396,6 +396,57 @@ test('late responses cannot replace a newer filter', async () => {
   ).toBeVisible();
 });
 
+test('returning to a loaded filter still shows loading until its new request completes', async () => {
+  const { fetch } = backend([candidate(1)]);
+  const { router } = mount();
+  await screen.findByRole('button', { name: 'Review Synthetic role 1' });
+  let finishSaved!: (response: Response) => void;
+  let finishReview!: (response: Response) => void;
+  fetch.mockImplementationOnce(
+    () =>
+      new Promise<Response>((resolve) => {
+        finishSaved = resolve;
+      }),
+  );
+  fetch.mockImplementationOnce(
+    () =>
+      new Promise<Response>((resolve) => {
+        finishReview = resolve;
+      }),
+  );
+  await act(async () => {
+    await router.navigate('/discover?filter=saved&page=1');
+  });
+  await act(async () => {
+    await router.navigate('/discover?filter=to-review&page=1');
+  });
+  expect(screen.getByText('Loading queue…')).toBeVisible();
+  await act(async () =>
+    finishSaved(
+      Response.json({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 10,
+        totalPages: 0,
+      }),
+    ),
+  );
+  expect(screen.getByText('Loading queue…')).toBeVisible();
+  await act(async () =>
+    finishReview(
+      Response.json({
+        items: [candidate(1)],
+        total: 1,
+        page: 1,
+        pageSize: 10,
+        totalPages: 1,
+      }),
+    ),
+  );
+  expect(await screen.findByText('1 candidates')).toBeVisible();
+});
+
 test('all queue filters remain accessible and reviewing identifies the active row', async () => {
   backend();
   const { container } = mount();

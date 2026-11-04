@@ -28,10 +28,9 @@ const queue = {
   get: jest.fn(async () => row),
 };
 const actions = {
-  run: jest.fn(async (_owner: string, _body: unknown) => ({
-    found: 0,
-    added: 0,
-  })),
+  run: jest.fn<
+    (owner: string, body: unknown) => Promise<{ found: number; added: number }>
+  >(async () => ({ found: 0, added: 0 })),
   status: jest.fn(async () => row),
   save: jest.fn(async (_owner: string, _id: string, body: unknown) => {
     validateSaveConfirmation(body);

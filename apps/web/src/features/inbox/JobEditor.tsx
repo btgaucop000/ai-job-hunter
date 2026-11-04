@@ -1,4 +1,4 @@
-import { useNotify } from '../../components/Notifications';
+import { useNotify } from '../../components/useNotify';
 import { SourceJdPreview } from './SourceJdPreview';
 import { ImportMethodCards, type ImportMethod } from './ImportMethodCards';
 import { JobActionLayout } from './JobActionLayout';

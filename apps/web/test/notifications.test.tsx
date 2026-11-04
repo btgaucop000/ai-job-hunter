@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from './render';
 import { expect, test, vi } from 'vitest';
-import { useNotify } from '../src/components/Notifications';
+import { useNotify } from '../src/components/useNotify';
 
 function Controls() {
   const notify = useNotify();

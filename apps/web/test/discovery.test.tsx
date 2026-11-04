@@ -325,8 +325,8 @@ test('successful run uses a success notification and consumes the additive respo
 });
 
 test('edited preference labels preserve backend enum values and match-any stacks', async () => {
-  const fetch = vi.fn(async (_url: string, _init?: RequestInit) =>
-    Response.json({ ...summary, warnings: [] }),
+  const fetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+    async () => Response.json({ ...summary, warnings: [] }),
   );
   vi.stubGlobal('fetch', fetch);
   mount();

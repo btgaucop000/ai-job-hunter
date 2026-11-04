@@ -1,25 +1,7 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { Notifications, type Notification } from './useNotify';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Alert, Portal, Snackbar } from '@mui/material';
 
-type Notification = {
-  severity: 'success' | 'error' | 'warning' | 'info';
-  text: string;
-};
-const Notifications = createContext<((message: Notification) => void) | null>(
-  null,
-);
-export function useNotify() {
-  const notify = useContext(Notifications);
-  if (!notify) throw new Error('NotificationProvider is required');
-  return notify;
-}
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const sequence = useRef(0);
   const [queue, setQueue] = useState<(Notification & { id: number })[]>([]);
