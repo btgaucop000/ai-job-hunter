@@ -1,3 +1,4 @@
+import { transactionalRepository } from '../support/transactional-repository.mock.js';
 import { expect, test } from '@jest/globals';
 import { validateOpportunity } from '../../src/opportunities/opportunity.validation.js';
 const input = {
@@ -95,7 +96,9 @@ test('service preserves omitted application details and accepts explicit edits a
     save: async (value: unknown) => value,
   };
   const service = new OpportunitiesService(
-    rows as unknown as ConstructorParameters<typeof OpportunitiesService>[0],
+    transactionalRepository(rows) as unknown as ConstructorParameters<
+      typeof OpportunitiesService
+    >[0],
     {} as ConstructorParameters<typeof OpportunitiesService>[1],
   );
   expect(await service.update('synthetic', input)).toMatchObject({

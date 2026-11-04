@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from './render';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { App } from '../src/app/App';
 import { emptyOpportunity } from '../src/features/inbox/opportunities-api';
@@ -91,7 +91,7 @@ test.each([360, 1280])(
   },
 );
 
-test('shell constraints apply to Edit JD, release for other detail tabs, and save still works', async () => {
+test('Edit JD retains its shell while Application bounds only its form and save still works', async () => {
   mount(`/jobs/${id}`);
   await screen.findByRole('heading', { name: 'Synthetic engineer' });
   expect(shell().style.height).toBe('');
@@ -104,15 +104,107 @@ test('shell constraints apply to Edit JD, release for other detail tabs, and sav
   expect(await screen.findByText('Changes saved')).toBeVisible();
   fireEvent.click(screen.getByRole('tab', { name: 'Application' }));
   await waitFor(() => expect(shell().style.height).toBe(''));
-  expect(
-    screen.queryByRole('region', { name: 'Scrollable job fields' }),
-  ).not.toBeInTheDocument();
+  const applicationFields = screen.getByRole('region', {
+    name: 'Scrollable job fields',
+  });
+  expect(applicationFields).toContainElement(
+    screen.getByLabelText('Application notes'),
+  );
+  expect(applicationFields).not.toContainElement(
+    screen.getByRole('heading', { name: 'Synthetic engineer' }),
+  );
+  expect(applicationFields).not.toContainElement(
+    screen.getByRole('button', { name: 'Save changes' }),
+  );
   fireEvent.click(screen.getByRole('tab', { name: 'Edit JD' }));
   expectSingleFormScroll();
   expect(screen.getByLabelText('Job description')).toHaveValue(
     'Reviewed synthetic JD',
   );
 });
+
+function applicationGeometry() {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: HTMLElement) {
+      const top = this.id === 'job-panel-2' ? 430 : 0;
+      const height =
+        this.getAttribute('aria-label') === 'Job save actions' ? 64 : 440;
+      return {
+        top,
+        bottom: top + height,
+        left: 0,
+        right: 1152,
+        width: 1152,
+        height,
+        x: 0,
+        y: top,
+        toJSON() {},
+      };
+    },
+  );
+}
+
+test('Application keeps header and footer outside its desktop form scroller, preserves values across resize and saves', async () => {
+  vi.stubGlobal('innerWidth', 1440);
+  vi.stubGlobal('innerHeight', 900);
+  applicationGeometry();
+  mount(`/jobs/${id}?tab=application`);
+  await screen.findByRole('heading', { name: 'Application details' });
+  const fields = screen.getByRole('region', { name: 'Scrollable job fields' });
+  const save = screen.getByRole('button', { name: 'Save changes' });
+  expect(fields).toHaveStyle({ overflowY: 'auto' });
+  expect(fields.closest('#job-panel-2')).not.toBeNull();
+  expect(fields).not.toContainElement(screen.getByRole('tablist'));
+  expect(fields).not.toContainElement(save);
+  expect(save.closest('form')).toHaveAttribute('id', 'job-editor-form');
+  fireEvent.change(screen.getByLabelText('Application notes'), {
+    target: { value: 'Desktop notes survive resizing' },
+  });
+  fireEvent.change(screen.getByLabelText('Next follow-up date'), {
+    target: { value: '2026-11-12' },
+  });
+  vi.stubGlobal('innerHeight', 600);
+  fireEvent(window, new Event('resize'));
+  expect(
+    screen.queryByRole('region', { name: 'Scrollable job fields' }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Application notes')).toHaveValue(
+    'Desktop notes survive resizing',
+  );
+  vi.stubGlobal('innerHeight', 900);
+  fireEvent(window, new Event('resize'));
+  expect(
+    screen.getByRole('region', { name: 'Scrollable job fields' }),
+  ).toContainElement(screen.getByLabelText('Application notes'));
+  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(await screen.findByText('Changes saved')).toBeVisible();
+  expect(screen.getByLabelText('Next follow-up date')).toHaveValue(
+    '2026-11-12',
+  );
+  expect(screen.getByText('Unsaved changes')).not.toBeVisible();
+});
+
+test.each([
+  { width: 390, height: 844 },
+  { width: 1440, height: 600 },
+])(
+  'Application falls back to document scrolling at $width × $height',
+  async ({ width, height }) => {
+    vi.stubGlobal('innerWidth', width);
+    vi.stubGlobal('innerHeight', height);
+    applicationGeometry();
+    mount(`/jobs/${id}?tab=application`);
+    await screen.findByRole('heading', { name: 'Application details' });
+    expect(
+      screen.queryByRole('region', { name: 'Scrollable job fields' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: 'Job save actions' }),
+    ).toContainElement(screen.getByRole('button', { name: 'Save changes' }));
+    expect(screen.getByLabelText('Application notes')).toBeVisible();
+    expect(shell().style.height).toBe('');
+  },
+);
 
 test('Confirm and Save submits the original form from the persistent action row', async () => {
   mount();

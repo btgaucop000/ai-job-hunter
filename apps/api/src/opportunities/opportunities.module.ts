@@ -26,5 +26,6 @@ import { OpportunitiesController } from './opportunities.controller.js';
     GreenhouseSource,
   ],
   controllers: [OpportunitiesController],
+  exports: [OpportunitiesService, DiscoveryService],
 })
 export class OpportunitiesModule {}

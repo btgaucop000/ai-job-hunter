@@ -2,10 +2,9 @@ import { importTopcvPage } from './topcv-page-import.js';
 import { PinnedJobPageTransport } from './job-url.transport.js';
 import { JobUrlImportService } from './job-url-import.js';
 import { CvMatchError } from '../matching/cv-match.error.js';
-import { DiscoveryService } from '../discovery/discovery.service.js';
 import { JobMatchService } from '../matching/job-match.service.js';
 import { JobDocumentError } from './job-document.error.js';
-import { localOpportunitySecurity } from './opportunities.security.js';
+import { localWrite } from './opportunities.security.js';
 import { JobImportService } from './job-import.service.js';
 import { readJobUpload } from './job-import.upload.js';
 import { Catch, HttpException, UseFilters } from '@nestjs/common';
@@ -15,8 +14,8 @@ import {
   BadRequestException,
   Body,
   Controller,
-  ForbiddenException,
   Get,
+  GoneException,
   Header,
   HttpCode,
   Param,
@@ -28,20 +27,7 @@ import {
 } from '@nestjs/common';
 import type { IncomingMessage } from 'node:http';
 import { OpportunitiesService } from './opportunities.service.js';
-import { checkAnalysisSecurity } from '../analysis/analysis-security.js';
 import { EXTRACTION_LIMITS } from '../extraction/extraction.limits.js';
-function localWrite(req: IncomingMessage) {
-  try {
-    checkAnalysisSecurity(
-      req,
-      localOpportunitySecurity(Number(process.env.API_PORT ?? 3000)),
-    );
-  } catch {
-    throw new ForbiddenException(
-      'Local browser requests only. Open http://127.0.0.1:5173 or http://localhost:5173; a single local Host and Origin are required.',
-    );
-  }
-}
 @Catch()
 export class OpportunityErrors implements ExceptionFilter {
   catch(error: unknown, host: ArgumentsHost): void {
@@ -81,7 +67,6 @@ export class OpportunitiesController {
     private readonly opportunities: OpportunitiesService,
     private readonly imports: JobImportService,
     private readonly matches: JobMatchService,
-    private readonly discovery: DiscoveryService,
   ) {}
   @Get() @Header('Cache-Control', 'no-store') list() {
     return this.opportunities.list();
@@ -107,9 +92,11 @@ export class OpportunitiesController {
   @Post('discover')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
-  discover(@Req() req: IncomingMessage, @Body() body: unknown) {
+  discover(@Req() req: IncomingMessage) {
     localWrite(req);
-    return this.discovery.discover(body);
+    throw new GoneException(
+      'Direct discovery import has been retired. Reload Discover Jobs to review candidates in the queue and explicitly save them to Inbox.',
+    );
   }
   @Get('cv/current')
   @Header('Cache-Control', 'no-store')

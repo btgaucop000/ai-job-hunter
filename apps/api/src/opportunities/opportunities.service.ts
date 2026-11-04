@@ -1,3 +1,9 @@
+import { lockOpportunityWrites } from './opportunity-write-lock.js';
+import {
+  discoveredOpportunityFields,
+  matchDiscoveredOpportunity,
+} from './discovered-opportunity.js';
+import { validateCandidateSnapshot } from '../discovery/discovery-candidate.validation.js';
 import {
   duplicateJob,
   normalizedUrl,
@@ -9,7 +15,7 @@ import type { JobDocument } from './job-import.upload.js';
 import { fullDescription } from './job-import.contract.js';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, type EntityManager } from 'typeorm';
 import { Opportunity } from './opportunity.entity.js';
 import { validateOpportunity } from './opportunity.validation.js';
 // Local single-user identity only. Never accept owner identifiers from callers.
@@ -53,10 +59,7 @@ export class OpportunitiesService {
   async importDiscovered(jobs: DiscoveredJob[]) {
     return this.rows.manager.transaction(async (manager) => {
       // Serialize imports across API processes; existing/manual jobs are never updated.
-      await manager.query(
-        "SELECT pg_advisory_xact_lock(hashtext('job-discovery'), hashtext($1))",
-        [LOCAL_OWNER_ID],
-      );
+      await lockOpportunityWrites(manager, LOCAL_OWNER_ID);
       const rows = manager.getRepository(Opportunity);
       const existing = await rows.find({ where: { ownerId: LOCAL_OWNER_ID } });
       let imported = 0;
@@ -72,23 +75,7 @@ export class OpportunitiesService {
           remaining++;
           continue;
         }
-        const fields = validateOpportunity({
-          title: job.title,
-          company: job.company,
-          location: job.location,
-          workMode: job.workMode,
-          seniority: job.seniority,
-          skills: job.skills,
-          preferredSkills: job.preferredSkills,
-          description: job.description,
-          originalLink: job.originalLink,
-          source: 'Website',
-          status: 'SAVED',
-          contactNotes: '',
-          notes: '',
-          contactDates: [],
-          followUpDate: null,
-        });
+        const fields = discoveredOpportunityFields(job);
         const row = await rows.save(
           rows.create({
             ...fields,
@@ -107,31 +94,78 @@ export class OpportunitiesService {
       return { imported, duplicatesSkipped, remaining, importedIds };
     });
   }
+  // Caller owns the transaction and has acquired the owner write lock.
+  async saveDiscovered(
+    manager: EntityManager,
+    ownerId: string,
+    sourceKey: string,
+    snapshot: DiscoveredJob,
+    confirmSeparate: boolean,
+  ) {
+    const job = validateCandidateSnapshot(snapshot);
+    const rows = manager.getRepository(Opportunity);
+    const existing = await rows.find({
+      where: { ownerId },
+      order: { id: 'ASC' },
+    });
+    const match = matchDiscoveredOpportunity(
+      job,
+      sourceKey,
+      existing,
+      confirmSeparate,
+    );
+    if (match)
+      return { opportunityId: match.id, outcome: 'linked_existing' as const };
+    const row = await rows.save(
+      rows.create({
+        ...discoveredOpportunityFields(job),
+        ownerId,
+        jdText: '',
+        discovery: job.discovery,
+        documentName: null,
+        documentType: null,
+        documentBytes: null,
+      }),
+    );
+    return { opportunityId: row.id, outcome: 'created' as const };
+  }
+  async requireOwnedLink(manager: EntityManager, ownerId: string, id: string) {
+    if (!(await manager.getRepository(Opportunity).existsBy({ id, ownerId })))
+      throw new ConflictException(
+        'Linked Inbox job is unavailable. No changes were saved.',
+      );
+  }
   async create(input: unknown, document?: JobDocument) {
     const parsed = document ? await this.imports.parse(document) : null;
     const fields = validateOpportunity(input, parsed?.source.text ?? '');
-    const urlKey = normalizedUrl(fields.originalLink);
-    if (urlKey) {
-      const existing = await this.list();
-      if (existing.some((job) => normalizedUrl(job.originalLink) === urlKey))
-        throw new ConflictException(
-          'This job URL is already saved. Open the existing job in Job Inbox; its fields have not been changed.',
-        );
-    }
-    const row = await this.rows.save(
-      this.rows.create({
-        ...fields,
-        description:
-          fields.description ||
-          fullDescription(fields.postText, parsed?.source.text ?? ''),
-        ownerId: LOCAL_OWNER_ID,
-        jdText: parsed?.source.text ?? '',
-        documentName: document?.fileName ?? null,
-        documentType: document?.mediaType ?? null,
-        documentBytes: document?.bytes ?? null,
-      }),
-    );
-    return this.get(row.id);
+    return this.rows.manager.transaction(async (manager) => {
+      await lockOpportunityWrites(manager, LOCAL_OWNER_ID);
+      const rows = manager.getRepository(Opportunity);
+      const urlKey = normalizedUrl(fields.originalLink);
+      if (urlKey) {
+        const existing = await rows.find({
+          where: { ownerId: LOCAL_OWNER_ID },
+        });
+        if (existing.some((job) => normalizedUrl(job.originalLink) === urlKey))
+          throw new ConflictException(
+            'This job URL is already saved. Open the existing job in Job Inbox; its fields have not been changed.',
+          );
+      }
+      const row = await rows.save(
+        rows.create({
+          ...fields,
+          description:
+            fields.description ||
+            fullDescription(fields.postText, parsed?.source.text ?? ''),
+          ownerId: LOCAL_OWNER_ID,
+          jdText: parsed?.source.text ?? '',
+          documentName: document?.fileName ?? null,
+          documentType: document?.mediaType ?? null,
+          documentBytes: document?.bytes ?? null,
+        }),
+      );
+      return rows.findOneByOrFail({ id: row.id, ownerId: LOCAL_OWNER_ID });
+    });
   }
   async update(id: string, input: unknown, document?: JobDocument) {
     const row = await this.get(id);
@@ -171,7 +205,10 @@ export class OpportunitiesService {
         documentType: document.mediaType,
         documentBytes: document.bytes,
       });
-    await this.rows.save(row);
+    await this.rows.manager.transaction(async (manager) => {
+      await lockOpportunityWrites(manager, LOCAL_OWNER_ID);
+      await manager.getRepository(Opportunity).save(row);
+    });
     return this.get(id);
   }
 }

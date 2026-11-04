@@ -75,6 +75,7 @@ export function ApiReadiness() {
         />
       </span>
       <Button
+        variant="outlined"
         size="small"
         disabled={status === 'loading'}
         onClick={() => {

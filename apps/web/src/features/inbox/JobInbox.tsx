@@ -1,6 +1,5 @@
 import { PageHeader } from '../../components/PageHeader';
 import { dueFollowUp, useLocalCalendarDate } from './follow-ups';
-import { DiscoverJobs } from './DiscoverJobs';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -31,7 +30,6 @@ const label = (value: string) => value.replaceAll('_', ' ');
 const message = (error: unknown) =>
   error instanceof Error ? error.message : 'Request failed. Retry manually.';
 export function JobInbox() {
-  const [discoveryOpen, setDiscoveryOpen] = useState(false);
   const today = useLocalCalendarDate();
   const [dueOnly, setDueOnly] = useState(false);
   const [page, setPage] = useState(0);
@@ -82,48 +80,6 @@ export function JobInbox() {
           </Button>
         }
       />
-      <Box
-        component="section"
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          flexShrink: 0,
-          maxHeight: discoveryOpen ? '30%' : undefined,
-        }}
-      >
-        <Button
-          fullWidth
-          aria-label="Toggle Discover Jobs"
-          aria-expanded={discoveryOpen}
-          aria-controls="discovery-panel"
-          onClick={() => setDiscoveryOpen((open) => !open)}
-          sx={{
-            justifyContent: 'space-between',
-            px: 2,
-            minHeight: 44,
-            flexShrink: 0,
-            color: 'text.secondary',
-            bgcolor: 'action.hover',
-          }}
-        >
-          Discover Jobs
-          <SvgIcon aria-hidden="true" sx={{ fontSize: 20, flexShrink: 0 }}>
-            <path d={discoveryOpen ? 'm7 14 5-5 5 5H7z' : 'm7 10 5 5 5-5H7z'} />
-          </SvgIcon>
-        </Button>
-        <Box
-          id="discovery-panel"
-          hidden={!discoveryOpen}
-          sx={{ overflowY: 'auto', minHeight: 0 }}
-        >
-          <DiscoverJobs
-            onImported={() => {
-              setLoading(true);
-              setAttempt((value) => value + 1);
-            }}
-          />
-        </Box>
-      </Box>
       <Paper
         component="section"
         aria-labelledby="saved-jobs-heading"
@@ -245,9 +201,9 @@ export function JobInbox() {
                                 to={`/jobs/${row.id}`}
                                 underline="hover"
                                 color="text.primary"
+                                variant="body1"
                                 sx={{
                                   fontWeight: 500,
-                                  fontSize: '1rem',
                                   overflowWrap: 'anywhere',
                                 }}
                               >
@@ -368,9 +324,27 @@ export function JobInbox() {
                             Clear filter
                           </Button>
                         ) : (
-                          <Button component={Link} to="/jobs/new">
-                            Add Job
-                          </Button>
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            useFlexGap
+                            sx={{ flexWrap: 'wrap' }}
+                          >
+                            <Button
+                              component={Link}
+                              to="/discover"
+                              variant="outlined"
+                            >
+                              Discover Jobs
+                            </Button>
+                            <Button
+                              component={Link}
+                              to="/jobs/new"
+                              variant="outlined"
+                            >
+                              Add Job
+                            </Button>
+                          </Stack>
                         )}
                       </TableCell>
                     </TableRow>

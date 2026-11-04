@@ -5,7 +5,7 @@ import {
   render,
   screen,
   waitFor,
-} from '@testing-library/react';
+} from './render';
 import { MemoryRouter } from 'react-router-dom';
 import { JobEditor } from '../src/features/inbox/JobEditor';
 import { SourceJdPreview } from '../src/features/inbox/SourceJdPreview';

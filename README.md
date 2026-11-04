@@ -17,8 +17,8 @@ of missing ability.
   dates persist in PostgreSQL. P4.1 adds applied date and application channel.
 - CV Match saves parsed CV text locally and analyzes the latest saved CV/job only
   when requested. Results are shown in the UI, not written into tracking fields.
-- On-demand discovery imports from the configured Axon and Backbase Greenhouse
-  boards. Discovery ranking is not CV suitability scoring.
+- On-demand discovery queues candidates from the configured Axon, Backbase,
+  Temus and Go1 Vietnam Greenhouse boards for explicit review and Save. Discovery ranking is not CV suitability scoring.
 - `/cv` retains the CV/JD parsing and review dashboard. Candidates, Matches, and
   Settings remain placeholders.
 
@@ -134,8 +134,38 @@ Job Inbox displays ten jobs per page. Pagination below the table shows the curre
 range and filtered total. Changing Due follow-ups returns to page one; paging and
 filtering reuse loaded jobs without fetching again or changing their saved order.
 
-Discover Jobs is collapsed by default; expand its labelled disclosure to use the
-existing discovery form. Inputs remain available after collapse and reopening.
+Open **Discover Jobs** in the navigation (or `/discover`) to use the discovery
+form. It adds up to 50 new candidates per run to the persistent Discovery Queue.
+Review candidates and explicitly Save to Inbox; discovery never saves automatically.
+Use To review (NEW before SEEN), New, Seen, Saved, Dismissed, or All. The queue
+uses ten items per page, with filter/page stored in the URL. Opening details does
+not mark a candidate seen. Mark as seen and Dismiss are explicit actions.
+Results stay on the Discover page; choose **View Job Inbox** when ready. If no jobs
+are found, adjust preferences or use **Add Job**. The empty Inbox also links to
+Discover Jobs and Add Job.
 The Saved Jobs section shows the total saved count and groups the All jobs /
 Due follow-ups selection with the table. The total heading counts all saved jobs;
 the pagination range counts the selected filter's results.
+
+The Discover page uses the Discovery Queue backend under `/api/v1/discovery`.
+Apply the additive candidate migration using the existing migration commands
+before using it; there is no historical backfill. Existing Inbox jobs stay unchanged.
+The retired `/api/v1/opportunities/discover` returns 410 to stale clients.
+
+- `POST /discovery/runs`: existing discovery preference body; returns
+  `found`, `added`, `refreshed`, `remaining`, `errors`, `scannedAt`, `scope`.
+- `GET /discovery/candidates?filter=to-review&page=1`: ten rows per page.
+- `GET /discovery/candidates/:id`: candidate detail without changing review state.
+- `PATCH /discovery/candidates/:id/status`: `{ "status": "SEEN" }` or
+  `{ "status": "DISMISSED" }`.
+- `POST /discovery/candidates/:id/save`: `{}` creates or links an Inbox job
+  atomically. A `POSSIBLE_DUPLICATE` 409 requires explicit confirmation with
+  `{ "confirmSeparate": true }` to create a separate job. An
+  `AMBIGUOUS_INBOX_MATCH` 409 cannot be bypassed by that confirmation.
+
+All paths above use the `/api/v1` prefix and mutations retain local Host/Origin
+protection. Save returns `candidateId`, `status`, `opportunityId`, and an outcome
+of `created`, `linked_existing`, or `already_saved`. Repeated Save returns the same
+Inbox link. The UI asks for confirmation before creating a separate possible
+duplicate; multiple exact matches cannot be overridden. After Save, use Open Inbox
+job. Discovery reports Added / Refreshed / Remaining / Errors and stays on the page.

@@ -1,3 +1,6 @@
+import { ForbiddenException } from '@nestjs/common';
+import type { IncomingMessage } from 'node:http';
+import { checkAnalysisSecurity } from '../analysis/analysis-security.js';
 import { localAnalysisSecurity } from '../analysis/analysis-security.js';
 import type { AnalysisSecurity } from '../analysis/analysis-security.js';
 
@@ -13,4 +16,17 @@ export function localOpportunitySecurity(port: number): AnalysisSecurity {
       'http://localhost:5173',
     ],
   };
+}
+
+export function localWrite(req: IncomingMessage) {
+  try {
+    checkAnalysisSecurity(
+      req,
+      localOpportunitySecurity(Number(process.env.API_PORT ?? 3000)),
+    );
+  } catch {
+    throw new ForbiddenException(
+      'Local browser requests only. Open http://127.0.0.1:5173 or http://localhost:5173; a single local Host and Origin are required.',
+    );
+  }
 }

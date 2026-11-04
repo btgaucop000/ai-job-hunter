@@ -1,6 +1,8 @@
+import { ThemeProvider } from '@mui/material';
+import { theme } from '../src/app/theme';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from './render';
 import {
   createMemoryRouter,
   RouterProvider,
@@ -43,7 +45,11 @@ function mount(path = '/jobs/new') {
     ],
     { initialEntries: ['/dashboard', path], initialIndex: 1 },
   );
-  const mounted = render(<RouterProvider router={router} />);
+  const mounted = render(
+    <ThemeProvider theme={theme}>
+      <RouterProvider router={router} />
+    </ThemeProvider>,
+  );
   if (path === '/jobs/new')
     fireEvent.click(screen.getByRole('button', { name: /Paste JD/ }));
   return { ...mounted, router };
@@ -83,6 +89,12 @@ test('creation is import then review; extraction advances, back preserves edits,
   const fetch = mockApi();
   mount();
   expect(screen.getByLabelText('Recruitment post')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Extract with AI' })).toHaveClass(
+    'MuiButton-outlined',
+  );
+  expect(
+    screen.getByRole('button', { name: 'Continue to Review & Save' }),
+  ).toHaveClass('MuiButton-contained');
   expect(
     screen.queryByRole('button', { name: 'Confirm and save job' }),
   ).not.toBeInTheDocument();
@@ -177,8 +189,20 @@ test('detail defaults to overview, match stays mounted, application and JD edits
 test('manual creation validates title and keeps fields after save failure', async () => {
   const fetch = mockApi();
   mount();
+  expect(
+    screen.getByRole('button', { name: 'Continue to Review & Save' }),
+  ).toHaveClass('MuiButton-contained');
+  const back = screen.getByRole('link', { name: 'Back to Job Inbox' });
+  expect(back).toHaveClass('MuiButton-outlined');
+  expect(back.querySelector('.MuiButton-startIcon svg')).toHaveAttribute(
+    'aria-hidden',
+    'true',
+  );
   fireEvent.click(
     screen.getByRole('button', { name: 'Continue to Review & Save' }),
+  );
+  expect(fetch.mock.calls.some(([url]) => url.endsWith('/extract'))).toBe(
+    false,
   );
   fireEvent.click(screen.getByRole('button', { name: 'Confirm and save job' }));
   expect(
@@ -199,12 +223,30 @@ test('unsaved link navigation, browser back, and refresh are guarded; stay retai
   fireEvent.change(screen.getByLabelText('Recruitment post'), {
     target: { value: 'Unsaved source' },
   });
+  const indicator = screen
+    .getByText('Unsaved changes')
+    .closest('.MuiChip-root');
+  expect(indicator).toHaveStyle({
+    color: theme.palette.grey[900],
+    backgroundColor: theme.palette.warning.main,
+  });
   const unload = new Event('beforeunload', { cancelable: true });
   window.dispatchEvent(unload);
   expect(unload.defaultPrevented).toBe(true);
   fireEvent.click(screen.getByRole('link', { name: 'Back to Job Inbox' }));
   expect(await screen.findByRole('dialog')).toBeVisible();
-  fireEvent.click(screen.getByRole('button', { name: 'Stay and edit' }));
+  const stay = screen.getByRole('button', { name: 'Stay and edit' });
+  const discard = screen.getByRole('button', { name: 'Discard and leave' });
+  await waitFor(() => expect(stay).toHaveFocus());
+  expect(stay).toHaveClass('MuiButton-outlined');
+  expect(discard).toHaveClass('MuiButton-colorError', 'MuiButton-outlined');
+  expect(
+    getComputedStyle(discard).getPropertyValue('--variant-outlinedColor'),
+  ).toBe(theme.palette.error.main);
+  expect(
+    stay.compareDocumentPosition(discard) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  fireEvent.click(stay);
   await waitFor(() =>
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
   );
@@ -443,6 +485,108 @@ test('narrow tab strip supports all four tabs and keyboard selection without los
   );
   tab('Application');
   expect(
-    screen.queryByRole('region', { name: 'Job save actions' }),
-  ).not.toBeInTheDocument();
+    screen.getByRole('region', { name: 'Job save actions' }),
+  ).toContainElement(screen.getByRole('button', { name: 'Save changes' }));
+});
+
+test('Overview external job navigation stays an inline MUI link while Back is an outlined task action', async () => {
+  const fetch = mockApi();
+  fetch.mockResolvedValueOnce(
+    Response.json({
+      ...row(),
+      originalLink: 'https://example.com/synthetic-job',
+    }),
+  );
+  mount('/jobs/' + id);
+  const original = await screen.findByRole('link', {
+    name: 'View Original Job',
+  });
+  expect(original).toHaveClass('MuiLink-root');
+  expect(original).not.toHaveClass('MuiButton-root');
+  expect(original).toHaveAttribute('href', 'https://example.com/synthetic-job');
+  expect(original).toHaveAttribute('rel', 'noopener noreferrer');
+  expect(screen.getByRole('link', { name: 'Back to Job Inbox' })).toHaveClass(
+    'MuiButton-outlined',
+  );
+});
+
+test('discovery provenance appears once between the tabs and every active panel', async () => {
+  const discoveredAt = '2026-11-04T00:00:00Z';
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      Response.json({
+        ...row(),
+        originalLink: 'https://example.com/synthetic-job',
+        discovery: {
+          sourceName: 'Axon · Greenhouse',
+          sourceJobId: 'synthetic-source-id',
+          sourceUrl: 'https://boards-api.greenhouse.io/v1/boards/axon/jobs',
+          discoveredAt,
+        },
+      }),
+    ),
+  );
+  mount(`/jobs/${id}`);
+  await screen.findByRole('heading', { name: 'Synthetic engineer' });
+  for (const name of ['Overview', 'CV Match', 'Application', 'Edit JD']) {
+    tab(name);
+    const banner = screen.getByRole('alert', { name: 'Discovery provenance' });
+    expect(screen.getAllByLabelText('Discovery provenance')).toHaveLength(1);
+    expect(banner).toHaveTextContent('Axon · Greenhouse');
+    expect(banner).toHaveTextContent(new Date(discoveredAt).toLocaleString());
+    expect(banner.closest('[role="tabpanel"]')).toBeNull();
+    const strip = screen.getByRole('tablist', { name: 'Job sections' });
+    const panel = screen.getByRole('tabpanel', { name });
+    expect(
+      strip.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      banner.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    const link = screen.getByRole('link', { name: 'Open original job' });
+    expect(link).toHaveAttribute('href', 'https://example.com/synthetic-job');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  }
+});
+
+test.each(['', 'javascript:alert(1)', 'https://user:secret@example.com/job'])(
+  'discovery provenance omits an unsafe or missing original job link: %s',
+  async (originalLink) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          ...row(),
+          originalLink,
+          discovery: {
+            sourceName: 'Axon · Greenhouse',
+            sourceJobId: 'synthetic',
+            sourceUrl: 'https://boards-api.greenhouse.io/v1/boards/axon/jobs',
+            discoveredAt: '2026-11-04T00:00:00Z',
+          },
+        }),
+      ),
+    );
+    mount(`/jobs/${id}`);
+    expect(
+      await screen.findByRole('alert', { name: 'Discovery provenance' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('link', { name: 'Open original job' }),
+    ).not.toBeInTheDocument();
+  },
+);
+
+test('jobs without discovery provenance have no banner on any tab', async () => {
+  mockApi();
+  mount(`/jobs/${id}`);
+  await screen.findByRole('heading', { name: 'Synthetic engineer' });
+  for (const name of ['Overview', 'CV Match', 'Application', 'Edit JD']) {
+    tab(name);
+    expect(
+      screen.queryByLabelText('Discovery provenance'),
+    ).not.toBeInTheDocument();
+  }
 });

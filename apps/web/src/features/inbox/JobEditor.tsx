@@ -1,3 +1,4 @@
+import { useNotify } from '../../components/Notifications';
 import { SourceJdPreview } from './SourceJdPreview';
 import { ImportMethodCards, type ImportMethod } from './ImportMethodCards';
 import { JobActionLayout } from './JobActionLayout';
@@ -24,8 +25,8 @@ import {
   FormControlLabel,
   MenuItem,
   Paper,
-  Portal,
-  Snackbar,
+  Link as MuiLink,
+  SvgIcon,
   Stack,
   Tabs,
   Tab,
@@ -34,6 +35,7 @@ import {
   StepLabel,
   TextField,
   Typography,
+  useTheme,
 } from '@mui/material';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -79,6 +81,12 @@ export function JobEditor({
   }
   const [step, setStep] = useState(0);
   const [importMethod, setImportMethod] = useState<ImportMethod>('url');
+  const theme = useTheme();
+  const applicationPanel = useRef<HTMLDivElement>(null);
+  const jobDetailsHeading = useRef<HTMLHeadingElement>(null);
+  const [applicationHeight, setApplicationHeight] = useState<number | null>(
+    null,
+  );
   const usesViewport = !id || view === 'edit';
   useLayoutEffect(() => {
     onViewportLayoutChange?.(usesViewport);
@@ -110,14 +118,10 @@ export function JobEditor({
     [],
   );
   const [file, setFile] = useState<File>();
-  const [documentName, setDocumentName] = useState<string | null>(null);
   const [jdText, setJdText] = useState('');
   const [discovery, setDiscovery] = useState<Opportunity['discovery']>(null);
   const [error, setError] = useState('');
-  const [notification, setNotification] = useState<{
-    severity: 'success' | 'error';
-    text: string;
-  } | null>(null);
+  const notify = useNotify();
   const saving = useRef(false);
   const [notice, setNotice] = useState('');
   const [contactDate, setContactDate] = useState('');
@@ -137,24 +141,10 @@ export function JobEditor({
             ]),
           ) as unknown as OpportunityInput;
           editedFields.current.clear();
-          for (const field of importFields) {
-            const suggestion = editable.importReview.find(
-              (item) => item.field === field,
-            );
-            if (
-              suggestion
-                ? editable[field] !== suggestion.value
-                : Boolean(editable[field])
-            )
-              editedFields.current.add(field);
-          }
-          if (editable.description) editedFields.current.add('description');
           baseline.current = JSON.stringify(editable);
           setForm(editable);
           setContactDate(latestContactDate(editable.contactDates));
-          setJdText(row.jdText ?? '');
           setDiscovery(row.discovery);
-          setDocumentName(row.documentName ?? null);
           setError('');
         },
         (error) => {
@@ -215,19 +205,18 @@ export function JobEditor({
     if (importFields.includes(key as ImportFieldName) || key === 'description')
       editedFields.current.add(key);
     setForm((row) => ({ ...row, [key]: value }));
-    setNotification(null);
   };
   const sourcesChanged = () => {
     setForm((row) => ({ ...row, importReview: [] }));
     setNotice(
       'Sources changed. Extract again or review the current fields manually before saving.',
     );
-    setNotification(null);
   };
   const conflicts = form.importReview.filter(
     (field) => field.status === 'CONFLICT' && !field.reviewed,
   );
   async function extract() {
+    if (id) return;
     if (
       form.importReview.length &&
       !window.confirm(
@@ -237,16 +226,12 @@ export function JobEditor({
       return;
     setExtracting(true);
     setError('');
-    setNotification(null);
     setNotice('');
     try {
-      const result = await opportunityRequest<ImportPreview>(
-        id ? `/${id}/extract` : '/extract',
-        {
-          method: 'POST',
-          body: importUpload({ postText: form.postText }, file),
-        },
-      );
+      const result = await opportunityRequest<ImportPreview>('/extract', {
+        method: 'POST',
+        body: importUpload({ postText: form.postText }, file),
+      });
       setJdText(result.jdText);
       if (result.error) {
         setError(result.error);
@@ -318,7 +303,7 @@ export function JobEditor({
           `Review every suggestion before saving. Manually edited values are kept.${result.rejected ? ` ${result.rejected} unsupported proposal(s) were discarded.` : ''}`,
         );
       }
-      if (!id) setStep(1);
+      setStep(1);
       if (result.warnings.length)
         setNotice(
           (previous) =>
@@ -332,6 +317,7 @@ export function JobEditor({
   }
   async function fetchFromUrl() {
     if (
+      id ||
       urlFetchRunning.current ||
       disabled ||
       !canFetchJobUrl(form.originalLink)
@@ -342,7 +328,6 @@ export function JobEditor({
     setBusy(true);
     setError('');
     setNotice('');
-    setNotification(null);
     try {
       const result = await opportunityRequest<UrlJobPreview>('/import-url', {
         method: 'POST',
@@ -366,7 +351,7 @@ export function JobEditor({
     if (saving.current) return;
     const reportSaveError = (text: string) => {
       if (id) {
-        setNotification({
+        notify({
           severity: 'error',
           text: `${text} Your inputs are retained; you can edit fields manually.`,
         });
@@ -393,7 +378,6 @@ export function JobEditor({
     saving.current = true;
     setBusy(true);
     setError('');
-    setNotification(null);
     try {
       const payload = {
         ...form,
@@ -423,10 +407,8 @@ export function JobEditor({
         });
         setForm((current) => ({ ...current, contactDates: row.contactDates }));
         setContactDate(latestContactDate(row.contactDates));
-        setJdText(row.jdText ?? '');
-        setDocumentName(row.documentName ?? null);
         setFile(undefined);
-        setNotification({ severity: 'success', text: 'Changes saved' });
+        notify({ severity: 'success', text: 'Changes saved' });
       } else {
         savedNavigation.current = true;
         navigate(`/jobs/${row.id}`, { replace: true });
@@ -439,6 +421,7 @@ export function JobEditor({
     }
   }
   async function attach(document: File) {
+    if (id) return;
     if (
       !/\.(pdf|docx)$/i.test(document.name) ||
       !document.size ||
@@ -492,7 +475,261 @@ export function JobEditor({
     Boolean(file) ||
     contactDate !== latestContactDate(form.contactDates);
   const disabled = busy || extracting || parsing || loadFailed;
+  useLayoutEffect(() => {
+    if (!id || view !== 'edit' || loading) return;
+    // The mobile shell can leave the details heading below the field viewport.
+    // Reveal it once on entry, after the existing bounded shell has settled.
+    const frame = requestAnimationFrame(() => {
+      const heading = jobDetailsHeading.current;
+      const fields = heading?.closest<HTMLElement>(
+        '[aria-label="Scrollable job fields"]',
+      );
+      if (!heading || !fields) return;
+      const headingRect = heading.getBoundingClientRect();
+      const fieldsRect = fields.getBoundingClientRect();
+      if (headingRect.bottom > fieldsRect.bottom)
+        fields.scrollTop += headingRect.top - fieldsRect.top;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [id, view, loading]);
+  useLayoutEffect(() => {
+    const panel = applicationPanel.current;
+    const main = panel?.closest('main');
+    const actions = panel?.querySelector<HTMLElement>(
+      '[aria-label="Job save actions"]',
+    );
+    if (!id || view !== 'application' || !panel || !main || !actions) {
+      setApplicationHeight(null);
+      return;
+    }
+    const measure = () => {
+      const rem =
+        parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const style = getComputedStyle(panel);
+      const available = Math.floor(
+        window.innerHeight -
+          (panel.getBoundingClientRect().top + window.scrollY) -
+          parseFloat(getComputedStyle(main).paddingBottom),
+      );
+      const chrome =
+        parseFloat(style.paddingTop) +
+        parseFloat(style.paddingBottom) +
+        parseFloat(style.borderTopWidth) +
+        parseFloat(style.borderBottomWidth) +
+        actions.getBoundingClientRect().height;
+      // Keep a usable form region; narrow/short windows use one document scroller.
+      setApplicationHeight(
+        window.innerWidth >= theme.breakpoints.values.md &&
+          available - chrome >= 12 * rem
+          ? available
+          : null,
+      );
+    };
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(measure);
+    [panel, main, actions].forEach((element) => observer?.observe(element));
+    window.addEventListener('resize', measure);
+    measure();
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [id, view, loading, theme.breakpoints.values.md]);
   if (loading) return <CircularProgress aria-label="Loading job" />;
+  const importSources = (
+    <Box hidden={!id && step !== 0}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+        <Stack spacing={2}>
+          {!id && (
+            <Typography variant="h6" component="h2">
+              How would you like to add this job?
+            </Typography>
+          )}
+          <ImportMethodCards
+            value={importMethod}
+            onChange={setImportMethod}
+            panelId="job-import-panel"
+            disabled={disabled}
+          />
+          <Box
+            id="job-import-panel"
+            role="region"
+            aria-label="Import method input"
+            sx={{ minWidth: 0 }}
+          >
+            {importMethod === 'url' && (
+              <Stack spacing={1.5}>
+                <TextField
+                  label="Original Job URL (optional)"
+                  type="url"
+                  value={form.originalLink}
+                  onChange={(e) => change('originalLink', e.target.value)}
+                  error={!jobUrlInfo(form.originalLink).valid}
+                  slotProps={{ htmlInput: { maxLength: 2048 } }}
+                  helperText={
+                    !jobUrlInfo(form.originalLink).valid
+                      ? 'Enter a full HTTP(S) URL without credentials, or leave it blank.'
+                      : `${jobUrlInfo(form.originalLink).platform ? `Platform: ${jobUrlInfo(form.originalLink).platform}. ` : ''}Fetching is manual and supports ITviec only.`
+                  }
+                />
+                <Button
+                  variant="outlined"
+                  disabled={disabled || !canFetchJobUrl(form.originalLink)}
+                  onClick={() => void fetchFromUrl()}
+                  aria-describedby="url-import-help"
+                >
+                  {urlFetchRunning.current ? 'Fetching JD…' : 'Fetch from URL'}
+                </Button>
+                <Typography
+                  id="url-import-help"
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  {!form.originalLink || canFetchJobUrl(form.originalLink)
+                    ? 'Direct fetch supports ITviec only and runs when you click Fetch from URL.'
+                    : urlImportHelp(form.originalLink)}
+                </Typography>
+              </Stack>
+            )}
+            {importMethod === 'bookmarklet' && <TopcvBookmarkletInstall />}
+            {importMethod === 'paste' && (
+              <Stack spacing={1.5}>
+                <TextField
+                  label="Recruitment post"
+                  multiline
+                  minRows={4}
+                  maxRows={12}
+                  value={form.postText}
+                  onChange={(e) => {
+                    change('postText', e.target.value);
+                    sourcesChanged();
+                  }}
+                  slotProps={{ htmlInput: { maxLength: 12000 } }}
+                  helperText="Paste the entire post, including contact details and links. Up to 12,000 characters. The original text is preserved when saved."
+                />
+              </Stack>
+            )}
+            {importMethod === 'upload' && (
+              <Stack spacing={1.5}>
+                <Box>
+                  <Typography component="label" htmlFor="jd-document">
+                    Upload JD document (PDF or DOCX)
+                  </Typography>
+                  <input
+                    id="jd-document"
+                    type="file"
+                    accept=".pdf,.docx"
+                    disabled={disabled}
+                    onChange={(e) => {
+                      const selected = e.target.files?.[0];
+                      if (selected) void attach(selected);
+                      e.target.value = '';
+                    }}
+                  />
+                  {file && (
+                    <Stack direction="row" spacing={1}>
+                      <Typography>{file.name}</Typography>
+                      <Button
+                        variant="outlined"
+                        type="button"
+                        onClick={() => {
+                          parseGeneration.current++;
+                          parseRequest.current?.abort();
+                          setSourceErrors((errors) => ({
+                            ...errors,
+                            upload: '',
+                          }));
+                          setFile(undefined);
+                          setJdText('');
+                          sourcesChanged();
+                        }}
+                      >
+                        Remove selected document
+                      </Button>
+                    </Stack>
+                  )}
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  Optional PDF/DOCX up to 5 MiB and 20 PDF pages. Original
+                  document is preserved on save. Scans/OCR, images and legacy
+                  DOC are unsupported; paste text instead.
+                </Typography>
+              </Stack>
+            )}
+          </Box>
+          {importMethod !== 'paste' && (
+            <SourceJdPreview
+              text={importMethod === 'upload' ? jdText : form.postText}
+              source={
+                importMethod === 'upload'
+                  ? `Document${file?.name ? ` · ${file.name}` : ''}`
+                  : (fetchedJob.current?.platform ??
+                    jobUrlInfo(form.originalLink).platform ??
+                    (importMethod === 'bookmarklet'
+                      ? 'Bookmarklet'
+                      : 'Job URL'))
+              }
+              loading={
+                importMethod === 'upload' ? parsing : urlFetchRunning.current
+              }
+              error={
+                sourceErrors[importMethod] &&
+                sourceErrors[importMethod] === error
+                  ? 'Loading this source failed. See the request error above, or use Paste JD.'
+                  : sourceErrors[importMethod]
+              }
+            />
+          )}
+          <TextField
+            select
+            label="Source"
+            value={form.source}
+            onChange={(e) =>
+              change('source', e.target.value as OpportunityInput['source'])
+            }
+            helperText="Choose the platform yourself; AI does not infer it. Use Other for LinkedIn or another platform."
+          >
+            {sources.map((value) => (
+              <MenuItem key={value} value={value}>
+                {value}
+              </MenuItem>
+            ))}
+          </TextField>
+          {(form.postText.trim() || file) && (
+            <Typography variant="body2" color="text.secondary">
+              Source content is available. Switching methods keeps your inputs.
+            </Typography>
+          )}
+          <Button
+            type="button"
+            variant="outlined"
+            disabled={disabled || (!form.postText.trim() && !file)}
+            onClick={() => void extract()}
+          >
+            {extracting ? 'Extracting…' : 'Extract with AI'}
+          </Button>
+          <Typography variant="body2" color="text.secondary">
+            Uses the configured local Ollama model only when you click Extract.
+            You can also enter fields manually and save without AI.
+          </Typography>
+          {extracting && (
+            <Typography role="status">
+              Reading sources and extracting suggestions… This may take up to 90
+              seconds after document parsing.
+            </Typography>
+          )}
+          {notice && <Alert severity="info">{notice}</Alert>}
+        </Stack>
+      </Paper>
+      {!id && (
+        <Button sx={{ mt: 2 }} variant="contained" onClick={() => setStep(1)}>
+          Continue to Review &amp; Save
+        </Button>
+      )}
+    </Box>
+  );
   return (
     <Stack
       spacing={3}
@@ -517,11 +754,17 @@ export function JobEditor({
                   ? undefined
                   : 'none',
               bgcolor: 'background.paper',
-              '& > .MuiButton-root': { flex: 1, minWidth: 0 },
+              ...(id
+                ? { alignItems: 'flex-end', justifyContent: 'flex-end' }
+                : { '& > .MuiButton-root': { flex: 1, minWidth: 0 } }),
             }}
           >
             {!id && (
-              <Button disabled={disabled} onClick={() => setStep(0)}>
+              <Button
+                variant="outlined"
+                disabled={disabled}
+                onClick={() => setStep(0)}
+              >
                 Back to Import sources
               </Button>
             )}
@@ -530,6 +773,7 @@ export function JobEditor({
               form="job-editor-form"
               variant="contained"
               disabled={disabled || conflicts.length > 0}
+              sx={id ? { minHeight: { xs: 44, sm: 36 } } : undefined}
             >
               {busy ? 'Saving…' : id ? 'Save changes' : 'Confirm and save job'}
             </Button>
@@ -540,11 +784,17 @@ export function JobEditor({
           <Button
             component={Link}
             to="/dashboard"
-            sx={{ alignSelf: 'flex-start' }}
+            variant="outlined"
+            startIcon={
+              <SvgIcon aria-hidden="true" sx={{ fontSize: 20 }}>
+                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+              </SvgIcon>
+            }
+            sx={{ alignSelf: 'flex-start', minHeight: { xs: 44, sm: 36 } }}
           >
             Back to Job Inbox
           </Button>
-          <Box>
+          <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
             <Typography variant="h4" component="h1">
               {id ? form.title || 'Job details' : 'Add Job'}
             </Typography>
@@ -627,6 +877,28 @@ export function JobEditor({
               </Step>
             </Stepper>
           )}
+          {id && discovery && (
+            <Alert
+              severity="info"
+              aria-label="Discovery provenance"
+              sx={{ overflowWrap: 'anywhere' }}
+            >
+              Discovered from {discovery.sourceName} on{' '}
+              {new Date(discovery.discoveredAt).toLocaleString()}.
+              {form.originalLink && jobUrlInfo(form.originalLink).valid && (
+                <>
+                  {' '}
+                  <MuiLink
+                    href={form.originalLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open original job
+                  </MuiLink>
+                </>
+              )}
+            </Alert>
+          )}
           {id && (
             <Box
               role="tabpanel"
@@ -671,9 +943,9 @@ export function JobEditor({
                         </Typography>
                         {form[field].split('\n').length > 5 && (
                           <Box component="details">
-                            <summary>
+                            <Typography component="summary" variant="body2">
                               Show all {fieldLabels[field].toLowerCase()}
-                            </summary>
+                            </Typography>
                             <Typography
                               sx={{
                                 whiteSpace: 'pre-line',
@@ -688,16 +960,22 @@ export function JobEditor({
                     ))}
                   </Box>
                   {form.originalLink && jobUrlInfo(form.originalLink).valid && (
-                    <a
+                    <MuiLink
                       href={form.originalLink}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
                       View Original Job
-                    </a>
+                    </MuiLink>
                   )}
                   <Box component="details">
-                    <summary>Full job description</summary>
+                    <Typography
+                      component="summary"
+                      variant="subtitle1"
+                      sx={{ fontWeight: 600 }}
+                    >
+                      Full job description
+                    </Typography>
                     <Typography
                       sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
                     >
@@ -709,13 +987,6 @@ export function JobEditor({
             </Box>
           )}
 
-          {discovery && (
-            <Alert severity="info">
-              Discovered from {discovery.sourceName} on{' '}
-              {new Date(discovery.discoveredAt).toLocaleString()}. The original
-              job/application link is below.
-            </Alert>
-          )}
           {error && (
             <Alert severity="error">
               {error} Your inputs are retained; you can edit fields manually.
@@ -761,235 +1032,7 @@ export function JobEditor({
                 spacing={3}
                 sx={{ display: id && view !== 'edit' ? 'none' : undefined }}
               >
-                <Box hidden={!id && step !== 0}>
-                  <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-                    <Stack spacing={2}>
-                      <Typography variant="h6" component="h2">
-                        How would you like to add this job?
-                      </Typography>
-                      <ImportMethodCards
-                        value={importMethod}
-                        onChange={setImportMethod}
-                        panelId="job-import-panel"
-                        disabled={disabled}
-                      />
-                      <Box
-                        id="job-import-panel"
-                        role="region"
-                        aria-label="Import method input"
-                        sx={{ minWidth: 0 }}
-                      >
-                        {importMethod === 'url' && (
-                          <Stack spacing={1.5}>
-                            <TextField
-                              label="Original Job URL (optional)"
-                              type="url"
-                              value={form.originalLink}
-                              onChange={(e) =>
-                                change('originalLink', e.target.value)
-                              }
-                              error={!jobUrlInfo(form.originalLink).valid}
-                              slotProps={{ htmlInput: { maxLength: 2048 } }}
-                              helperText={
-                                !jobUrlInfo(form.originalLink).valid
-                                  ? 'Enter a full HTTP(S) URL without credentials, or leave it blank.'
-                                  : `${jobUrlInfo(form.originalLink).platform ? `Platform: ${jobUrlInfo(form.originalLink).platform}. ` : ''}Fetching is manual and supports ITviec only.`
-                              }
-                            />
-                            <Button
-                              variant="outlined"
-                              disabled={
-                                disabled || !canFetchJobUrl(form.originalLink)
-                              }
-                              onClick={() => void fetchFromUrl()}
-                              aria-describedby="url-import-help"
-                            >
-                              {urlFetchRunning.current
-                                ? 'Fetching JD…'
-                                : 'Fetch from URL'}
-                            </Button>
-                            <Typography
-                              id="url-import-help"
-                              variant="body2"
-                              color="text.secondary"
-                            >
-                              {!form.originalLink ||
-                              canFetchJobUrl(form.originalLink)
-                                ? 'Direct fetch supports ITviec only and runs when you click Fetch from URL.'
-                                : urlImportHelp(form.originalLink)}
-                            </Typography>
-                          </Stack>
-                        )}
-                        {importMethod === 'bookmarklet' && (
-                          <TopcvBookmarkletInstall />
-                        )}
-                        {importMethod === 'paste' && (
-                          <Stack spacing={1.5}>
-                            <TextField
-                              label="Recruitment post"
-                              multiline
-                              minRows={4}
-                              maxRows={12}
-                              value={form.postText}
-                              onChange={(e) => {
-                                change('postText', e.target.value);
-                                sourcesChanged();
-                              }}
-                              slotProps={{ htmlInput: { maxLength: 12000 } }}
-                              helperText="Paste the entire post, including contact details and links. Up to 12,000 characters. The original text is preserved when saved."
-                            />
-                          </Stack>
-                        )}
-                        {importMethod === 'upload' && (
-                          <Stack spacing={1.5}>
-                            {documentName ? (
-                              <Box>
-                                <Typography>
-                                  Original JD: {documentName}
-                                </Typography>
-                                <a
-                                  href={`/api/v1/opportunities/${id}/document`}
-                                >
-                                  Download original JD
-                                </a>
-                              </Box>
-                            ) : (
-                              <Box>
-                                <Typography
-                                  component="label"
-                                  htmlFor="jd-document"
-                                >
-                                  Upload JD document (PDF or DOCX)
-                                </Typography>
-                                <input
-                                  id="jd-document"
-                                  type="file"
-                                  accept=".pdf,.docx"
-                                  disabled={disabled}
-                                  onChange={(e) => {
-                                    const selected = e.target.files?.[0];
-                                    if (selected) void attach(selected);
-                                    e.target.value = '';
-                                  }}
-                                />
-                                {file && (
-                                  <Stack direction="row" spacing={1}>
-                                    <Typography>{file.name}</Typography>
-                                    <Button
-                                      type="button"
-                                      onClick={() => {
-                                        parseGeneration.current++;
-                                        parseRequest.current?.abort();
-                                        setSourceErrors((errors) => ({
-                                          ...errors,
-                                          upload: '',
-                                        }));
-                                        setFile(undefined);
-                                        setJdText('');
-                                        sourcesChanged();
-                                      }}
-                                    >
-                                      Remove selected document
-                                    </Button>
-                                  </Stack>
-                                )}
-                              </Box>
-                            )}
-                            <Typography variant="body2" color="text.secondary">
-                              Optional PDF/DOCX up to 5 MiB and 20 PDF pages.
-                              Original document is preserved on save. Scans/OCR,
-                              images and legacy DOC are unsupported; paste text
-                              instead.
-                            </Typography>
-                          </Stack>
-                        )}
-                      </Box>
-                      {importMethod !== 'paste' && (
-                        <SourceJdPreview
-                          text={
-                            importMethod === 'upload' ? jdText : form.postText
-                          }
-                          source={
-                            importMethod === 'upload'
-                              ? `Document${file?.name || documentName ? ` · ${file?.name ?? documentName}` : ''}`
-                              : (fetchedJob.current?.platform ??
-                                jobUrlInfo(form.originalLink).platform ??
-                                (importMethod === 'bookmarklet'
-                                  ? 'Bookmarklet'
-                                  : 'Job URL'))
-                          }
-                          loading={
-                            importMethod === 'upload'
-                              ? parsing
-                              : urlFetchRunning.current
-                          }
-                          error={
-                            sourceErrors[importMethod] &&
-                            sourceErrors[importMethod] === error
-                              ? 'Loading this source failed. See the request error above, or use Paste JD.'
-                              : sourceErrors[importMethod]
-                          }
-                        />
-                      )}
-                      <TextField
-                        select
-                        label="Source"
-                        value={form.source}
-                        onChange={(e) =>
-                          change(
-                            'source',
-                            e.target.value as OpportunityInput['source'],
-                          )
-                        }
-                        helperText="Choose the platform yourself; AI does not infer it. Use Other for LinkedIn or another platform."
-                      >
-                        {sources.map((value) => (
-                          <MenuItem key={value} value={value}>
-                            {value}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                      {(form.postText.trim() || file || documentName) && (
-                        <Typography variant="body2" color="text.secondary">
-                          Source content is available. Switching methods keeps
-                          your inputs.
-                        </Typography>
-                      )}
-                      <Button
-                        type="button"
-                        variant="contained"
-                        disabled={
-                          disabled ||
-                          (!form.postText.trim() && !file && !documentName)
-                        }
-                        onClick={() => void extract()}
-                      >
-                        {extracting ? 'Extracting…' : 'Extract with AI'}
-                      </Button>
-                      <Typography variant="body2" color="text.secondary">
-                        Uses the configured local Ollama model only when you
-                        click Extract. You can also enter fields manually and
-                        save without AI.
-                      </Typography>
-                      {extracting && (
-                        <Typography role="status">
-                          Reading sources and extracting suggestions… This may
-                          take up to 90 seconds after document parsing.
-                        </Typography>
-                      )}
-                      {notice && <Alert severity="info">{notice}</Alert>}
-                    </Stack>
-                  </Paper>
-                  {!id && (
-                    <Button
-                      sx={{ mt: 2 }}
-                      variant="outlined"
-                      onClick={() => setStep(1)}
-                    >
-                      Continue to Review &amp; Save
-                    </Button>
-                  )}
-                </Box>
+                {!id && importSources}
                 <Stack
                   spacing={2}
                   sx={{
@@ -998,8 +1041,12 @@ export function JobEditor({
                       : 'none',
                   }}
                 >
-                  <Typography variant="h6" component="h2">
-                    Review &amp; Save
+                  <Typography
+                    ref={jobDetailsHeading}
+                    variant="h6"
+                    component="h2"
+                  >
+                    {id ? 'Job details' : 'Review & Save'}
                   </Typography>
                   <Typography color="text.secondary">
                     Unknown values can stay blank. Only job title is required.
@@ -1110,11 +1157,14 @@ export function JobEditor({
                           )}
                           {review && review.candidates.length > 0 && (
                             <Box component="details" open={conflict}>
-                              <summary>
+                              <Typography
+                                component="summary"
+                                variant="subtitle2"
+                              >
                                 {conflict
                                   ? 'Conflicting evidence'
                                   : 'Source evidence'}
-                              </summary>
+                              </Typography>
                               <Stack spacing={1}>
                                 {review.candidates.map((candidate, index) => (
                                   <Box
@@ -1140,6 +1190,7 @@ export function JobEditor({
                                     </Typography>
                                     {conflict && (
                                       <Button
+                                        variant="outlined"
                                         type="button"
                                         onClick={() => {
                                           change(field, candidate.value);
@@ -1188,14 +1239,34 @@ export function JobEditor({
                       );
                     })}
                   </Box>
+                  {id && (
+                    <TextField
+                      select
+                      label="Source"
+                      value={form.source}
+                      onChange={(e) =>
+                        change(
+                          'source',
+                          e.target.value as OpportunityInput['source'],
+                        )
+                      }
+                      helperText="Where this job was originally found."
+                    >
+                      {sources.map((value) => (
+                        <MenuItem key={value} value={value}>
+                          {value}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
                   {form.originalLink && jobUrlInfo(form.originalLink).valid && (
-                    <a
+                    <MuiLink
                       href={form.originalLink}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
                       View Original Job
-                    </a>
+                    </MuiLink>
                   )}
                   <TextField
                     label="Job description"
@@ -1205,150 +1276,170 @@ export function JobEditor({
                     value={form.description}
                     onChange={(e) => change('description', e.target.value)}
                     slotProps={{ htmlInput: { maxLength: 26000 } }}
-                    helperText="Both source texts are included after extraction; edit the description as needed. The original sources are preserved separately."
+                    helperText={
+                      id
+                        ? 'Edit this job description manually. Original imported source text and documents are preserved separately.'
+                        : 'Both source texts are included after extraction; edit the description as needed. The original sources are preserved separately.'
+                    }
                   />
                 </Stack>
               </Stack>
               <Paper
+                ref={applicationPanel}
                 role="tabpanel"
                 id="job-panel-2"
                 aria-labelledby="job-tab-2"
                 variant="outlined"
                 sx={{
-                  display: id && view === 'application' ? undefined : 'none',
+                  display: id && view === 'application' ? 'flex' : 'none',
+                  flexDirection: 'column',
+                  height: applicationHeight ?? undefined,
                   p: { xs: 2, sm: 3 },
                   minWidth: 0,
                 }}
               >
-                <Stack spacing={2} divider={<Divider />}>
-                  <Stack spacing={2}>
-                    <Typography variant="h6" component="h2">
-                      Application details
-                    </Typography>
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: {
-                          xs: 'minmax(0, 1fr)',
-                          sm: 'repeat(2, minmax(0, 1fr))',
-                        },
-                        gap: 2,
-                      }}
-                    >
-                      <TextField
-                        select
-                        size="small"
-                        label="Application status"
-                        value={form.status}
-                        onChange={(e) =>
-                          change(
-                            'status',
-                            e.target.value as OpportunityInput['status'],
-                          )
-                        }
-                      >
-                        {statuses.map((value) => (
-                          <MenuItem key={value} value={value}>
-                            {value.replaceAll('_', ' ')}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                      <TextField
-                        size="small"
-                        label="Applied date"
-                        type="date"
-                        value={form.appliedDate ?? ''}
-                        onChange={(e) =>
-                          change('appliedDate', e.target.value || null)
-                        }
-                        helperText="Actual submission date; leave blank if unknown."
-                        slotProps={{ inputLabel: { shrink: true } }}
-                      />
-                      <TextField
-                        size="small"
-                        label="Application channel"
-                        value={form.applicationChannel ?? ''}
-                        onChange={(e) =>
-                          change('applicationChannel', e.target.value || null)
-                        }
-                        helperText="How you applied, separate from job source."
-                        slotProps={{ htmlInput: { maxLength: 200 } }}
-                      />
-                    </Box>
-                  </Stack>
-                  <Stack spacing={2}>
-                    <Typography variant="h6" component="h2">
-                      Recruiter contact &amp; follow-up
-                    </Typography>
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: {
-                          xs: 'minmax(0, 1fr)',
-                          sm: 'repeat(2, minmax(0, 1fr))',
-                        },
-                        gap: 2,
-                      }}
-                    >
-                      <TextField
-                        size="small"
-                        label="Last HR contact date"
-                        helperText="When HR last contacted you. Earlier dates are retained."
-                        type="date"
-                        value={contactDate}
-                        onChange={(e) => {
-                          setContactDate(e.target.value);
-                          setNotification(null);
+                <JobActionLayout
+                  active={Boolean(id) && view === 'application'}
+                  scrollable={applicationHeight !== null}
+                  feedbackKey={error}
+                  actions={
+                    <Stack spacing={2}>
+                      {conflicts.length > 0 && (
+                        <Alert severity="warning">
+                          Review {conflicts.length} conflicting field(s) before
+                          saving.
+                          <Button
+                            variant="outlined"
+                            onClick={() => setView('edit')}
+                          >
+                            Review conflicts in Edit JD
+                          </Button>
+                        </Alert>
+                      )}
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={disabled || conflicts.length > 0}
+                        sx={{
+                          alignSelf: { xs: 'stretch', sm: 'flex-end' },
+                          minHeight: { xs: 44, sm: 36 },
                         }}
-                        slotProps={{ inputLabel: { shrink: true } }}
-                      />
+                      >
+                        {busy ? 'Saving…' : 'Save changes'}
+                      </Button>
+                    </Stack>
+                  }
+                >
+                  <Stack spacing={2} divider={<Divider />}>
+                    <Stack spacing={2}>
+                      <Typography variant="h6" component="h2">
+                        Application details
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: {
+                            xs: 'minmax(0, 1fr)',
+                            sm: 'repeat(2, minmax(0, 1fr))',
+                          },
+                          gap: 2,
+                        }}
+                      >
+                        <TextField
+                          select
+                          size="small"
+                          label="Application status"
+                          value={form.status}
+                          onChange={(e) =>
+                            change(
+                              'status',
+                              e.target.value as OpportunityInput['status'],
+                            )
+                          }
+                        >
+                          {statuses.map((value) => (
+                            <MenuItem key={value} value={value}>
+                              {value.replaceAll('_', ' ')}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                        <TextField
+                          size="small"
+                          label="Applied date"
+                          type="date"
+                          value={form.appliedDate ?? ''}
+                          onChange={(e) =>
+                            change('appliedDate', e.target.value || null)
+                          }
+                          helperText="Actual submission date; leave blank if unknown."
+                          slotProps={{ inputLabel: { shrink: true } }}
+                        />
+                        <TextField
+                          size="small"
+                          label="Application channel"
+                          value={form.applicationChannel ?? ''}
+                          onChange={(e) =>
+                            change('applicationChannel', e.target.value || null)
+                          }
+                          helperText="How you applied, separate from job source."
+                          slotProps={{ htmlInput: { maxLength: 200 } }}
+                        />
+                      </Box>
+                    </Stack>
+                    <Stack spacing={2}>
+                      <Typography variant="h6" component="h2">
+                        Recruiter contact &amp; follow-up
+                      </Typography>
+                      <Box
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: {
+                            xs: 'minmax(0, 1fr)',
+                            sm: 'repeat(2, minmax(0, 1fr))',
+                          },
+                          gap: 2,
+                        }}
+                      >
+                        <TextField
+                          size="small"
+                          label="Last HR contact date"
+                          helperText="When HR last contacted you. Earlier dates are retained."
+                          type="date"
+                          value={contactDate}
+                          onChange={(e) => {
+                            setContactDate(e.target.value);
+                          }}
+                          slotProps={{ inputLabel: { shrink: true } }}
+                        />
+                        <TextField
+                          size="small"
+                          label="Next follow-up date"
+                          helperText="When you plan to contact HR; independent of actual contact."
+                          type="date"
+                          value={form.followUpDate ?? ''}
+                          onChange={(e) =>
+                            change('followUpDate', e.target.value || null)
+                          }
+                          slotProps={{ inputLabel: { shrink: true } }}
+                        />
+                      </Box>
+                    </Stack>
+                    <Stack spacing={2}>
+                      <Typography variant="h6" component="h2">
+                        Notes
+                      </Typography>
                       <TextField
                         size="small"
-                        label="Next follow-up date"
-                        helperText="When you plan to contact HR; independent of actual contact."
-                        type="date"
-                        value={form.followUpDate ?? ''}
-                        onChange={(e) =>
-                          change('followUpDate', e.target.value || null)
-                        }
-                        slotProps={{ inputLabel: { shrink: true } }}
+                        label="Application notes"
+                        multiline
+                        minRows={3}
+                        value={form.notes}
+                        onChange={(e) => change('notes', e.target.value)}
+                        slotProps={{ htmlInput: { maxLength: 20000 } }}
                       />
-                    </Box>
+                    </Stack>
                   </Stack>
-                  <Stack spacing={2}>
-                    <Typography variant="h6" component="h2">
-                      Notes
-                    </Typography>
-                    <TextField
-                      size="small"
-                      label="Application notes"
-                      multiline
-                      minRows={3}
-                      value={form.notes}
-                      onChange={(e) => change('notes', e.target.value)}
-                      slotProps={{ htmlInput: { maxLength: 20000 } }}
-                    />
-                  </Stack>
-                  <Stack spacing={2}>
-                    {conflicts.length > 0 && (
-                      <Alert severity="warning">
-                        Review {conflicts.length} conflicting field(s) before
-                        saving.
-                        <Button onClick={() => setView('edit')}>
-                          Review conflicts in Edit JD
-                        </Button>
-                      </Alert>
-                    )}
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      disabled={disabled || conflicts.length > 0}
-                      sx={{ alignSelf: { xs: 'stretch', sm: 'flex-end' } }}
-                    >
-                      {busy ? 'Saving…' : 'Save changes'}
-                    </Button>
-                  </Stack>
-                </Stack>
+                </JobActionLayout>
               </Paper>
               <Stack
                 spacing={2}
@@ -1367,7 +1458,10 @@ export function JobEditor({
                     Review {conflicts.length} conflicting field(s) before
                     saving.
                     {id && view !== 'edit' && (
-                      <Button onClick={() => setView('edit')}>
+                      <Button
+                        variant="outlined"
+                        onClick={() => setView('edit')}
+                      >
                         Review conflicts in Edit JD
                       </Button>
                     )}
@@ -1383,36 +1477,6 @@ export function JobEditor({
           </Box>
         </Stack>
       </JobActionLayout>
-      <Portal>
-        <Snackbar
-          open={notification !== null}
-          autoHideDuration={notification?.severity === 'success' ? 3000 : null}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          onClose={(_, reason) => {
-            if (reason !== 'clickaway') setNotification(null);
-          }}
-          sx={{
-            top: { xs: 'max(16px, env(safe-area-inset-top))', sm: 'auto' },
-            bottom: { xs: 'auto', sm: 24 },
-            left: { xs: 16, sm: 'auto' },
-            right: { xs: 16, sm: 24 },
-            maxWidth: { sm: 'min(32rem, calc(100vw - 48px))' },
-          }}
-        >
-          <Alert
-            severity={notification?.severity ?? 'success'}
-            onClose={() => setNotification(null)}
-            sx={{
-              width: '100%',
-              overflowWrap: 'anywhere',
-              maxHeight: 'calc(100dvh - 32px)',
-              overflowY: 'auto',
-            }}
-          >
-            {notification?.text}
-          </Alert>
-        </Snackbar>
-      </Portal>
     </Stack>
   );
 }

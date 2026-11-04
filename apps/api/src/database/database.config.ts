@@ -1,3 +1,5 @@
+import { DiscoveryCandidate } from '../discovery/discovery-candidate.entity.js';
+import { DiscoveryCandidates1793700000000 } from './migrations/1793700000000-DiscoveryCandidates.js';
 import { ApplicationDetails1793600000000 } from './migrations/1793600000000-ApplicationDetails.js';
 import { JobDiscovery1793510000000 } from './migrations/1793510000000-JobDiscovery.js';
 import { SavedCv } from '../matching/saved-cv.entity.js';
@@ -52,7 +54,7 @@ export function databaseOptions(
     // History stays in public so it can exist before the application schema.
     schema: 'public',
     migrationsTableName: 'typeorm_migrations',
-    entities: [Opportunity, SavedCv],
+    entities: [Opportunity, SavedCv, DiscoveryCandidate],
     migrations: [
       CreateApplicationSchema1792598400000,
       CreateOpportunities1792800000000,
@@ -61,6 +63,7 @@ export function databaseOptions(
       SavedCv1793500000000,
       JobDiscovery1793510000000,
       ApplicationDetails1793600000000,
+      DiscoveryCandidates1793700000000,
     ],
     synchronize: false,
     migrationsRun: false,
