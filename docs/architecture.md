@@ -615,3 +615,46 @@ retired replacement characterization tests are superseded by manual-only safety
 regressions; the C6c audit remains a historical account of the removed workflow.
 It does not claim that Add Job's audited suggestion semantics or historical data
 have been changed, nor that backend import endpoints have been removed.
+
+### P5.4a Add Job import reliability
+
+Add Job tracks the last applied page preview. A repeat Fetch replaces that
+preview's exact source segment instead of appending it. A different URL requires
+explicit replacement confirmation, updates automatic fields and clears obsolete
+AI suggestions, while deliberate edits and separate source text survive. If the
+original source segment was rewritten manually, Fetch reports a recoverable error
+rather than guessing which text to remove. Responses apply to the latest draft,
+with request generations rejecting results after method or URL changes and unmount.
+Failed requests leave the valid draft available for retry.
+
+A document becomes an active attachment only after a readable parse succeeds.
+Leaving Upload JD cancels parsing and clears its attachment, preview
+and error; Paste JD extraction and Save therefore cannot resend a failed or stale
+file. Separate pasted text can still be combined with a document by entering the
+text first and then choosing Upload JD. This deliberately replaces implicit
+attachment retention across methods with an explicit active upload; the UI states
+that leaving Upload removes the document. Evidence/conflict validation, explicit
+Save, manual-only Edit JD and Discovery Queue remain unchanged. No backend,
+transport policy, schema or dependency changes are needed.
+
+### P5.4b Early exact-URL duplicate warning
+
+Add Job debounces valid source URLs for 500 ms, including URLs populated by
+imports, and calls `GET /api/v1/opportunities/duplicate-url?url=…`. The read-only,
+no-store endpoint returns `{ match: { id, title, company } | null }`, validates
+HTTP(S) URLs without credentials and selects only the owned Inbox rows' link
+metadata. It uses the same `normalizedUrl` function as Create: tracking parameters,
+hash, www and trailing slash handling remain consistent with Save. There is no
+title/company heuristic, external URL fetch or Discovery Queue change.
+
+No dedicated early lookup existed; this narrow endpoint avoids transferring the
+whole Inbox and duplicating normalization rules in the browser. It retains the
+current linear lookup strategy without adding a schema/index or search framework.
+A future scale change can optimize both early lookup and Create together.
+
+The warning is advisory and stays visible during review. Its existing-job link
+opens a new tab to retain the draft. Lookup failure gives safe, non-blocking
+guidance; URL changes abort pending requests and ignore late success/failure.
+Create's transactional duplicate enforcement remains authoritative, including
+when early lookup fails or another job is saved after checking. P5.4a replacement
+confirmation, manual-edit protection and upload recovery remain in place.

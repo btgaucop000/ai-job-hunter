@@ -116,7 +116,7 @@ test('four method cards are keyboard buttons with selected states and no radio/d
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
 });
 
-test('one contextual panel retains source and parsed-document state without fetching on selection', async () => {
+test('one contextual panel retains text but clears the document when leaving Upload JD without fetching on selection', async () => {
   const fetch = api();
   mount();
   expect(
@@ -160,7 +160,7 @@ test('one contextual panel retains source and parsed-document state without fetc
     'Preserved recruiter post',
   );
   select('Upload JD');
-  expect(screen.getByText('synthetic.docx')).toBeVisible();
+  expect(screen.queryByText('synthetic.docx')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Extract with AI' })).toBeEnabled();
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(fetch.mock.calls[0]![0]).toBe('/api/v1/opportunities/parse-document');
@@ -171,10 +171,10 @@ test('one contextual panel retains source and parsed-document state without fetc
   );
   select('Paste JD');
   select('Upload JD');
-  expect(screen.getByText('synthetic.docx')).toBeVisible();
-  expect(screen.getByLabelText('Source JD text (read-only)')).toHaveValue(
-    'Parsed synthetic document',
-  );
+  expect(screen.queryByText('synthetic.docx')).not.toBeInTheDocument();
+  expect(
+    screen.queryByLabelText('Source JD text (read-only)'),
+  ).not.toBeInTheDocument();
 });
 
 test('ITviec fetch loads once without AI, extraction remains explicit, and manual review edits survive', async () => {
@@ -249,3 +249,8 @@ test('validated bookmark transfer selects Bookmarklet and keeps the original URL
   );
   expect(fetch).toHaveBeenCalledTimes(1);
 });
+
+// Keep import orchestration assertions independent of the advisory lookup timer.
+vi.mock('../src/features/inbox/DuplicateJobNotice', () => ({
+  DuplicateJobNotice: () => null,
+}));

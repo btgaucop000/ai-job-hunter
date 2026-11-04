@@ -152,18 +152,19 @@ test.each([false, true])(
     const file = new File(['synthetic PDF bytes'], 'synthetic.pdf', {
       type: 'application/pdf',
     });
-    fireEvent.click(screen.getByRole('button', { name: /Upload JD/ }));
+    if (withPost) {
+      fireEvent.change(screen.getByLabelText('Recruitment post'), {
+        target: { value: post },
+      });
+    }
     fireEvent.click(screen.getByRole('button', { name: /Upload JD/ }));
     await userEvent.upload(
       screen.getByLabelText('Upload JD document (PDF or DOCX)'),
       file,
     );
-    if (withPost) {
-      fireEvent.click(screen.getByRole('button', { name: /Paste JD/ }));
-      fireEvent.change(screen.getByLabelText('Recruitment post'), {
-        target: { value: post },
-      });
-    }
+    await waitFor(() =>
+      expect(screen.getByText('synthetic.pdf')).toBeVisible(),
+    );
     await userEvent.click(
       screen.getByRole('button', { name: 'Extract with AI' }),
     );
@@ -337,7 +338,7 @@ test('maps the captured single Ollama result, requires conflict review and saves
   ).toHaveLength(1);
 });
 
-test('an actionable DOCX parsing failure retains the post, file and manual fields', async () => {
+test('an actionable DOCX parsing failure retains post and manual fields but rejects the file', async () => {
   const parseMessage =
     'The DOCX archive is damaged or has an unsupported ZIP layout. Open it in Word or LibreOffice and Save As a new .docx, or paste the JD text.';
   const fetch = vi.fn(async () =>
@@ -367,7 +368,7 @@ test('an actionable DOCX parsing failure retains the post, file and manual field
     }),
   );
   await screen.findByText(/The DOCX archive is damaged/);
-  expect(screen.getByText('retained-synthetic.docx')).toBeVisible();
+  expect(screen.queryByText('retained-synthetic.docx')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /Paste JD/ }));
   expect(screen.getByLabelText('Recruitment post')).toHaveValue(post);
   fireEvent.click(
@@ -705,3 +706,73 @@ test('invalid job URL blocks save with actionable feedback and retains inputs', 
   );
   expect(fetch).not.toHaveBeenCalled();
 });
+
+test.each(['failed', 'pending', 'valid'])(
+  'upload %s cannot leak into Paste JD extraction or save',
+  async (state) => {
+    let release!: (response: Response) => void;
+    const result = preview({ title: 'Paste recovery' });
+    const fetch = mock(result);
+    const normal = fetch.getMockImplementation()!;
+    fetch.mockImplementation(async (url, init) => {
+      if (url.endsWith('/parse-document')) {
+        if (state === 'pending')
+          return new Promise<Response>((resolve) => {
+            release = resolve;
+          });
+        if (state === 'failed')
+          return Response.json(
+            { message: 'Cannot parse synthetic document' },
+            { status: 400 },
+          );
+      }
+      return normal(url, init);
+    });
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: /Upload JD/ }));
+    await userEvent.upload(
+      screen.getByLabelText('Upload JD document (PDF or DOCX)'),
+      new File(['synthetic'], 'recovery.pdf', { type: 'application/pdf' }),
+    );
+    if (state === 'failed') {
+      await screen.findByText(/Cannot parse synthetic document/);
+      expect(screen.queryByText('recovery.pdf')).not.toBeInTheDocument();
+    }
+    if (state === 'valid') await screen.findByText('recovery.pdf');
+    expect(screen.getByRole('button', { name: /^Paste JD/ })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: /^Paste JD/ }));
+    expect(screen.getByRole('button', { name: /^Paste JD/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    if (state === 'pending')
+      release(Response.json({ text: 'Stale document', warnings: [] }));
+    fireEvent.change(screen.getByLabelText('Recruitment post'), {
+      target: { value: post },
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Extract with AI' }),
+    );
+    await screen.findByDisplayValue('Paste recovery');
+    const extracted = fetch.mock.calls.find(([url]) =>
+      url.endsWith('/extract'),
+    )![1]!.body as FormData;
+    expect(extracted.get('document')).toBeNull();
+    expect(JSON.parse(extracted.get('record') as string)).toEqual({
+      postText: post,
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Confirm and save job' }),
+    );
+    await screen.findByRole('heading', { name: 'Job overview' });
+    const saved = fetch.mock.calls.find(
+      ([url, init]) =>
+        url === '/api/v1/opportunities' && init?.method === 'POST',
+    )![1]!.body;
+    expect(typeof saved).toBe('string');
+    expect(JSON.parse(saved as string)).toMatchObject({
+      title: 'Paste recovery',
+      postText: post,
+    });
+  },
+);

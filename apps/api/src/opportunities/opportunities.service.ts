@@ -33,6 +33,40 @@ export class OpportunitiesService {
       order: { updatedAt: 'DESC', id: 'ASC' },
     });
   }
+  async duplicateUrl(value: unknown) {
+    if (typeof value !== 'string' || !value || value.length > 2048)
+      throw new BadRequestException(
+        'Enter a full HTTP(S) job URL without credentials.',
+      );
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new BadRequestException(
+        'Enter a full HTTP(S) job URL without credentials.',
+      );
+    }
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      url.username ||
+      url.password
+    )
+      throw new BadRequestException(
+        'Enter a full HTTP(S) job URL without credentials.',
+      );
+    const key = normalizedUrl(value);
+    const existing = await this.rows.find({
+      where: { ownerId: LOCAL_OWNER_ID },
+      select: { id: true, title: true, company: true, originalLink: true },
+      order: { id: 'ASC' },
+    });
+    const row = existing.find((job) => normalizedUrl(job.originalLink) === key);
+    return {
+      match: row
+        ? { id: row.id, title: row.title, company: row.company }
+        : null,
+    };
+  }
   async get(id: string) {
     const row = await this.rows.findOneBy({ id, ownerId: LOCAL_OWNER_ID });
     if (!row) throw new NotFoundException('Opportunity not found');

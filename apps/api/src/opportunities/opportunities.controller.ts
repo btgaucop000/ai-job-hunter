@@ -22,6 +22,7 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
+  Query,
   Req,
   Res,
 } from '@nestjs/common';
@@ -70,6 +71,11 @@ export class OpportunitiesController {
   ) {}
   @Get() @Header('Cache-Control', 'no-store') list() {
     return this.opportunities.list();
+  }
+  @Get('duplicate-url')
+  @Header('Cache-Control', 'no-store')
+  duplicateUrl(@Query('url') url: unknown) {
+    return this.opportunities.duplicateUrl(url);
   }
   @Post('import-url')
   @HttpCode(200)

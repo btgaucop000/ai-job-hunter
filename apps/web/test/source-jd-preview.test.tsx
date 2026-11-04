@@ -85,7 +85,7 @@ test('bookmarklet preview uses transferred source text with its known platform a
   expect(fetch.mock.calls[0]).toBeDefined();
 });
 
-test('upload calls existing parse-only endpoint once, shows real parsed text, and retains it across cards', async () => {
+test('upload calls existing parse-only endpoint once, shows real parsed text, and clears it when leaving Upload JD', async () => {
   const fetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
     async () => Response.json({ text: raw, warnings: [] }),
   );
@@ -112,12 +112,14 @@ test('upload calls existing parse-only endpoint once, shows real parsed text, an
   select('Paste JD');
   select('Job URL');
   select('Upload JD');
-  expect(screen.getByLabelText('Source JD text (read-only)')).toHaveValue(raw);
-  expect(screen.getByText('synthetic.docx')).toBeVisible();
+  expect(
+    screen.queryByLabelText('Source JD text (read-only)'),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText('synthetic.docx')).not.toBeInTheDocument();
   expect(fetch).toHaveBeenCalledTimes(1);
 });
 
-test('parse failure shows an actionable preview error without inventing parsed content or discarding the file', async () => {
+test('parse failure shows an actionable preview error without inventing parsed content or retaining the failed file', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn(async () =>
@@ -141,7 +143,7 @@ test('parse failure shows an actionable preview error without inventing parsed c
   expect(
     screen.queryByLabelText('Source JD text (read-only)'),
   ).not.toBeInTheDocument();
-  expect(screen.getByText('synthetic.pdf')).toBeVisible();
+  expect(screen.queryByText('synthetic.pdf')).not.toBeInTheDocument();
 });
 
 test('preview can collapse and automatically expands when new source text arrives', async () => {
@@ -178,3 +180,8 @@ test('height-limited preview retains the complete long source rather than trunca
     ).value.split('\n'),
   ).toHaveLength(80);
 });
+
+// Isolate source-import requests from the separately tested duplicate lookup timer.
+vi.mock('../src/features/inbox/DuplicateJobNotice', () => ({
+  DuplicateJobNotice: () => null,
+}));
