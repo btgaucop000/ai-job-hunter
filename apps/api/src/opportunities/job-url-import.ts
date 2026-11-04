@@ -1,3 +1,4 @@
+import { itviecMetadata, type ItviecMetadata } from './itviec-metadata.js';
 import {
   salaryEvidence,
   structuredSalaryEvidence,
@@ -89,6 +90,8 @@ export interface UrlJobPreview {
   sourceText: string;
   salary: string;
   salaryDetails: SalaryEvidence | null;
+  sourceMetadata?: ItviecMetadata;
+  domain?: string;
 }
 export function parseJobPosting(
   html: string,
@@ -127,6 +130,8 @@ export function parseJobPosting(
       'Expected one JobPosting on this page. Paste the specific JD instead.',
     );
   const job = jobs[0]!;
+  const sourceMetadata =
+    platform === 'ITviec' ? itviecMetadata(html) : undefined;
   const descriptionParts = [plain(job.description)];
   // JobPosting may keep the actual requirements outside its description.
   for (const [key, label] of [
@@ -135,6 +140,7 @@ export function parseJobPosting(
     ['responsibilities', 'Responsibilities'],
     ['industry', 'Source industry'],
   ] as const) {
+    if (key === 'skills' && sourceMetadata?.skills.length) continue;
     const content = [job[key]].flat().map(plain).filter(Boolean).join('\n');
     if (content && !descriptionParts.join('\n').includes(content)) {
       const evidence =
@@ -144,6 +150,23 @@ export function parseJobPosting(
       );
     }
   }
+  if (sourceMetadata?.skills.length)
+    descriptionParts.push(
+      `Supplemental skill tags (not requirements): ${sourceMetadata.skills.join('; ')}`,
+    );
+  if (sourceMetadata?.jobExpertise.length)
+    descriptionParts.push(
+      `ITviec Job Expertise: ${sourceMetadata.jobExpertise.join('; ')}`,
+    );
+  if (sourceMetadata?.jobDomains.length)
+    descriptionParts.push(
+      `ITviec Job Domain:\n${sourceMetadata.jobDomains.join('\n')}\nEnd ITviec Job Domain`,
+    );
+  const domain = sourceMetadata?.jobDomains.join('; ');
+  if (domain && domain.length > 2000)
+    throw new BadRequestException(
+      'Job domains exceed the field limit. Paste the relevant JD content manually.',
+    );
   const description = descriptionParts.filter(Boolean).join('\n');
   if (!description)
     throw new BadRequestException(
@@ -298,6 +321,8 @@ export function parseJobPosting(
       'Job content exceeds the paste limit. Paste the relevant JD content manually.',
     );
   return {
+    ...(sourceMetadata ? { sourceMetadata } : {}),
+    ...(domain ? { domain } : {}),
     originalLink,
     platform,
     title,

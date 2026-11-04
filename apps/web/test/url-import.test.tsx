@@ -241,10 +241,15 @@ test('repeat preview replaces tracked source without duplication; replacement pr
 });
 
 test('failed fetch retains draft and retry is idempotent; different URL requires replacement approval', async () => {
-  const first = { ...preview, originalLink: 'https://itviec.com/it-jobs/a' };
+  const first = {
+    ...preview,
+    domain: 'IT Services and IT Consulting',
+    originalLink: 'https://itviec.com/it-jobs/a',
+  };
   const second = {
     ...first,
     title: 'Job B',
+    domain: 'Banking; Financial Services',
     description: 'Description B',
     sourceText: 'Source B',
     originalLink: 'https://itviec.com/it-jobs/b',
@@ -277,6 +282,10 @@ test('failed fetch retains draft and retry is idempotent; different URL requires
   };
   fireEvent.change(url, { target: { value: first.originalLink } });
   await run();
+  expect(screen.getByLabelText('Domain')).toHaveValue(first.domain);
+  fireEvent.change(screen.getByLabelText('Domain'), {
+    target: { value: 'Manual domain' },
+  });
   await run();
   expect(screen.getByLabelText('Job description')).toHaveValue(
     first.description,
@@ -285,8 +294,10 @@ test('failed fetch retains draft and retry is idempotent; different URL requires
   fireEvent.change(url, { target: { value: second.originalLink } });
   await run();
   expect(fetch).toHaveBeenCalledTimes(3);
+  expect(screen.getByLabelText('Domain')).toHaveValue('Manual domain');
   confirm.mockReturnValue(true);
   await run();
+  expect(screen.getByLabelText('Domain')).toHaveValue('Manual domain');
   expect(screen.getByLabelText('Job description')).toHaveValue(
     second.description,
   );
@@ -388,3 +399,42 @@ test('successful pending fetch preserves edits made after the request began', as
 vi.mock('../src/features/inbox/DuplicateJobNotice', () => ({
   DuplicateJobNotice: () => null,
 }));
+
+test('domain taxonomy maps atomically, protects manual edits and clears obsolete source domains', () => {
+  const domain =
+    'Media, Advertising and Entertainment; IT Services and IT Consulting';
+  const first = {
+    ...preview,
+    domain,
+    sourceMetadata: {
+      skills: ['Java'],
+      jobExpertise: ['Architect'],
+      jobDomains: domain.split('; '),
+    },
+  };
+  const form = applyUrlJobPreview(emptyOpportunity(), first, new Set());
+  expect(form.domain).toBe(domain);
+  expect(form.skills).toBe('');
+  expect(form.preferredSkills).toBe('');
+  expect(form).not.toHaveProperty('sourceMetadata');
+  const same = { ...first, domain: 'Banking', sourceText: 'Updated source' };
+  expect(applyUrlJobPreview(form, same, new Set(), first).domain).toBe(
+    'Banking',
+  );
+  for (const manual of ['Manual domain', ''])
+    expect(
+      applyUrlJobPreview(
+        { ...form, domain: manual },
+        same,
+        new Set(['domain']),
+        first,
+      ).domain,
+    ).toBe(manual);
+  const replacement = {
+    ...preview,
+    originalLink: 'https://itviec.com/it-jobs/other',
+  };
+  expect(applyUrlJobPreview(form, replacement, new Set(), first).domain).toBe(
+    '',
+  );
+});

@@ -1,0 +1,170 @@
+{
+  "case": "itviec-ai-solution-architect-public-2026-11-04",
+  "url": "https://itviec.com/it-jobs/ai-solution-architect-itviec-recruitment-consulting-0525",
+  "provenance": "Normalized sourceText from P5.5a public HTML capture using current uncommitted P5.5b parseJobPosting. Not a model capture.",
+  "sourceText": "Job title: AI Solution Architect\nCompany: ITviec Recruitment Consulting\nLocation: City, Not Available, Hồ Chí Minh, VN\nOriginal URL: https://itviec.com/it-jobs/ai-solution-architect-itviec-recruitment-consulting-0525\nSalary: 4,000 - 5,000 USD per MONTH\nSalary: 4000-5000 USD per MONTH\nSalary metadata: {\"@type\":\"MonetaryAmount\",\"currency\":\"USD\",\"value\":{\"@type\":\"QuantitativeValue\",\"minValue\":4000,\"maxValue\":5000,\"unitText\":\"MONTH\",\"value\":\"4,000 - 5,000 USD\"}}\nTop 3 Reasons To Join Us\r\nThe Job\r\nWe are looking for an AI Solution Architect to shape how AI solutions are designed and delivered across client \nengagements. You will connect business needs with practical AI architectures, stay hands-on through PoCs and \ntechnical reviews, and help engineering teams adopt AI-assisted development through coaching, reusable tools, and \nclear standards. \nKey Responsibilities \nLead client discovery and solution workshops, assess AI use cases, and translate business needs into feasible technical approaches. \nDesign secure, scalable, and cost-aware architectures using LLMs, RAG, agents, data integrations, and cloud services. \nBuild or guide PoCs, review designs and code, and support critical technical decisions during delivery. \nSupport solution scoping, technical proposals, presentations, and estimation for selected client opportunities. \nLead AI enablement by coaching teams on AI-assisted development, coding agents, evaluation practices, and reusable engineering workflows. \nDefine reference architectures, reusable patterns, governance principles, and success measures across AI projects. \nYour Skills and Experience\r\nMust Have \nBachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience. \n6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience. \nStrong English communication, facilitation, presentation, and technical documentation skills. \nPersonally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage. \nWorking knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations.\nExperience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices. \nUnderstanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs. \nExperience using AI coding tools and the ability to coach engineers in practical AI-assisted software development. \nClient-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication.\nNice to Have \nExperience with technical presales, proposals, RFP/RFI responses, or delivery estimation. \nMulti-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence. \nExperience designing technical training, engineering standards, or reusable solution accelerators. \nSpec-driven development, AI governance frameworks, or relevant cloud and AI certifications.\nWhy You'll Love Working Here\r\nWork Environment & Culture:\nEngage with a youthful, dynamic team working on awesome projects applying cutting-edge technologies.\nGain global exposure by working alongside international specialists, providing a fantastic opportunity to expand your skill set.\nA transparent, honest, and respectful culture that empowers individuals to reach their full potential.\nCompensation & Health Benefits:\n13th-month salary and highly attractive performance-based bonuses.\nPremium accident and healthcare insurance plans, plus comprehensive annual health check-ups.\nAllowances & Facilities:\nAllowances for lunch, free parking, and life events (marriage, newborn baby, bereavement, etc.).\nA spacious, fully equipped pantry (microwave, fridge, coffee maker, etc.) for your most comfortable lunch breaks.\nEngagement & Recognition:\nDiverse sports clubs and social activities (Badminton, Football, Yoga, Tech clubs).\nAnnual company teambuilding trips.\nEngaging monthly internal events: Happy Gatherings, Mini Games, Team Birthdays, Year-End Party, etc.\nQuarterly and yearly awards recognizing outstanding individuals, teams, and long-term dedication.\nAdvanced English and soft skill training programs to assist your career development.\nExclusive perk: Unique internal company supporting funds to help ease personal financial goals (Home, Vehicle, Tuition loans, etc.).\nSupplemental skill tags (not requirements): LLM; Kubernetes; RAG; English\nITviec Job Expertise: AI Architect\nITviec Job Domain:\nBanking\nIT Services and IT Consulting\nSoftware Products and Web Services\nFinancial Services\nEnd ITviec Job Domain",
+  "mustHave": [
+    {
+      "id": "M1",
+      "classification": "education",
+      "quote": "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience.",
+      "coverageSpans": [
+        "Bachelor's degree in Computer Science, Software Engineering, Information Technology, or a related field, or equivalent practical experience"
+      ],
+      "interpretation": "Education OR related-field/equivalent-practical-experience alternatives; do not require every degree."
+    },
+    {
+      "id": "M2",
+      "classification": "experience-and-competency",
+      "quote": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience.",
+      "coverageSpans": [
+        "6+ years of experience in software engineering, solution architecture, or a related technical role",
+        "recent hands-on Generative AI experience"
+      ],
+      "interpretation": "Minimum six years in any stated role category, including recent hands-on Generative AI experience; not six years of GenAI specifically."
+    },
+    {
+      "id": "M3",
+      "classification": "required-competency",
+      "quote": "Strong English communication, facilitation, presentation, and technical documentation skills.",
+      "coverageSpans": [
+        "English communication",
+        "facilitation",
+        "presentation",
+        "technical documentation skills"
+      ],
+      "interpretation": "All stated communication competencies; English strength applies to the clause."
+    },
+    {
+      "id": "M4",
+      "classification": "required-competency",
+      "quote": "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage.",
+      "coverageSpans": [
+        "Personally built and delivered at least one LLM, RAG, or agent-based application beyond the prototype stage"
+      ],
+      "interpretation": "At least one delivered application of the listed alternatives beyond prototype; not all three mandatory technologies."
+    },
+    {
+      "id": "M5",
+      "classification": "required-competency",
+      "quote": "Working knowledge of RAG, vector search, agentic workflows, tool calling, model selection, and AI system limitations.",
+      "coverageSpans": [
+        "RAG",
+        "vector search",
+        "agentic workflows",
+        "tool calling",
+        "model selection",
+        "AI system limitations"
+      ],
+      "interpretation": "Working knowledge applies to every listed competency; do not upgrade to expertise."
+    },
+    {
+      "id": "M6",
+      "classification": "required-competency",
+      "quote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices.",
+      "coverageSpans": [
+        "cloud-based architectures",
+        "APIs",
+        "integrations",
+        "data flows",
+        "CI/CD practices"
+      ],
+      "interpretation": "Experience designing applies to all listed architecture/interface/integration competencies."
+    },
+    {
+      "id": "M7",
+      "classification": "required-competency",
+      "quote": "Understanding of AI evaluation, observability, security, privacy, performance, and cost trade-offs.",
+      "coverageSpans": [
+        "AI evaluation",
+        "observability",
+        "security",
+        "privacy",
+        "performance",
+        "cost trade-offs"
+      ],
+      "interpretation": "Understanding of applies to the entire AI-system evaluation/trade-off list; do not display generic expert security/privacy claims."
+    },
+    {
+      "id": "M8",
+      "classification": "required-competency",
+      "quote": "Experience using AI coding tools and the ability to coach engineers in practical AI-assisted software development.",
+      "coverageSpans": [
+        "AI coding tools",
+        "coach engineers in practical AI-assisted software development"
+      ],
+      "interpretation": "Experience using tools AND ability to coach engineers; coaching is explicit here, not inferred from responsibilities."
+    },
+    {
+      "id": "M9",
+      "classification": "required-competency",
+      "quote": "Client-facing experience in discovery, requirement translation, architecture presentations, and stakeholder communication.",
+      "coverageSpans": [
+        "discovery",
+        "requirement translation",
+        "architecture presentations",
+        "stakeholder communication"
+      ],
+      "interpretation": "Client-facing experience applies to the entire list."
+    }
+  ],
+  "niceToHave": [
+    {
+      "id": "P1",
+      "classification": "preferred-alternative-group",
+      "quote": "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation.",
+      "coverageSpans": [
+        "Experience with technical presales, proposals, RFP/RFI responses, or delivery estimation"
+      ],
+      "interpretation": "Preserve this source-listed OR group as optional/preferred; do not turn all alternatives into mandatory AND conditions."
+    },
+    {
+      "id": "P2",
+      "classification": "preferred-alternative-group",
+      "quote": "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence.",
+      "coverageSpans": [
+        "Multi-agent systems, MCP, knowledge graphs, multimodal AI, or document intelligence"
+      ],
+      "interpretation": "Preserve this source-listed OR group as optional/preferred; do not turn all alternatives into mandatory AND conditions."
+    },
+    {
+      "id": "P3",
+      "classification": "preferred-alternative-group",
+      "quote": "Experience designing technical training, engineering standards, or reusable solution accelerators.",
+      "coverageSpans": [
+        "Experience designing technical training, engineering standards, or reusable solution accelerators"
+      ],
+      "interpretation": "Preserve this source-listed OR group as optional/preferred; do not turn all alternatives into mandatory AND conditions."
+    },
+    {
+      "id": "P4",
+      "classification": "preferred-alternative-group",
+      "quote": "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications.",
+      "coverageSpans": [
+        "Spec-driven development, AI governance frameworks, or relevant cloud and AI certifications"
+      ],
+      "interpretation": "Preserve this source-listed OR group as optional/preferred; do not turn all alternatives into mandatory AND conditions."
+    }
+  ],
+  "experience": {
+    "value": "Minimum 6 years",
+    "quote": "6+ years of experience in software engineering, solution architecture, or a related technical role, including recent hands-on Generative AI experience.",
+    "sourceValue": "6+ years"
+  },
+  "taxonomy": {
+    "skills": ["LLM", "Kubernetes", "RAG", "English"],
+    "jobExpertise": ["AI Architect"],
+    "jobDomains": [
+      "Banking",
+      "IT Services and IT Consulting",
+      "Software Products and Web Services",
+      "Financial Services"
+    ]
+  },
+  "negativeControls": [
+    "Kubernetes is a supplemental tag only in this JD, not a hiring requirement.",
+    "AI Architect is Job Expertise, not evidence of seniority.",
+    "No named coding-tool vendor, cloud vendor, degree equivalence rule or proficiency level beyond the literal JD."
+  ],
+  "rawModelResponse": "NOT_AVAILABLE: no capture for the reported extraction was supplied or found; live inference not run."
+}

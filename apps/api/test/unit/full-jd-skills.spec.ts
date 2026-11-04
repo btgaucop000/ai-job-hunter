@@ -79,7 +79,18 @@ test('full JD reaches provider unchanged and sparse model output is recovered in
     'global or multicultural',
   ])
     expect(skills.value).toContain(term);
-  expect(skills.value.split('\n')).toContain('Java');
+  const requirementClauses = jd
+    .split('Requirements\n')[1]!
+    .split('\nSupplemental skill tags')[0]!
+    .split('\n');
+  expect(skills.value.split('\n')).toHaveLength(requirementClauses.length);
+  for (const clause of requirementClauses) {
+    expect(
+      skills.candidates.some((candidate) => candidate.quote === clause),
+    ).toBe(true);
+    expect(skills.value).toContain(clause.replace(/\.$/u, ''));
+  }
+  expect(skills.value.split('\n')).not.toContain('Java');
   expect(skills.value).not.toContain('Java Swing');
   expect(skills.value.split('\n')).not.toContain('React');
   expect(skills.value.split('\n')).not.toContain('AWS');
@@ -103,9 +114,18 @@ test('Java is not replaced by an alternative clause containing JavaScript', () =
     jd,
     '',
   );
-  expect(result.fields.find((field) => field.field === 'skills')?.value).toBe(
-    'Java',
+  const skills = result.fields.find((field) => field.field === 'skills')!;
+  expect(skills.candidates).toHaveLength(1);
+  const qualification = skills.candidates[0]!;
+  expect(qualification.value).toMatch(/\bJava\b/u);
+  expect(qualification.value).toContain(
+    '5 years of experience in Java Full Stack development',
   );
+  expect(qualification.value).not.toContain('JavaScript');
+  expect(qualification.value).not.toMatch(/React|Vue|Angular/u);
+  expect(jd).toContain(qualification.quote);
+  expect(qualification.quote).toContain(qualification.value);
+  expect(validateImportReview(result.fields, jd, '')).toEqual(result.fields);
 });
 
 test('parenthetical cloud alternatives remain one downstream requirement', () => {

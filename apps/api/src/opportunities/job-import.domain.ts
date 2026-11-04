@@ -1,3 +1,4 @@
+import { itviecDomainCandidates } from './itviec-metadata.js';
 import { requirementLines } from './job-import.sections.js';
 import type { ImportCandidate } from './job-import.contract.js';
 const normalized = (value: string) =>
@@ -19,7 +20,12 @@ export function businessDomainCandidates(
   text: string,
   source: 'post' | 'jd',
 ): ImportCandidate[] {
-  const result: ImportCandidate[] = [];
+  const taxonomy = itviecDomainCandidates(text);
+  const result: ImportCandidate[] = taxonomy.map((item) => ({
+    ...item,
+    field: 'domain',
+    source,
+  }));
   const qualifications = requirementLines(text);
   const employers = new Set(
     text
@@ -32,6 +38,8 @@ export function businessDomainCandidates(
   );
   for (const raw of text.split(/\r?\n/u)) {
     const line = raw.trim();
+    if (taxonomy.some((item) => item.quote.split('\n').includes(line)))
+      continue;
     const qualification = qualifications.filter(
       (item) => item.kind && line.includes(item.line),
     );
@@ -111,7 +119,10 @@ export function businessDomainCandidates(
 }
 export function supportedBusinessDomain(text: string, value: string): boolean {
   return (
-    useful(value) &&
+    (useful(value) ||
+      itviecDomainCandidates(text).some(
+        (item) => normalized(item.value) === normalized(value),
+      )) &&
     businessDomainCandidates(text, 'post').some(
       (candidate) => normalized(candidate.value) === normalized(value),
     )
@@ -151,7 +162,11 @@ export function mergeBusinessDomains(candidates: ImportCandidate[]): {
           candidate.value,
         ]),
       ).values(),
-    ].join(', ');
+    ].join(
+      candidates.some((item) => item.quote.startsWith('ITviec Job Domain:\n'))
+        ? '; '
+        : ', ',
+    );
     return {
       value: value.length <= 2000 ? value : '',
       conflict: value.length > 2000,
@@ -170,7 +185,7 @@ export function mergeBusinessDomains(candidates: ImportCandidate[]): {
             normalized(quote).indexOf(normalized(a)) -
             normalized(quote).indexOf(normalized(b)),
         )
-        .join(', ')
+        .join(quote.includes('ITviec Job Domain:\n') ? '; ' : ', ')
     : '';
   return {
     value: value.length <= 2000 ? value : '',
