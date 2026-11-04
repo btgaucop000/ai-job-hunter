@@ -242,7 +242,6 @@ The foreign key checks existence, so Save also checks linked-job ownership in th
 service. Schema rollback drops queue data only and requires explicit authorization
 for any populated database.
 
-
 ## Discovery queue ingestion and review actions (P5.2c)
 
 DiscoveryQueueModule now exposes `/api/v1/discovery/runs` and candidate list,
@@ -292,7 +291,6 @@ and HTTP-controller tests do not establish transaction correctness. The P5.2b
 migration lifecycle remains pending until that database is available. There is
 no bulk save, AI ranking or scheduler.
 
-
 ## Discovery Queue UI and endpoint cutover (P5.2d)
 
 The existing Discover form now posts to `/discovery/runs` and refreshes the queue
@@ -307,7 +305,6 @@ The Inbox layout and interactions are unchanged. Candidate ingestion is independ
 of existing Inbox identities, so old imports still produce NEW candidates. Explicit
 Save links an exact match without overwriting fields or application history.
 No local data rewrite or backfill is part of this cutover.
-
 
 ## Shared frontend notifications (P5.2f)
 
@@ -333,7 +330,6 @@ inline success banners. Review failures and duplicate confirmation stay local
 and actionable. Application saves reuse the shared host instead of owning a
 second Snackbar. DOM tests verify overlay placement and unchanged dialog scroll
 containers; actual scroll and narrow-screen acceptance still require a browser.
-
 
 ## Greenhouse source registry and coverage (P5.3b)
 

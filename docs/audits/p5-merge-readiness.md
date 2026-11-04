@@ -26,16 +26,16 @@ PR creation or merge is authorized by this report.
 These are executed results, not a proposed test plan. M3 changed documentation
 only; M1/M2 results were reused without rerunning database or browser acceptance.
 
-| Check | Actual result |
-| --- | --- |
-| Focused backend unit tests, pre-merge check | 9 suites, 61 tests passed. |
-| M1 affected App test file | 10/10 passed after updating the discovery fixture and notification assertion. |
-| M1 focused frontend suite | 18 files, 181/181 passed serially. |
-| M2 focused frontend tests | App, discovery, queue and notifications: 4 files, 34/34 passed. |
-| M2 PostgreSQL integration | Discovery queue/actions/retired route: 3 suites, 13/13 passed. |
-| M2 migration lifecycle | All eight applied; latest Discovery Candidates migration reverted/reapplied via supported source and compiled CLI; repeat runs had no pending migrations. |
-| M2 live API/DB Chromium | All seven scoped scenarios passed at 1440×900 with deterministic synthetic Greenhouse provider data. API responses and PostgreSQL transactions were real. |
-| M3 lightweight checks | API/web typechecks and `git diff --check` passed. |
+| Check                                       | Actual result                                                                                                                                             |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Focused backend unit tests, pre-merge check | 9 suites, 61 tests passed.                                                                                                                                |
+| M1 affected App test file                   | 10/10 passed after updating the discovery fixture and notification assertion.                                                                             |
+| M1 focused frontend suite                   | 18 files, 181/181 passed serially.                                                                                                                        |
+| M2 focused frontend tests                   | App, discovery, queue and notifications: 4 files, 34/34 passed.                                                                                           |
+| M2 PostgreSQL integration                   | Discovery queue/actions/retired route: 3 suites, 13/13 passed.                                                                                            |
+| M2 migration lifecycle                      | All eight applied; latest Discovery Candidates migration reverted/reapplied via supported source and compiled CLI; repeat runs had no pending migrations. |
+| M2 live API/DB Chromium                     | All seven scoped scenarios passed at 1440×900 with deterministic synthetic Greenhouse provider data. API responses and PostgreSQL transactions were real. |
+| M3 lightweight checks                       | API/web typechecks and `git diff --check` passed.                                                                                                         |
 
 M2 verified `127.0.0.1:5433`, database/role `ai_job_hunter_test`, before writes.
 The separate API used port 3001; browser API traffic was forwarded exclusively

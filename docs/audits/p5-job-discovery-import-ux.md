@@ -8,14 +8,14 @@ This is a **code-based audit**. No journey was exercised in a real browser. “C
 
 The implemented flow has two branches: Discover Jobs imports directly into the Inbox; Add Job stages individual sources for review. Discovery does not pass through Import Sources or Review & Save.
 
-| Method | Entry point | Main steps | Destination |
-| --- | --- | --- | --- |
-| Public-feed discovery | Inbox → expand Discover Jobs | Choose stacks/preferences → Discover Jobs → inspect counts/errors | Up to 50 new records saved directly; Inbox reloads |
-| ITviec direct URL | Add Job → Job URL (default) | Paste individual HTTPS ITviec URL → Fetch from URL → preview → optional AI extraction or manual review → confirm save | Saved job detail; return to Inbox through navigation |
-| TopCV bookmarklet | Add Job → Bookmarklet | Install bookmark → open supported individual TopCV page → run bookmark → new local Add Job window receives content → optional extraction/manual review → save | Saved job detail in the new window |
-| VietnamWorks bookmarklet | Same bookmarklet card | Install bookmark → open supported individual job, expand required content → run bookmark → receive/preview → review → save | Saved job detail in the new window |
-| Paste description | Add Job → Paste JD | Paste recruitment text (up to 12,000 characters) → optional Extract with AI → Review & Save; without extraction, enter required title manually | Saved job detail |
-| Upload PDF/DOCX | Add Job → Upload JD | Select supported file → automatic text preview → optional extraction/manual review → save | Saved job detail with original document preserved |
+| Method                   | Entry point                  | Main steps                                                                                                                                                    | Destination                                          |
+| ------------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Public-feed discovery    | Inbox → expand Discover Jobs | Choose stacks/preferences → Discover Jobs → inspect counts/errors                                                                                             | Up to 50 new records saved directly; Inbox reloads   |
+| ITviec direct URL        | Add Job → Job URL (default)  | Paste individual HTTPS ITviec URL → Fetch from URL → preview → optional AI extraction or manual review → confirm save                                         | Saved job detail; return to Inbox through navigation |
+| TopCV bookmarklet        | Add Job → Bookmarklet        | Install bookmark → open supported individual TopCV page → run bookmark → new local Add Job window receives content → optional extraction/manual review → save | Saved job detail in the new window                   |
+| VietnamWorks bookmarklet | Same bookmarklet card        | Install bookmark → open supported individual job, expand required content → run bookmark → receive/preview → review → save                                    | Saved job detail in the new window                   |
+| Paste description        | Add Job → Paste JD           | Paste recruitment text (up to 12,000 characters) → optional Extract with AI → Review & Save; without extraction, enter required title manually                | Saved job detail                                     |
+| Upload PDF/DOCX          | Add Job → Upload JD          | Select supported file → automatic text preview → optional extraction/manual review → save                                                                     | Saved job detail with original document preserved    |
 
 Evidence: `apps/web/src/features/inbox/JobInbox.tsx:34`, `DiscoverJobs.tsx`, `ImportMethodCards.tsx`, `JobEditor.tsx:176,230,365,764`, `TopcvBookmarkletInstall.tsx`, and `topcv-bookmarklet.ts:431` (web paths in this report are under `apps/web/src/features/inbox/` unless fully qualified).
 
@@ -88,12 +88,12 @@ Evidence: `apps/web/src/features/inbox/JobInbox.tsx:34`, `DiscoverJobs.tsx`, `Im
 
 ### Duplicate handling: confirmed rules and limits
 
-| Operation | Detection | Result |
-| --- | --- | --- |
-| Discovery | Same source name + source job ID; normalized URL; or folded company + title + normalized location | Skip existing record; count duplicates. Transaction/advisory lock serializes discovery imports; existing records are not updated |
-| Individual create | Nonempty normalized URL only, regardless of selected Source | 409 before insert; existing record unchanged; no direct record link |
-| Individual create with no matching URL | No title/company/source-ID comparison | New row can be created, including a repeat paste/upload without a URL |
-| Edit existing record | No duplicate URL comparison | Updates the explicitly addressed record; can make its URL match another record, without merging or overwriting that other record |
+| Operation                              | Detection                                                                                         | Result                                                                                                                           |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Discovery                              | Same source name + source job ID; normalized URL; or folded company + title + normalized location | Skip existing record; count duplicates. Transaction/advisory lock serializes discovery imports; existing records are not updated |
+| Individual create                      | Nonempty normalized URL only, regardless of selected Source                                       | 409 before insert; existing record unchanged; no direct record link                                                              |
+| Individual create with no matching URL | No title/company/source-ID comparison                                                             | New row can be created, including a repeat paste/upload without a URL                                                            |
+| Edit existing record                   | No duplicate URL comparison                                                                       | Updates the explicitly addressed record; can make its URL match another record, without merging or overwriting that other record |
 
 `apps/api/src/discovery/discovery.ts:118` normalizes by removing hash, selected tracking parameters, `www.` and trailing slash, sorting remaining query parameters, and comparing host/path/query (not scheme). It does not equate all alternate job links. `duplicateJob` at line 132 adds discovery identity and company/title/location matching. Creation and update are in `opportunities.service.ts:110,136`.
 
@@ -106,16 +106,16 @@ Evidence: `apps/web/src/features/inbox/JobInbox.tsx:34`, `DiscoverJobs.tsx`, `Im
 
 ### Source reliability coverage
 
-| Scenario | Inspected behavior / recovery | Audit assessment |
-| --- | --- | --- |
-| Unsupported/malformed URL | Frontend disables fetch and explains supported ITviec path or alternate method; backend validates independently | Generally actionable; generic backend validation text still mentions TopCV although live direct transport rejects it |
-| Fetch failure, redirect, blocked page, timeout | Bounded five-second fetch, safe messages generally suggest paste; preview errors retain inputs | Existing recovery is useful; repeat-fetch semantics are P5-UX-01 |
-| Missing/invalid bookmarklet payload | Origin/window/nonce checks; 30-second timeout; retry/manual-import guidance; source-page alert for blocked popup | Security preserved; real browser behavior unverified |
-| Empty/invalid pasted description | Whitespace-only text without document disables extraction; server enforces text type, 12,000-character bound and presence | Manual entry remains allowed with required title. Arbitrary nonempty text is not necessarily a valid JD; extraction/manual review handles it, with no quality guarantee |
-| Wrong extension, empty/oversized file | Frontend rejects non-PDF/DOCX, zero bytes or over 5 MiB; backend independently bounds/validates | Helpful format/size guidance; no new environment needed |
-| Malformed, scanned or otherwise unsupported document | Preview parse errors, detailed DOCX recovery and documented 20-page PDF/no-OCR limits | Failed-file retention creates P5-UX-02 |
-| Extraction error | AI failure returns retained source text and manual/retry guidance; review can proceed; parse failure occurs earlier | No Ollama call made in this audit; busy 503 loses specific guidance (P5-UX-06) |
-| Save failure | Form/file retained; duplicate 409 is shown; storage 5xx gets safe API/retry message | No automatic overwrite; field validation and duplicate navigation need improvement |
+| Scenario                                             | Inspected behavior / recovery                                                                                             | Audit assessment                                                                                                                                                        |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unsupported/malformed URL                            | Frontend disables fetch and explains supported ITviec path or alternate method; backend validates independently           | Generally actionable; generic backend validation text still mentions TopCV although live direct transport rejects it                                                    |
+| Fetch failure, redirect, blocked page, timeout       | Bounded five-second fetch, safe messages generally suggest paste; preview errors retain inputs                            | Existing recovery is useful; repeat-fetch semantics are P5-UX-01                                                                                                        |
+| Missing/invalid bookmarklet payload                  | Origin/window/nonce checks; 30-second timeout; retry/manual-import guidance; source-page alert for blocked popup          | Security preserved; real browser behavior unverified                                                                                                                    |
+| Empty/invalid pasted description                     | Whitespace-only text without document disables extraction; server enforces text type, 12,000-character bound and presence | Manual entry remains allowed with required title. Arbitrary nonempty text is not necessarily a valid JD; extraction/manual review handles it, with no quality guarantee |
+| Wrong extension, empty/oversized file                | Frontend rejects non-PDF/DOCX, zero bytes or over 5 MiB; backend independently bounds/validates                           | Helpful format/size guidance; no new environment needed                                                                                                                 |
+| Malformed, scanned or otherwise unsupported document | Preview parse errors, detailed DOCX recovery and documented 20-page PDF/no-OCR limits                                     | Failed-file retention creates P5-UX-02                                                                                                                                  |
+| Extraction error                                     | AI failure returns retained source text and manual/retry guidance; review can proceed; parse failure occurs earlier       | No Ollama call made in this audit; busy 503 loses specific guidance (P5-UX-06)                                                                                          |
+| Save failure                                         | Form/file retained; duplicate 409 is shown; storage 5xx gets safe API/retry message                                       | No automatic overwrite; field validation and duplicate navigation need improvement                                                                                      |
 
 Additional evidence: `apps/api/src/opportunities/job-url-import.ts:322`, `job-url.transport.ts`, `job-import.upload.ts`, `job-import.service.ts`, `job-document.error.ts`, `opportunities.controller.ts` (`parse`); `SourceJdPreview.tsx`, `TopcvBookmarkletInstall.tsx`.
 

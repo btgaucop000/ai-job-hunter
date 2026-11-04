@@ -6,16 +6,16 @@ Approved direction: **Discover → persistent queue → user review → explicit
 
 ## 1. Current architecture and side effects
 
-| Layer / reference | Current behavior |
-| --- | --- |
-| `apps/web/src/app/App.tsx`, `features/inbox/DiscoverJobsPage.tsx` | `/discover` is a navigation destination with PageHeader and outlined Paper. Inbox is separate. |
-| `apps/web/src/features/inbox/DiscoverJobs.tsx`, `opportunities-api.ts` | Local form state; explicit POST `/api/v1/opportunities/discover`; sends location, stacks, workMode, seniority. Displays counts/errors and View Job Inbox. No persistent candidate state. |
-| `apps/api/src/opportunities/opportunities.controller.ts` — `discover`, `localWrite`, `OpportunityErrors` | Validates local write origin/host, delegates to DiscoveryService, returns no-store responses and safe errors. Owner is server-selected, not request-provided. |
-| `apps/api/src/discovery/discovery.service.ts` — `discover` | Validates filters; process-local active flag returns 409 for overlapping calls in that instance; reads sources sequentially, collects failures, normalizes, ranks, then calls `OpportunitiesService.importDiscovered`. |
-| `apps/api/src/discovery/greenhouse.source.ts` | Fixed Axon and Backbase Greenhouse boards, no user-supplied destinations or redirects. Validates positive numeric source ID, title, bounded content and allowed HTTPS Greenhouse job URL. Invalid rows are omitted and counted. Plain-text description and source-derived skills/metadata are retained. |
-| `apps/api/src/discovery/discovery.ts` | Stack OR eligibility; explicit foreign locations excluded; unknown/global/remote eligibility retained. Location/work mode/seniority rank locally. Rank descending then title determines import order. Contains `normalizedUrl`, `folded`, `duplicateJob`. |
-| `apps/api/src/opportunities/opportunities.service.ts` — `importDiscovered` | Owner-scoped transaction and advisory lock; reads existing opportunities, skips duplicates, inserts at most 50 new jobs with status SAVED and source Website; returns imported IDs/count, duplicates, remaining. Does not modify existing jobs. |
-| `opportunity.entity.ts`, `database/migrations/1793510000000-JobDiscovery.ts` | Discovery attribution is nullable JSONB on Inbox records, not a separate queue. Includes source name/ID/feed URL, discovery timestamp, technology/requirements metadata. |
+| Layer / reference                                                                                        | Current behavior                                                                                                                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/app/App.tsx`, `features/inbox/DiscoverJobsPage.tsx`                                        | `/discover` is a navigation destination with PageHeader and outlined Paper. Inbox is separate.                                                                                                                                                                                                          |
+| `apps/web/src/features/inbox/DiscoverJobs.tsx`, `opportunities-api.ts`                                   | Local form state; explicit POST `/api/v1/opportunities/discover`; sends location, stacks, workMode, seniority. Displays counts/errors and View Job Inbox. No persistent candidate state.                                                                                                                |
+| `apps/api/src/opportunities/opportunities.controller.ts` — `discover`, `localWrite`, `OpportunityErrors` | Validates local write origin/host, delegates to DiscoveryService, returns no-store responses and safe errors. Owner is server-selected, not request-provided.                                                                                                                                           |
+| `apps/api/src/discovery/discovery.service.ts` — `discover`                                               | Validates filters; process-local active flag returns 409 for overlapping calls in that instance; reads sources sequentially, collects failures, normalizes, ranks, then calls `OpportunitiesService.importDiscovered`.                                                                                  |
+| `apps/api/src/discovery/greenhouse.source.ts`                                                            | Fixed Axon and Backbase Greenhouse boards, no user-supplied destinations or redirects. Validates positive numeric source ID, title, bounded content and allowed HTTPS Greenhouse job URL. Invalid rows are omitted and counted. Plain-text description and source-derived skills/metadata are retained. |
+| `apps/api/src/discovery/discovery.ts`                                                                    | Stack OR eligibility; explicit foreign locations excluded; unknown/global/remote eligibility retained. Location/work mode/seniority rank locally. Rank descending then title determines import order. Contains `normalizedUrl`, `folded`, `duplicateJob`.                                               |
+| `apps/api/src/opportunities/opportunities.service.ts` — `importDiscovered`                               | Owner-scoped transaction and advisory lock; reads existing opportunities, skips duplicates, inserts at most 50 new jobs with status SAVED and source Website; returns imported IDs/count, duplicates, remaining. Does not modify existing jobs.                                                         |
+| `opportunity.entity.ts`, `database/migrations/1793510000000-JobDiscovery.ts`                             | Discovery attribution is nullable JSONB on Inbox records, not a separate queue. Includes source name/ID/feed URL, discovery timestamp, technology/requirements metadata.                                                                                                                                |
 
 Other side effects and bounds to retain:
 
@@ -29,17 +29,17 @@ Other side effects and bounds to retain:
 
 Add one table, `ai_job_hunter.discovery_candidates`, owned by discovery. Keep Inbox `opportunities` and its statuses unchanged. No run-history table, worker, scheduler, shared browser entity, or new dependency.
 
-| Column | Proposed type / purpose |
-| --- | --- |
-| `id` | UUID primary key, generated as existing entities are |
-| `ownerId` | UUID, server-selected local owner |
-| `sourceKey` | Bounded text stable key: `greenhouse:axon` or `greenhouse:workatbackbase`; independent of display labels |
-| `sourceJobId` | Bounded nonempty text; current adapters emit positive integer strings |
-| `status` | varchar with CHECK: NEW, SEEN, SAVED, DISMISSED; default NEW |
-| `snapshot` | JSONB containing bounded validated `DiscoveredJob` fields and attribution, rendered only as text; application validation on writes, DB object check |
-| `firstSeenAt`, `lastSeenAt` | timestamptz; first retained, last updated monotonically on eligible rescan |
-| `updatedAt` | timestamptz for snapshot/status/link changes; not queue sort priority |
-| `opportunityId` | Nullable UUID FK to opportunities, ON DELETE RESTRICT; many candidates may link to one Inbox job |
+| Column                      | Proposed type / purpose                                                                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                        | UUID primary key, generated as existing entities are                                                                                                |
+| `ownerId`                   | UUID, server-selected local owner                                                                                                                   |
+| `sourceKey`                 | Bounded text stable key: `greenhouse:axon` or `greenhouse:workatbackbase`; independent of display labels                                            |
+| `sourceJobId`               | Bounded nonempty text; current adapters emit positive integer strings                                                                               |
+| `status`                    | varchar with CHECK: NEW, SEEN, SAVED, DISMISSED; default NEW                                                                                        |
+| `snapshot`                  | JSONB containing bounded validated `DiscoveredJob` fields and attribution, rendered only as text; application validation on writes, DB object check |
+| `firstSeenAt`, `lastSeenAt` | timestamptz; first retained, last updated monotonically on eligible rescan                                                                          |
+| `updatedAt`                 | timestamptz for snapshot/status/link changes; not queue sort priority                                                                               |
+| `opportunityId`             | Nullable UUID FK to opportunities, ON DELETE RESTRICT; many candidates may link to one Inbox job                                                    |
 
 Constraints/indexes: unique `(ownerId, sourceKey, sourceJobId)`; CHECK `lastSeenAt >= firstSeenAt`; CHECK `(status = 'SAVED') = (opportunityId IS NOT NULL)`; queue index `(ownerId, status, firstSeenAt DESC, id)`. A simple FK plus owner-scoped service lookup enforces the link in this single-owner app; cross-owner link rejection must be tested. No unique opportunityId: equivalent source listings may share an existing job. No URL or company/title unique constraint.
 
@@ -53,14 +53,14 @@ Create a small DiscoveryModule for its entity, service and controller. Export th
 
 Exact missing/unstable URL policy:
 
-| Input | MVP handling |
-| --- | --- |
-| Missing, invalid or unsafe URL, even with stable ID | Keep current Greenhouse rejection/invalid-row count. Do not create a URL-less candidate or invent a URL. |
-| Missing/invalid provider ID, even with safe URL | Keep current rejection. No title/company fingerprint fallback. |
+| Input                                                     | MVP handling                                                                                                                                                                       |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing, invalid or unsafe URL, even with stable ID       | Keep current Greenhouse rejection/invalid-row count. Do not create a URL-less candidate or invent a URL.                                                                           |
+| Missing/invalid provider ID, even with safe URL           | Keep current rejection. No title/company fingerprint fallback.                                                                                                                     |
 | Same source ID with changed valid URL/tracking parameters | Same candidate, lastSeenAt updated; original snapshot/link retained. Warn in documentation that links are snapshots, not verified-live URLs. No fetch solely to resolve redirects. |
-| New provider ID with same normalized URL | Separate source candidate; Save resolves against existing Inbox records. |
-| New ID and changed URL but same company/title/location | Separate candidate; existing heuristic can identify a possible Inbox match at Save, subject to ambiguity rules below. No automatic merging of queue review states. |
-| Same ID on a different board | Separate candidate. Source identity is namespaced, not a global numeric ID. |
+| New provider ID with same normalized URL                  | Separate source candidate; Save resolves against existing Inbox records.                                                                                                           |
+| New ID and changed URL but same company/title/location    | Separate candidate; existing heuristic can identify a possible Inbox match at Save, subject to ambiguity rules below. No automatic merging of queue review states.                 |
+| Same ID on a different board                              | Separate candidate. Source identity is namespaced, not a global numeric ID.                                                                                                        |
 
 This deliberately separates **queue identity** from **Inbox duplicate matching**. Reusing `duplicateJob` as a unique candidate key would conflate different openings and cannot consistently represent several source IDs in one row. A true cross-source canonical candidate would require aliases/merge policy beyond this minimum design. Approval is needed for the resulting visible separate source listings; sources, eligibility, ranking and the 50-new-row cap otherwise remain unchanged.
 
@@ -78,12 +78,12 @@ Existing Inbox records are never moved, overwritten or demoted. New candidates s
 
 ## 4. States and explicit actions
 
-| Current state | Mark as seen | Dismiss | Save to Inbox |
-| --- | --- | --- | --- |
-| NEW | SEEN | DISMISSED | Atomic create/link → SAVED |
-| SEEN | No-op SEEN | DISMISSED | Atomic create/link → SAVED |
-| DISMISSED | 409 invalid transition | No-op DISMISSED | Explicit save allowed → SAVED |
-| SAVED | 409 invalid transition | 409 invalid transition | Return original link, no-op |
+| Current state | Mark as seen           | Dismiss                | Save to Inbox                 |
+| ------------- | ---------------------- | ---------------------- | ----------------------------- |
+| NEW           | SEEN                   | DISMISSED              | Atomic create/link → SAVED    |
+| SEEN          | No-op SEEN             | DISMISSED              | Atomic create/link → SAVED    |
+| DISMISSED     | 409 invalid transition | No-op DISMISSED        | Explicit save allowed → SAVED |
+| SAVED         | 409 invalid transition | 409 invalid transition | Return original link, no-op   |
 
 GET/list/opening details, refresh, pagination, source-site opening and rescan never mark SEEN. No “mark new,” undismiss, bulk transition or hard-delete operation in MVP. Allowing explicit save from Dismissed is the proposed minimal recovery path and needs approval. SAVED is queue linkage, not the opportunity's application status; an Inbox job may later be APPLIED/CLOSED without changing its candidate.
 
@@ -91,13 +91,13 @@ GET/list/opening details, refresh, pagination, source-site opening and rescan ne
 
 All paths below are under `/api/v1`; use JSON, UUID validation, bounded enum/query parsing, owner scope, local-write checks on mutations, no-store responses and safe errors. Bodies reject unknown fields. Clients cannot supply owner, snapshot, source ID or opportunityId when saving/updating state.
 
-| Endpoint | Request | Response / semantics |
-| --- | --- | --- |
-| `POST /discovery/runs` | Existing `{location, stacks, workMode, seniority}` unchanged | 200 `{found, added, refreshed, remaining, errors: string[], scannedAt, scope}`. Queue writes only; no imported IDs or Inbox counts. |
-| `GET /discovery/candidates?filter=to-review&page=1` | filter: to-review/new/seen/saved/dismissed/all; positive safe integer page; fixed size 10 | 200 `{items, page, pageSize:10, total, totalPages}`. No source fetch and no mutation. |
-| `GET /discovery/candidates/:id` | UUID | 200 full candidate DTO for review; 404 absent/other owner. |
-| `PATCH /discovery/candidates/:id/status` | `{status:'SEEN'\|'DISMISSED'}` | 200 current candidate DTO, including no-op retry; 409 invalid transition. SAVED cannot be set here. |
-| `POST /discovery/candidates/:id/save` | Empty body | 200 `{candidateId, status:'SAVED', opportunityId, outcome:'created'\|'linked_existing'\|'already_saved'}` on first call and repeats. Link is `/jobs/:opportunityId`. |
+| Endpoint                                            | Request                                                                                   | Response / semantics                                                                                                                                                 |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /discovery/runs`                              | Existing `{location, stacks, workMode, seniority}` unchanged                              | 200 `{found, added, refreshed, remaining, errors: string[], scannedAt, scope}`. Queue writes only; no imported IDs or Inbox counts.                                  |
+| `GET /discovery/candidates?filter=to-review&page=1` | filter: to-review/new/seen/saved/dismissed/all; positive safe integer page; fixed size 10 | 200 `{items, page, pageSize:10, total, totalPages}`. No source fetch and no mutation.                                                                                |
+| `GET /discovery/candidates/:id`                     | UUID                                                                                      | 200 full candidate DTO for review; 404 absent/other owner.                                                                                                           |
+| `PATCH /discovery/candidates/:id/status`            | `{status:'SEEN'\|'DISMISSED'}`                                                            | 200 current candidate DTO, including no-op retry; 409 invalid transition. SAVED cannot be set here.                                                                  |
+| `POST /discovery/candidates/:id/save`               | Empty body                                                                                | 200 `{candidateId, status:'SAVED', opportunityId, outcome:'created'\|'linked_existing'\|'already_saved'}` on first call and repeats. Link is `/jobs/:opportunityId`. |
 
 List DTO: id, status, title, company, location, workMode, seniority, originalLink, sourceName, firstSeenAt, lastSeenAt, opportunityId. Detail adds full plain-text description, skills/preferredSkills and source attribution. Review is read-only in this minimum version; edits remain available on the saved Inbox record. Do not route candidate review through the existing Add Job create endpoint: it would bypass atomic linking/idempotency.
 
