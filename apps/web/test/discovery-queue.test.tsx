@@ -354,11 +354,14 @@ test('queue errors can retry and server-clamped pages replace the URL', async ()
   await userEvent.click(
     await screen.findByRole('button', { name: 'Retry queue' }),
   );
-  expect(
-    await screen.findByRole('button', { name: 'Review Synthetic role 1' }),
-  ).toBeVisible();
   await waitFor(() =>
     expect(router.state.location.search).toBe('?filter=new&page=1'),
+  );
+  // Clamping starts another request; query the current DOM on each retry.
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Review Synthetic role 1' }),
+    ).toBeVisible(),
   );
   expect(screen.getByText('1–1 of 1')).toBeVisible();
 });
