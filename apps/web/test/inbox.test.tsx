@@ -21,7 +21,7 @@ function mount(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/dashboard" element={<JobInbox />} />
+        <Route path="/jobs" element={<JobInbox />} />
         <Route path="/jobs/new" element={<JobEditor />} />
         <Route path="/jobs/:id" element={<JobEditor />} />
       </Routes>
@@ -31,14 +31,14 @@ function mount(path: string) {
 test('lists persisted jobs again after remount (refresh)', async () => {
   const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify([row])));
   vi.stubGlobal('fetch', fetch);
-  const first = mount('/dashboard');
+  const first = mount('/jobs');
   expect(await screen.findByText('Synthetic engineer')).toBeVisible();
   expect(
     screen.queryByText('2026-11-02') ?? screen.getByTitle('2026-11-02'),
   ).toBeVisible();
   first.unmount();
   fetch.mockResolvedValue(new Response(JSON.stringify([row])));
-  mount('/dashboard');
+  mount('/jobs');
   expect(await screen.findByText('Synthetic engineer')).toBeVisible();
   expect(fetch).toHaveBeenCalledTimes(2);
 });
@@ -433,7 +433,7 @@ test('dirty chip stays in metadata and save success is a dismissible notificatio
   });
   expect(chip).toBeVisible();
   expect(chip.parentElement).toBe(metadata);
-  expect(metadata).toHaveTextContent('Unknown seniority');
+  expect(metadata).not.toHaveTextContent('Unknown seniority');
   expect(screen.getByRole('tablist')).toBe(tabs);
   vi.useFakeTimers();
   try {
@@ -522,7 +522,7 @@ test('empty Inbox keeps primary Add and outlined task navigation alternatives', 
     'fetch',
     vi.fn(async () => Response.json([])),
   );
-  mount('/dashboard');
+  mount('/jobs');
   await screen.findByText('No saved opportunities yet');
   expect(screen.getByRole('link', { name: 'Discover Jobs' })).toHaveClass(
     'MuiButton-outlined',

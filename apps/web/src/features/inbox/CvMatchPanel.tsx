@@ -1,4 +1,15 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { CvSuggestionsSection } from './CvSuggestionsSection';
+import { type MatchResult, statusLabel } from './cv-match.types';
+import { validSourceDate } from './cv-suggestions.contract';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type Ref,
+} from 'react';
 import {
   Accordion,
   AccordionDetails,
@@ -21,64 +32,48 @@ interface SavedCv {
   fileName: string;
   updatedAt: string;
 }
-interface MatchResult {
-  score: number | null;
-  recommendation: string;
-  explanation: string;
-  advice: string;
-  analyzedAt: string;
-  requirements: {
-    requirement: string;
-    priority: string;
-    category: string;
-    jdQuote: string;
-    cvQuote: string;
-    status: 'EVIDENCED' | 'PARTIAL' | 'NOT_EVIDENCED' | 'CONFLICT';
-    coverage?: {
-      mode: 'SINGLE' | 'AND' | 'OR' | 'UNKNOWN';
-      reason: string;
-      credit: number;
-      components: {
-        id: string;
-        label: string;
-        jdQuote: string;
-        cvQuote: string;
-        status: 'EVIDENCED' | 'NOT_EVIDENCED' | 'CONFLICT';
-        conflictingQuotes: string[];
-      }[];
-    };
-  }[];
+
+interface MatchInspection {
+  inspect: (parentId: string) => boolean;
 }
-const statusLabel = (status: MatchResult['requirements'][number]['status']) =>
-  ({
-    EVIDENCED: 'Matched',
-    PARTIAL: 'Partial',
-    NOT_EVIDENCED: 'Unknown',
-    CONFLICT: 'Conflict / Needs review',
-  })[status];
 
 export function CvMatchPanel({
   jobId,
   revision,
+  view = 'match',
+  jobDirty = false,
+  onGoToMatch,
 }: {
   jobId: string;
   revision: string;
+  view?: 'match' | 'improve' | 'hidden';
+  jobDirty?: boolean;
+  onGoToMatch?: () => void;
 }) {
   const generation = useRef(0);
+  const inspection = useRef<MatchInspection>(null);
+  const [contextRejected, setContextRejected] = useState(false);
+  const rejectContext = useCallback(() => setContextRejected(true), []);
   const [cv, setCv] = useState<SavedCv | null>(null);
   const [busy, setBusy] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestionEpoch, setSuggestionEpoch] = useState(0);
   const [error, setError] = useState('');
   const [result, setResult] = useState<MatchResult | null>(null);
   const [source, setSource] = useState({ jobId, revision });
   if (source.jobId !== jobId || source.revision !== revision) {
     setSource({ jobId, revision });
     setResult(null);
+    setBusy(false);
+    setSuggesting(false);
+    setContextRejected(false);
   }
   useEffect(() => {
-    const request = ++generation.current;
-    return () => {
-      generation.current = request + 1;
+    const invalidateRequests = () => {
+      generation.current++;
     };
+    invalidateRequests();
+    return invalidateRequests;
   }, [jobId, revision]);
   useEffect(() => {
     let active = true;
@@ -94,25 +89,39 @@ export function CvMatchPanel({
       active = false;
     };
   }, [jobId]);
+  useEffect(() => {
+    if (!result || !validSourceDate(result.analyzedAt)) return;
+    const timer = setTimeout(
+      rejectContext,
+      Math.max(0, Date.parse(result.analyzedAt) + 15 * 60 * 1000 - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [result, rejectContext]);
   async function upload(file: File) {
+    const request = ++generation.current;
+    setSuggestionEpoch((value) => value + 1);
     setBusy(true);
     setError('');
     try {
-      setCv(
-        await opportunityRequest<SavedCv>('/cv/current', {
-          method: 'POST',
-          body: importUpload({}, file),
-        }),
-      );
-      setResult(null);
+      const saved = await opportunityRequest<SavedCv>('/cv/current', {
+        method: 'POST',
+        body: importUpload({}, file),
+      });
+      if (request === generation.current) {
+        setCv(saved);
+        setResult(null);
+      }
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'CV upload failed.');
+      if (request === generation.current)
+        setError(error instanceof Error ? error.message : 'CV upload failed.');
     } finally {
-      setBusy(false);
+      if (request === generation.current) setBusy(false);
     }
   }
   async function analyze() {
-    const request = generation.current;
+    setContextRejected(true);
+    const request = ++generation.current;
+    setSuggestionEpoch((value) => value + 1);
     setBusy(true);
     setError('');
     try {
@@ -155,7 +164,10 @@ export function CvMatchPanel({
         throw new Error(
           'The API returned an invalid matching result. Retry; no new fit score was produced.',
         );
-      if (request === generation.current) setResult(value);
+      if (request === generation.current) {
+        setResult(value);
+        setContextRejected(false);
+      }
     } catch (error) {
       if (request === generation.current)
         setError(
@@ -164,103 +176,146 @@ export function CvMatchPanel({
             : 'CV matching failed. Check the local API and retry.',
         );
     } finally {
-      setBusy(false);
+      if (request === generation.current) setBusy(false);
     }
   }
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, minWidth: 0 }}>
-      <Stack spacing={2}>
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={2}
-          sx={{
-            justifyContent: 'space-between',
-            alignItems: { sm: 'flex-start' },
-          }}
-        >
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="h6" component="h2">
-              CV–JD match
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Your documented experience, compared with this opportunity.
-            </Typography>
-          </Box>
-          <Button
-            variant={result ? 'outlined' : 'contained'}
-            disableElevation
-            disabled={busy || !cv}
-            onClick={() => void analyze()}
-            sx={{
-              textTransform: 'none',
-              flexShrink: 0,
-              alignSelf: 'flex-start',
-            }}
-          >
-            {result ? 'Reanalyze CV Match' : 'Analyze CV Match'}
-          </Button>
-        </Stack>
-        <Box>
-          <Stack
-            direction="row"
-            spacing={1}
-            useFlexGap
-            sx={{ alignItems: 'center', flexWrap: 'wrap' }}
-          >
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ overflowWrap: 'anywhere', minWidth: 0 }}
+    <>
+      <Box
+        role="tabpanel"
+        id="job-panel-1"
+        aria-labelledby="job-tab-1"
+        hidden={view !== 'match'}
+      >
+        <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, minWidth: 0 }}>
+          <Stack spacing={2}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              sx={{
+                justifyContent: 'space-between',
+                alignItems: { sm: 'flex-start' },
+              }}
             >
-              {cv ? `Saved CV: ${cv.fileName}` : 'No saved CV yet.'}
-            </Typography>
-            <Button
-              component="label"
-              size="small"
-              disabled={busy}
-              sx={{ textTransform: 'none', flexShrink: 0 }}
-            >
-              {cv ? 'Replace CV' : 'Save CV'}
-              <input
-                disabled={busy}
-                hidden
-                type="file"
-                accept=".pdf,.docx"
-                aria-label="Save CV for matching"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = '';
-                  if (file) void upload(file);
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="h6" component="h2">
+                  CV–JD match
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  Your documented experience, compared with this opportunity.
+                </Typography>
+              </Box>
+              <Button
+                variant={result ? 'outlined' : 'contained'}
+                disableElevation
+                disabled={busy || suggesting || !cv}
+                onClick={() => void analyze()}
+                sx={{
+                  textTransform: 'none',
+                  flexShrink: 0,
+                  alignSelf: 'flex-start',
                 }}
+              >
+                {result ? 'Reanalyze CV Match' : 'Analyze CV Match'}
+              </Button>
+            </Stack>
+            <Box>
+              <Stack
+                direction="row"
+                spacing={1}
+                useFlexGap
+                sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+              >
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ overflowWrap: 'anywhere', minWidth: 0 }}
+                >
+                  {cv ? `Saved CV: ${cv.fileName}` : 'No saved CV yet.'}
+                </Typography>
+                <Button
+                  component="label"
+                  size="small"
+                  disabled={busy || suggesting}
+                  sx={{ textTransform: 'none', flexShrink: 0 }}
+                >
+                  {cv ? 'Replace CV' : 'Save CV'}
+                  <input
+                    disabled={busy || suggesting}
+                    hidden
+                    type="file"
+                    accept=".pdf,.docx"
+                    aria-label="Save CV for matching"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      if (file) void upload(file);
+                    }}
+                  />
+                </Button>
+              </Stack>
+              <Typography variant="caption" color="text.secondary">
+                Uses the latest saved CV and job, not unsaved edits. Files parse
+                locally; analysis sends them to local Ollama.
+              </Typography>
+            </Box>
+            {busy && (
+              <Stack direction="row" spacing={1} role="status">
+                <CircularProgress size={20} />
+                <Typography>Processing locally…</Typography>
+              </Stack>
+            )}
+            {error && (
+              <Alert severity="error">
+                {error}
+                {result &&
+                  ' The last successful result is retained below; it does not reflect this failed attempt.'}
+              </Alert>
+            )}
+            {busy && result && (
+              <Typography variant="caption">
+                Previous successful result shown while reanalysis is running.
+              </Typography>
+            )}
+            {result && (
+              <MatchContent
+                key={result.matchId ?? result.analyzedAt}
+                result={result}
+                inspection={inspection}
               />
-            </Button>
+            )}
           </Stack>
-          <Typography variant="caption" color="text.secondary">
-            Uses the latest saved CV and job, not unsaved edits. Files parse
-            locally; analysis sends them to local Ollama.
-          </Typography>
-        </Box>
-        {busy && (
-          <Stack direction="row" spacing={1} role="status">
-            <CircularProgress size={20} />
-            <Typography>Processing locally…</Typography>
-          </Stack>
-        )}
-        {error && (
-          <Alert severity="error">
-            {error}
-            {result &&
-              ' The last successful result is retained below; it does not reflect this failed attempt.'}
-          </Alert>
-        )}
-        {busy && result && (
-          <Typography variant="caption">
-            Previous successful result shown while reanalysis is running.
-          </Typography>
-        )}
-        {result && <MatchContent key={result.analyzedAt} result={result} />}
-      </Stack>
-    </Paper>
+        </Paper>
+      </Box>
+      <Box
+        role="tabpanel"
+        id="job-panel-2"
+        aria-labelledby="job-tab-2"
+        hidden={view !== 'improve'}
+      >
+        <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, minWidth: 0 }}>
+          <CvSuggestionsSection
+            key={`${result?.matchId ?? 'none'}:${suggestionEpoch}:${contextRejected}`}
+            result={result}
+            jobId={jobId}
+            disabled={busy}
+            cvSaved={!!cv}
+            jobDirty={jobDirty}
+            rejected={contextRejected}
+            onBusyChange={setSuggesting}
+            onGoToMatch={() => onGoToMatch?.()}
+            onInvalidContext={rejectContext}
+            onInspect={(parentId) => {
+              if (inspection.current?.inspect(parentId)) onGoToMatch?.();
+            }}
+          />
+        </Paper>
+      </Box>
+    </>
   );
 }
 
@@ -286,17 +341,37 @@ function MatchIcon({ kind }: { kind: 'matched' | 'gap' | 'expand' }) {
   );
 }
 
-function MatchContent({ result }: { result: MatchResult }) {
+function MatchContent({
+  result,
+  inspection,
+}: {
+  result: MatchResult;
+  inspection: Ref<MatchInspection>;
+}) {
   const [filter, setFilter] = useState('all');
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
   const [target, setTarget] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
-  function inspect(index: number) {
+  const inspect = useCallback((index: number) => {
     setSelected(index);
     setFilter('all');
     setExpanded((previous) => new Set(previous).add(index));
     setTarget(index);
-  }
+  }, []);
+  useImperativeHandle(
+    inspection,
+    () => ({
+      inspect(parentId: string) {
+        const index = result.requirements.findIndex(
+          (row) => row.parentId === parentId,
+        );
+        if (index < 0) return false;
+        inspect(index);
+        return true;
+      },
+    }),
+    [result.requirements, inspect],
+  );
   return (
     <Stack spacing={3} sx={{ minWidth: 0 }}>
       <MatchOverview result={result} onInspect={inspect} />
@@ -510,7 +585,9 @@ function MatchOverview({
           empty="No unknown requirements reported."
           hint={
             requiredGaps.length
-              ? 'Required qualifications not evidenced in your CV'
+              ? requiredGaps.some(({ item }) => item.status === 'PARTIAL')
+                ? 'Required qualifications needing more evidence'
+                : 'Required qualifications not evidenced in your CV'
               : 'No required gaps reported. Preferred qualifications to review.'
           }
           onInspect={onInspect}
@@ -612,8 +689,23 @@ function validCoverage(value: unknown): boolean {
         typeof component.label === 'string' &&
         typeof component.jdQuote === 'string' &&
         typeof component.cvQuote === 'string' &&
-        ['EVIDENCED', 'NOT_EVIDENCED', 'CONFLICT'].includes(component.status) &&
-        (component.status !== 'EVIDENCED' || component.cvQuote.trim()) &&
+        ['EVIDENCED', 'PARTIAL', 'NOT_EVIDENCED', 'CONFLICT'].includes(
+          component.status,
+        ) &&
+        (!['EVIDENCED', 'PARTIAL'].includes(component.status) ||
+          component.cvQuote.trim()) &&
+        (component.observations === undefined ||
+          (Array.isArray(component.observations) &&
+            component.observations.length <= 2 &&
+            component.observations.every(
+              (observation) =>
+                observation &&
+                ['mention', 'experience'].includes(observation.kind) &&
+                typeof observation.cvQuote === 'string' &&
+                !!observation.cvQuote.trim(),
+            ))) &&
+        (component.qualificationReason === undefined ||
+          typeof component.qualificationReason === 'string') &&
         Array.isArray(component.conflictingQuotes) &&
         component.conflictingQuotes.every((quote) => typeof quote === 'string'),
     )
@@ -624,6 +716,11 @@ function isMatchResult(value: unknown): value is MatchResult {
   if (!value || typeof value !== 'object') return false;
   const row = value as Partial<MatchResult>;
   return (
+    (row.matchId === undefined ||
+      (typeof row.matchId === 'string' &&
+        /^[A-Za-z0-9_-]{1,100}$/u.test(row.matchId))) &&
+    (row.cvUpdatedAt === undefined || validSourceDate(row.cvUpdatedAt)) &&
+    (row.jobUpdatedAt === undefined || validSourceDate(row.jobUpdatedAt)) &&
     (row.score === null ||
       (typeof row.score === 'number' &&
         Number.isInteger(row.score) &&
@@ -637,6 +734,7 @@ function isMatchResult(value: unknown): value is MatchResult {
     row.requirements.every(
       (item) =>
         item &&
+        (item.parentId === undefined || typeof item.parentId === 'string') &&
         typeof item.requirement === 'string' &&
         typeof item.jdQuote === 'string' &&
         item.jdQuote.trim() &&
@@ -916,6 +1014,13 @@ function RequirementCard({
           <EvidenceQuote source="JD evidence" quote={item.jdQuote} />
           {item.cvQuote ? (
             <EvidenceQuote source="CV evidence" quote={item.cvQuote} />
+          ) : item.coverage?.components.some(
+              (component) => component.observations?.length,
+            ) ? (
+            <Typography variant="body2">
+              Relevant CV evidence is shown below; proficiency is not fully
+              verified.
+            </Typography>
           ) : (
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
@@ -940,7 +1045,15 @@ function RequirementCard({
                   (component) => component.status === 'EVIDENCED',
                 ).length
               }
-              /{item.coverage.components.length} components supported
+              /{item.coverage.components.length}{' '}
+              {item.coverage.components.some(
+                (component) => component.status === 'PARTIAL',
+              )
+                ? 'components fully supported'
+                : 'components supported'}
+              {item.coverage.components.some(
+                (component) => component.status === 'PARTIAL',
+              ) && ' · Partial evidence available'}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {item.coverage.reason}
@@ -955,13 +1068,35 @@ function RequirementCard({
                   label={`JD evidence: ${component.label}`}
                   quote={component.jdQuote}
                 />
-                {component.cvQuote ? (
+                {component.qualificationReason && (
+                  <Typography variant="body2">
+                    {component.qualificationReason}
+                  </Typography>
+                )}
+                {component.observations?.map((observation, index) => (
+                  <Box key={index} sx={{ mt: 1 }}>
+                    <Typography variant="body2">
+                      {observation.kind === 'experience'
+                        ? 'Verified professional experience'
+                        : 'Verified technology mention'}
+                    </Typography>
+                    <EvidenceQuote
+                      source="Original parsed CV passage"
+                      label={`${observation.kind === 'experience' ? 'Professional experience' : 'Technology mention'}: ${component.label}`}
+                      quote={observation.cvQuote}
+                    />
+                  </Box>
+                ))}
+                {component.cvQuote &&
+                !component.observations?.some(
+                  (observation) => observation.cvQuote === component.cvQuote,
+                ) ? (
                   <EvidenceQuote
                     source="CV evidence"
                     label={`CV evidence: ${component.label}`}
                     quote={component.cvQuote}
                   />
-                ) : (
+                ) : component.observations?.length ? null : (
                   <Typography variant="body2" color="text.secondary">
                     Not evidenced in CV
                   </Typography>
@@ -988,13 +1123,17 @@ function EvidenceQuote({
   label,
 }: {
   label?: string;
-  source: 'CV evidence' | 'JD evidence';
+  source: 'CV evidence' | 'JD evidence' | 'Original parsed CV passage';
   quote: string;
 }) {
   return (
     <Box>
       <Typography variant="subtitle2">
-        {source === 'CV evidence' ? 'Your CV' : 'Job description'}
+        {source === 'CV evidence'
+          ? 'Your CV'
+          : source === 'JD evidence'
+            ? 'Job description'
+            : source}
       </Typography>
       <Box
         component="blockquote"

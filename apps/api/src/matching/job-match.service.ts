@@ -1,3 +1,10 @@
+import { CvSuggestionsError } from './cv-suggestions.error.js';
+import {
+  CvSuggestionsService,
+  suggestionMatchId,
+  type CvSuggestionsResponse,
+} from './cv-suggestions.js';
+import { MatchContexts, type MatchSnapshot } from './match-context.js';
 import { AiError } from '../ai/ai.errors.js';
 import { CvMatchError } from './cv-match.error.js';
 import { MatchingService } from './matching.service.js';
@@ -5,6 +12,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  HttpException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -28,6 +36,26 @@ import {
 @Injectable()
 export class JobMatchService {
   private active = false;
+  private readonly contexts = new MatchContexts();
+
+  async requireSnapshot(id: string, matchId: string): Promise<MatchSnapshot> {
+    const cv = await this.cv();
+    const job = await this.jobs.get(id);
+    if (!cv)
+      throw new ConflictException(
+        'Saved CV is unavailable. Reanalyze CV Match.',
+      );
+    try {
+      return this.contexts.require(matchId, LOCAL_OWNER_ID, id, {
+        cvUpdatedAt: cv.updatedAt.toISOString(),
+        jobUpdatedAt: job.updatedAt.toISOString(),
+      });
+    } catch {
+      throw new ConflictException(
+        'Match context is unavailable or stale. Reanalyze CV Match.',
+      );
+    }
+  }
   constructor(
     @InjectRepository(SavedCv) private readonly cvs: Repository<SavedCv>,
     private readonly extraction: ExtractionService,
@@ -58,6 +86,63 @@ export class JobMatchService {
       throw new BadRequestException(
         'Could not save this CV. Use a text-based PDF or DOCX up to 5 MiB; the previous CV is retained.',
       );
+    }
+  }
+  private async recheckSuggestionSnapshot(
+    id: string,
+    matchId: string,
+    snapshot: MatchSnapshot,
+  ): Promise<void> {
+    try {
+      if ((await this.requireSnapshot(id, matchId)) !== snapshot)
+        throw new CvSuggestionsError('CV_SUGGESTIONS_STALE_MATCH');
+    } catch (error) {
+      if (
+        error instanceof HttpException &&
+        [404, 409].includes(error.getStatus())
+      )
+        throw new CvSuggestionsError('CV_SUGGESTIONS_STALE_MATCH');
+      throw error;
+    }
+  }
+  async suggest(id: string, body: unknown): Promise<CvSuggestionsResponse> {
+    const matchId = suggestionMatchId(body);
+    if (this.active) throw new CvSuggestionsError('CV_SUGGESTIONS_BUSY');
+    this.active = true;
+    try {
+      const snapshot = await this.requireSnapshot(id, matchId);
+      const cv = await this.cvs.findOne({
+        where: { ownerId: LOCAL_OWNER_ID },
+        select: { ownerId: true, text: true, updatedAt: true },
+      });
+      if (
+        !cv ||
+        !cv.text?.trim() ||
+        cv.updatedAt.toISOString() !== snapshot.cvUpdatedAt
+      )
+        throw new CvSuggestionsError('CV_SUGGESTIONS_STALE_MATCH');
+      await this.recheckSuggestionSnapshot(id, matchId, snapshot);
+      const service = new CvSuggestionsService(this.ai);
+      let result: CvSuggestionsResponse;
+      try {
+        result = await service.generate(snapshot, cv.text);
+      } catch (error) {
+        await this.recheckSuggestionSnapshot(id, matchId, snapshot);
+        throw error;
+      }
+      await this.recheckSuggestionSnapshot(id, matchId, snapshot);
+      return result;
+    } catch (error) {
+      if (error instanceof CvSuggestionsError) throw error;
+      if (error instanceof HttpException) {
+        if (error.getStatus() === 404)
+          throw new CvSuggestionsError('CV_SUGGESTIONS_JOB_NOT_FOUND');
+        if (error.getStatus() === 409)
+          throw new CvSuggestionsError('CV_SUGGESTIONS_STALE_MATCH');
+      }
+      throw new CvSuggestionsError('CV_SUGGESTIONS_UNAVAILABLE');
+    } finally {
+      this.active = false;
     }
   }
   async analyze(id: string) {
@@ -100,7 +185,7 @@ export class JobMatchService {
       try {
         output = await this.ai.generateStructured({
           prompt,
-          schema: matchOutputSchema(cv.text),
+          schema: matchOutputSchema(cv.text, canonical),
         });
       } catch (error) {
         if (error instanceof AiError && error.code === 'TIMEOUT')
@@ -135,8 +220,18 @@ export class JobMatchService {
         jd,
         canonical,
       );
+      const snapshot = this.contexts.create(
+        LOCAL_OWNER_ID,
+        id,
+        {
+          cvUpdatedAt: cv.updatedAt.toISOString(),
+          jobUpdatedAt: job.updatedAt.toISOString(),
+        },
+        result,
+      );
       return {
         ...result,
+        matchId: snapshot.matchId,
         cvUpdatedAt: cv.updatedAt,
         jobUpdatedAt: job.updatedAt,
         analyzedAt: new Date().toISOString(),

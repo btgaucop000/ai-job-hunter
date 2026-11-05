@@ -1,3 +1,9 @@
+import {
+  cvQuoteChoices,
+  resolveCvQuote,
+  databaseAttributedQuoteChoices,
+  databaseSemanticClauses,
+} from './cv-match.evidence.js';
 import { normalize } from './matching.policy.js';
 
 export type CoverageStatus =
@@ -10,8 +16,16 @@ export interface RequirementComponent {
 export interface RequirementGroup {
   mode: 'SINGLE' | 'AND' | 'OR' | 'UNKNOWN';
   components: RequirementComponent[];
-  context: 'skill' | 'design' | 'knowledge' | 'experience' | 'education';
+  context:
+    | 'skill'
+    | 'design'
+    | 'knowledge'
+    | 'experience'
+    | 'education'
+    | 'proficiency';
   personalDelivery?: true;
+  managedLanguage?: true;
+  aiFamiliarityOrInterest?: true;
   minimumYears?: number;
 }
 export interface ComponentEvidence {
@@ -20,9 +34,12 @@ export interface ComponentEvidence {
   cvQuote: string;
 }
 export interface ComponentCoverage extends RequirementComponent {
-  status: Exclude<CoverageStatus, 'PARTIAL'>;
+  status: CoverageStatus;
   cvQuote: string;
   conflictingQuotes: string[];
+  // Original source observations; mentions alone never authorize credit or copying.
+  observations?: { kind: 'mention' | 'experience'; cvQuote: string }[];
+  qualificationReason?: string;
 }
 
 // Keep prose clauses whole; only bare comma/semicolon skill lists are independent
@@ -61,6 +78,15 @@ export function requirementGroup(
     })),
   });
   if (category !== 'skill') return group('SINGLE', [text]);
+  if (
+    /^Familiarity with or interest in AI-assisted development tools, code generation, and automation workflows$/iu.test(
+      text,
+    )
+  )
+    return {
+      ...group('OR', ['Familiarity', 'interest'], 'knowledge'),
+      aiFamiliarityOrInterest: true,
+    };
   const duration =
     /^(?:(?:minimum|at least)\s+)?(\d+)\+? years? (?:of )?experience (?:with|in) (.+)$/iu.exec(
       text,
@@ -105,16 +131,40 @@ export function requirementGroup(
       'experience',
       true,
     );
+  // Recognize the one-of quantifier only inside this database/proficiency
+  // grammar, before the conservative unresolved-quantity fallback below.
+  const databaseAlternatives =
+    /^(?:thành thạo|sử dụng thành thạo)\s+(?:ít nhất một(?: trong(?: các)?)?|một trong(?: các)?)\s+(?:hệ quản trị cơ sở dữ liệu|cơ sở dữ liệu)(?: sau)?\s*:\s*(.+)$/iu.exec(
+      text,
+    );
+  if (databaseAlternatives) {
+    const labels = databaseAlternatives[1]!
+      .split(/[,;/]\s*(?:(?:or|hoặc)\s+)?|\s+(?:or|hoặc)\s+/iu)
+      .map((label) => label.trim())
+      .filter(Boolean);
+    if (
+      labels.length >= 2 &&
+      labels.length <= 20 &&
+      labels.every((label) => databaseName.test(label))
+    )
+      return group('OR', labels, 'proficiency');
+    return group('UNKNOWN', [text]);
+  }
   if (singleManagedLanguage.test(text)) return group('SINGLE', [text]);
   const languages = /\bat least one managed language such as (.+)$/iu.exec(
     text,
   );
   if (languages)
-    return group(
-      'OR',
-      languages[1]!.replace(/,?\s+or similar$/iu, '').split(/,\s*|\s+or\s+/iu),
-      'experience',
-    );
+    return {
+      ...group(
+        'OR',
+        languages[1]!
+          .replace(/,?\s+or similar$/iu, '')
+          .split(/,\s*|\s+or\s+/iu),
+        'experience',
+      ),
+      managedLanguage: true,
+    };
   if (
     /\b(?:multiple|at least (?:[0-9]+|two|three|four|five)|such as|including|either.*and)\b|ít nhất|một trong/iu.test(
       text,
@@ -157,6 +207,8 @@ export function requirementGroup(
   }
   return group('SINGLE', [text], context);
 }
+
+const databaseName = /^(?:MySQL|Oracle|SQL Server|PostgreSQL|MariaDB)$/iu;
 
 const aliases: readonly [RegExp, RegExp][] = [
   [
@@ -293,6 +345,7 @@ function supports(
   text: string,
   group: RequirementGroup,
 ): boolean {
+  if (group.aiFamiliarityOrInterest) return supportsAiFamiliarity(label, text);
   if (
     !componentMention(label, text, group) ||
     negative(text) ||
@@ -303,6 +356,9 @@ function supports(
     const years = /\b(\d+)\+?\s+years?\b/iu.exec(text);
     if (!years || Number(years[1]) < group.minimumYears) return false;
   }
+  if (group.managedLanguage) return supportsManagedLanguage(label, text);
+  if (group.context === 'proficiency')
+    return supportsDatabaseProficiency(label, text);
   if (group.context === 'education') {
     if (/equivalent practical experience/iu.test(label))
       return (
@@ -330,6 +386,306 @@ function supports(
     active(text) ||
     /^\s*(?:technical skills[:\s]*|(?:backend|databases)\s*[:—–-])/iu.test(text)
   );
+}
+
+const managedAttribution =
+  /^(?:(?:employer|company|role|project)\s*:|(?:(?:professional|work|employment)\s+(?:experience|history)|experience)\s*:?$|(?:learning|academic|personal|practice|tutorial|coursework|hobby|planned|study)(?:\s+projects?)?\s*:?$)/iu;
+function completeAttribution(cv: string, quote: string): boolean {
+  const lines = quote.split(/[\r\n\u2028\u2029]+/u);
+  for (const marker of [
+    /^(?:employer|company)\s*:/iu,
+    /^role\s*:/iu,
+    /^project\s*:/iu,
+  ])
+    if (lines.filter((line) => marker.test(line.trim())).length > 1)
+      return false;
+  const activity = lines.findIndex((line) =>
+    /\b(?:developed|built|implemented|used|administered|tuned|optimized|designed|troubleshot)\b/iu.test(
+      line,
+    ),
+  );
+  if (
+    activity >= 0 &&
+    lines
+      .slice(activity + 1)
+      .some((line) => managedAttribution.test(line.trim()))
+  )
+    return false;
+  const start = cv.indexOf(quote);
+  if (start < 0 || cv.indexOf(quote, start + 1) >= 0) return false;
+  const prefix = cv.slice(0, start).split(/\r\n|[\r\n\u2028\u2029]/u);
+  if (prefix.at(-1)?.trim()) return false; // no mid-line context truncation
+  const previous = prefix
+    .slice(0, -1)
+    .reverse()
+    .find((line) => line.trim())
+    ?.trim();
+  return !previous || !managedAttribution.test(previous);
+}
+
+// Only the recognized managed-language experience OR family uses this guard.
+// A source statement must name the language and the actual development work;
+// professional context may be in the same bounded, contiguous source passage.
+function supportsManagedLanguage(label: string, text: string): boolean {
+  if (
+    !/^(?:Java|Scala|Go|C#)$/iu.test(label) ||
+    /\b(?:will|would|could|want|wish|intend|aim|plan(?:ned|ning)?|hoping|goal|if|tutorial|courses?|academic|student|homework|hobby|personal projects?|prototype only|team|we|they|copilot|chatgpt)\b|ai[- ]assisted/iu.test(
+      text,
+    )
+  )
+    return false;
+  const lines = text.split(/[\r\n\u2028\u2029]+/u);
+  // A bounded quote must not merge employers, roles, projects or work sections.
+  for (const marker of [
+    /^(?:employer|company)\s*:/iu,
+    /^role\s*:/iu,
+    /^project\s*:/iu,
+    /^(?:(?:professional|work|employment)\s+(?:experience|history)|experience)\s*:?$/iu,
+  ])
+    if (lines.filter((line) => marker.test(line.trim())).length > 1)
+      return false;
+  return lines.some((line, index) => {
+    if (
+      !mentions(label, line) ||
+      !/\b(?:built|developed|implemented|delivered|designed|led)\b/iu.test(
+        line,
+      ) ||
+      !/\b(?:software|applications?|services?|apis?|features?|systems?|backend)\b/iu.test(
+        line,
+      ) ||
+      /^(?:technical skills|skills|languages|frameworks|backend)\s*[:—–-]/iu.test(
+        line.trim(),
+      )
+    )
+      return false;
+    if (
+      /^Go$/iu.test(label) &&
+      !/\b(?:using|with|in) Go\b|\bGo (?:services?|applications?|apis?|software|language)\b/u.test(
+        line,
+      )
+    )
+      return false;
+    if (
+      lines
+        .slice(index + 1)
+        .some((next) => managedAttribution.test(next.trim()))
+    )
+      return false;
+    const preceding = lines.slice(0, index + 1).join('\n');
+    return /\b(?:professional|commercial|production|enterprise|employment|employer|client)\b|\b(?:software|backend|application|systems?) (?:engineer|developer)\b|^(?:work experience|experience)\s*:?$/imu.test(
+      preceding,
+    );
+  });
+}
+
+// The familiarity-or-interest exception belongs only to the exact Axon family.
+const aiTool =
+  /\b(?:Claude|ChatGPT|GitHub Copilot|Cursor)\b|ai[- ]assisted (?:development|coding) tools?/iu;
+const aiScope =
+  /ai[- ]assisted (?:development|coding)|code generation|automation workflows|\brefactor(?:ing|ed)?\b|\bdebug(?:ging|ged)?\b|\bprototyp(?:ing|ed)\b|code review/iu;
+function aiRelevant(text: string): boolean {
+  return (
+    aiTool.test(text) &&
+    (aiScope.test(text) ||
+      (/technical documentation/iu.test(text) &&
+        /software|development|engineering/iu.test(text)))
+  );
+}
+function supportsAiFamiliarity(label: string, text: string): boolean {
+  if (negative(text)) return false;
+  return text.split(/[\r\n\u2028\u2029]+/u).some((line) => {
+    if (!aiRelevant(line)) return false;
+    if (label === 'interest')
+      return /\b(?:interested in|interest in)\b/iu.test(line);
+    return (
+      !uncertain(line) &&
+      !/\b(?:will|would|could|want|plan|intend|hope)\b/iu.test(line) &&
+      /\b(?:used|using|integrated|applied|familiar with|familiarity with)\b/iu.test(
+        line,
+      )
+    );
+  });
+}
+function aiDenial(label: string, text: string): boolean {
+  if (!aiRelevant(text) || !negative(text)) return false;
+  return label === 'interest'
+    ? /\b(?:not interested|no interest|lack interest)\b/iu.test(text)
+    : /\b(?:never used|not used|no familiarity|not familiar|haven['’]t used|didn['’]t use)\b/iu.test(
+        text,
+      );
+}
+
+function databaseProfessionalUse(text: string): boolean {
+  return (
+    !/\b(?:team|we|they|personal|tutorial|course|learning|hobby|basic)\b/iu.test(
+      text,
+    ) &&
+    /\b(?:professional|commercial|production|enterprise|employment|employer|client)\b|\b(?:backend|software|data) (?:engineer|developer)\b|^(?:work experience|experience)\s*:?$/imu.test(
+      text,
+    )
+  );
+}
+
+// This policy is used only by the recognized Vietnamese database one-of
+// family. Ordinary use and bare skills lists cannot establish proficiency.
+function supportsDatabaseProficiency(label: string, text: string): boolean {
+  if (
+    !databaseName.test(label) ||
+    /\b(?:will|would|want|wish|intend|aim|planning|hoping|goal|if|only|basic|beginner|prototype|tutorial|course|personal|hobby|learning|team|we|they)\b|dự định|dự kiến|mong muốn|kế hoạch|hy vọng|đang học|sẽ học|muốn học|sẽ thành thạo|chỉ biết|cơ bản/iu.test(
+      text,
+    )
+  )
+    return false;
+  if (
+    /^Oracle$/iu.test(label) &&
+    /\bOracle\s+(?:Cloud|Java|JDK|VirtualBox)\b/iu.test(text)
+  )
+    return false;
+  const database = String.raw`(?:MySQL|Oracle|SQL Server|PostgreSQL|MariaDB)(?![\p{L}\p{N}])`;
+  const declarations = new RegExp(
+    String.raw`(?:\b(?:proficient|expert|advanced)\s+(?:(?:in|with)\s+)?|thành thạo\s+)(?<databases>${database}(?:\s*(?:,|/|\band\b|\bor\b|và|hoặc)\s*${database})*)`,
+    'giu',
+  );
+  for (const declaration of text.matchAll(declarations)) {
+    const names = declaration.groups!.databases!.split(
+      /\s*(?:,|\/|\band\b|\bor\b|và|hoặc)\s*/iu,
+    );
+    if (names.some((name) => normalize(name) === normalize(label))) return true;
+  }
+  // Direct independent responsibility with an explicit database and work scope
+  // can establish practical proficiency without a literal level declaration.
+  const independent =
+    /\b(?:independently|personally|owned|sole|responsible for)\b/iu.test(
+      text,
+    ) || /^(?:I )?(?:designed|tuned|optimized|troubleshot)\b/imu.test(text);
+  const responsibility = new RegExp(
+    String.raw`\b(?:designed|tuned|optimized|troubleshot)\s+(?:production\s+)?${escape(label)}\s+(?:(?:database\s+)?schemas?|queries|database performance|production incidents|databases?)\b`,
+    'iu',
+  );
+  if (independent && responsibility.test(text) && databaseProfessionalUse(text))
+    return true;
+  // Existing concrete production administration remains sufficient as well.
+  const ownership = new RegExp(
+    String.raw`\b(?:administered|optimized|tuned|designed)\s+(?:production\s+)?${escape(label)}\s+(?:databases?|clusters?)\b`,
+    'iu',
+  );
+  const tasks = [
+    /\bquery tuning\b/iu,
+    /\bindex(?:ing| optimization)\b/iu,
+    /\breplication\b/iu,
+    /\bfailover\b/iu,
+    /\bbackup (?:and )?restor(?:e|ation)\b/iu,
+  ];
+  return (
+    ownership.test(text) &&
+    [...text.matchAll(new RegExp(database, 'giu'))].every(
+      (match) => normalize(match[0]) === normalize(label),
+    ) &&
+    /\bproduction\b/iu.test(text) &&
+    tasks.filter((task) => task.test(text)).length >= 2
+  );
+}
+
+// Preserve source-backed observations separately from proficiency support.
+// Do not infer a database for an adjacent generic MyBatis/optimization bullet.
+function nominalDatabaseUse(label: string, quote: string): boolean {
+  const lines = quote.split(/\r\n|[\r\n\u2028\u2029]/u);
+  const database = new RegExp(
+    String.raw`^(?:Microsoft\s+)?${escape(label).replace(/\s+/gu, String.raw`\s+`)}(?![\p{L}\p{N}])`,
+    'iu',
+  );
+  return lines.some((_line, index) => {
+    // Later role/project headings cannot lend ownership to this responsibility.
+    if (
+      lines
+        .slice(index + 1)
+        .some((next) => managedAttribution.test(next.trim()))
+    )
+      return false;
+    const clauses = databaseSemanticClauses(
+      lines.slice(index, index + 2).join('\n'),
+    );
+    return clauses.some((clause) => {
+      const nominal =
+        /^\s*(?:[-*•]\s*)?(?:(?:led\s+the\s+)?(?:development|implementation)\s+of|responsible\s+for\s+(?:developing|implementing))\s+(?<object>[^.!?;:\r\n]{1,160}?)\s+(?:using|with|on)\s+(?<tools>[^.!?;:\r\n]{1,160})(?:[.!?]|$)/iu.exec(
+          clause,
+        );
+      if (
+        !nominal ||
+        !/\b(?:features?|functionality|applications?|services?|software|systems?|backend)\b/iu.test(
+          nominal.groups!.object!,
+        )
+      )
+        return false;
+      const context = [
+        ...lines
+          .slice(0, index)
+          .filter((prior) => managedAttribution.test(prior.trim())),
+        clause,
+      ].join('\n');
+      // A named item in an explicit coordinated use list is not incidental stack
+      // co-occurrence. No other technology or qualification is inferred from it.
+      return (
+        databaseProfessionalUse(context) &&
+        nominal
+          .groups!.tools!.split(/\s*(?:,|·|\/|&|\band\b)\s*/iu)
+          .some((tool) => {
+            const match = database.exec(tool);
+            return (
+              !!match &&
+              !/^\s+(?:documentation|manuals?|reference|tutorials?)\b/iu.test(
+                tool.slice(match[0].length),
+              )
+            );
+          })
+      );
+    });
+  });
+}
+
+function databaseObservations(
+  label: string,
+  source: string,
+  candidates: string[],
+): NonNullable<ComponentCoverage['observations']> {
+  const eligible = candidates.filter(
+    (quote) =>
+      quote.length <= 2000 &&
+      source.includes(quote) &&
+      !(
+        /^Oracle$/iu.test(label) &&
+        /\bOracle\s+(?:Cloud|Java|JDK|VirtualBox)\b/iu.test(quote)
+      ) &&
+      mentions(label, quote) &&
+      !negative(quote) &&
+      !uncertain(quote) &&
+      !/\b(?:will|would|want|wish|intend|aim|planning|hoping|goal|if|only|prototype|tutorial|course)\b|dự định|dự kiến|mong muốn|kế hoạch|hy vọng|đang học|sẽ học|muốn học/iu.test(
+        quote,
+      ),
+  );
+  const database = escape(label).replace(/\s+/gu, String.raw`\s+`);
+  const applied = new RegExp(
+    String.raw`\b(?:developed|built|implemented|delivered)\b[^.!?;\r\n]{0,200}\b(?:using|with|on)\s+(?:Microsoft\s+)?${database}(?![\p{L}\p{N}])|\b(?:optimized|tuned|administered|designed)\s+(?:production\s+)?${database}\s+(?:databases?|queries|clusters?)\b`,
+    'iu',
+  );
+  const work = eligible.find(
+    (quote) =>
+      databaseProfessionalUse(quote) &&
+      (databaseSemanticClauses(quote).some((clause) => applied.test(clause)) ||
+        nominalDatabaseUse(label, quote)),
+  );
+  const mention = eligible.find(
+    (quote) =>
+      quote !== work &&
+      /^(?:technical skills|skills|databases)\s*[:—–-]/iu.test(quote),
+  );
+  if (work)
+    return [
+      { kind: 'experience', cvQuote: work },
+      ...(mention ? [{ kind: 'mention' as const, cvQuote: mention }] : []),
+    ];
+  const quote = mention ?? eligible[0];
+  return quote ? [{ kind: 'mention', cvQuote: quote }] : [];
 }
 
 // Recovery is deliberately restricted to these named design competencies. Each
@@ -444,7 +800,36 @@ export function evaluateCoverage(
   cv: string,
   allowRecovery = false,
 ) {
-  const quotes = selected.flatMap(passages);
+  const contextual =
+    group.managedLanguage ||
+    group.aiFamiliarityOrInterest ||
+    group.context === 'proficiency';
+  const quotes = contextual
+    ? selected.filter(
+        (quote) => cv.includes(quote) && completeAttribution(cv, quote),
+      )
+    : selected.flatMap(passages);
+  // Reuse the existing source-passage enumeration and exact quote resolver.
+  // Shortest sufficient contiguous passage wins; never concatenate source spans.
+  const contextCandidates = contextual
+    ? [
+        ...new Set(
+          cvQuoteChoices(cv)
+            .concat(
+              passages(cv),
+              group.context === 'proficiency'
+                ? databaseAttributedQuoteChoices(cv)
+                : [],
+            )
+            .map((quote) => resolveCvQuote(cv, quote))
+            .filter((quote): quote is string => quote !== null),
+        ),
+      ]
+        .filter(
+          (quote) => quote.length <= 2000 && completeAttribution(cv, quote),
+        )
+        .sort((a, b) => a.length - b.length)
+    : [];
   const all = passages(cv);
   const education =
     group.mode === 'OR' && group.context === 'education'
@@ -454,8 +839,22 @@ export function evaluateCoverage(
     // Omitted evidence is recoverable only for an explicit OR and a known
     // alias-policy term. Never turn arbitrary source keywords or an AND gap
     // into a match, and apply the same shared-constraint/positive-context checks.
+    const proficiencyRecovery =
+      allowRecovery && group.context === 'proficiency'
+        ? contextCandidates.find((quote) =>
+            supports(component.label, quote, group),
+          )
+        : undefined;
+    const managedRecovery =
+      allowRecovery && (group.managedLanguage || group.aiFamiliarityOrInterest)
+        ? contextCandidates.find((quote) =>
+            supports(component.label, quote, group),
+          )
+        : undefined;
     const recovered =
-      allowRecovery &&
+      managedRecovery ??
+      proficiencyRecovery ??
+      (allowRecovery &&
       group.mode === 'OR' &&
       aliases.some(([pattern]) => pattern.test(component.label))
         ? all.find(
@@ -473,7 +872,7 @@ export function evaluateCoverage(
               ) &&
               supports(component.label, quote, group),
           )
-        : undefined;
+        : undefined);
     const degree =
       group.mode === 'OR' &&
       group.context === 'education' &&
@@ -500,39 +899,86 @@ export function evaluateCoverage(
     const source = degree ? education : all;
     const positiveInCv =
       positive ??
-      source.find((quote) =>
+      (contextual ? contextCandidates : source).find((quote) =>
         degree
           ? degreeSupported(quote)
           : supports(component.label, quote, group),
       );
-    const negatives = source.filter(
-      (quote) =>
-        (componentMention(component.label, quote, group) ||
-          (degree &&
-            negative(quote) &&
-            /\b(?:bachelor(?:['’]s)?|degree)\b/iu.test(quote) &&
-            !/\b(?:degree|science|engineering)\s+in\s+\S/iu.test(
-              normalize(quote),
-            ))) &&
-        (negative(quote) ||
-          (degree && degreeIncomplete.test(quote)) ||
-          (group.personalDelivery &&
-            /\b(?:prototype only|only (?:a |built )?(?:\w+ )?prototypes?)\b/iu.test(
-              quote,
-            ))) &&
-        (!degree ||
-          !positiveInCv ||
-          !educationFieldsIn(quote).length ||
-          educationFieldsIn(quote).some((field) =>
-            educationFieldsIn(positiveInCv).includes(field),
-          )),
+    const negatives = source.filter((quote) =>
+      group.aiFamiliarityOrInterest
+        ? aiDenial(component.label, quote)
+        : (componentMention(component.label, quote, group) ||
+            (degree &&
+              negative(quote) &&
+              /\b(?:bachelor(?:['’]s)?|degree)\b/iu.test(quote) &&
+              !/\b(?:degree|science|engineering)\s+in\s+\S/iu.test(
+                normalize(quote),
+              ))) &&
+          (negative(quote) ||
+            (degree && degreeIncomplete.test(quote)) ||
+            (group.personalDelivery &&
+              /\b(?:prototype only|only (?:a |built )?(?:\w+ )?prototypes?)\b/iu.test(
+                quote,
+              ))) &&
+          (!degree ||
+            !positiveInCv ||
+            !educationFieldsIn(quote).length ||
+            educationFieldsIn(quote).some((field) =>
+              educationFieldsIn(positiveInCv).includes(field),
+            )),
     );
-    const conflict = negatives.length > 0 && !!positiveInCv;
+    const observations =
+      group.context === 'proficiency' && !positive
+        ? databaseObservations(
+            component.label,
+            cv,
+            allowRecovery ? contextCandidates : quotes,
+          )
+        : [];
+    const work = observations.find((item) => item.kind === 'experience');
+    const partial =
+      group.context === 'proficiency' &&
+      !!work &&
+      databaseProfessionalUse(work.cvQuote);
+    // Work contradicts a denial of use/development responsibility, but not a
+    // disclaimer of proficiency or database-administration responsibility.
+    const deniedWork = negatives.some(
+      (quote) =>
+        /\b(?:never (?:used|worked)|no (?:work )?experience|have not used|haven['’]t used|didn['’]t use)\b|chưa (?:từng )?sử dụng|không có kinh nghiệm/iu.test(
+          quote,
+        ) ||
+        /\b(?:no responsibility for|not responsible for)\b[^.!?;\r\n]{0,100}\b(?:development|developing|implementation|implementing)\b/iu.test(
+          quote,
+        ),
+    );
+    const conflict =
+      (negatives.length > 0 && !!positiveInCv) || (!!work && deniedWork);
     return {
       ...component,
-      status: conflict ? 'CONFLICT' : positive ? 'EVIDENCED' : 'NOT_EVIDENCED',
-      cvQuote: positive ?? (conflict ? positiveInCv : '') ?? '',
+      status: conflict
+        ? 'CONFLICT'
+        : positive
+          ? 'EVIDENCED'
+          : partial
+            ? 'PARTIAL'
+            : 'NOT_EVIDENCED',
+      cvQuote:
+        positive ??
+        (conflict
+          ? (positiveInCv ?? work?.cvQuote)
+          : partial
+            ? work?.cvQuote
+            : '') ??
+        '',
       conflictingQuotes: conflict ? negatives : [],
+      ...(!conflict && observations.length
+        ? {
+            observations,
+            qualificationReason: work
+              ? 'Project experience is evidenced; proficiency remains unverified.'
+              : 'Mentioned in the CV; proficiency remains unverified.',
+          }
+        : {}),
     };
   });
   const conflict = components.some((item) => item.status === 'CONFLICT');
@@ -543,7 +989,12 @@ export function evaluateCoverage(
     group.mode === 'UNKNOWN' || conflict
       ? 0
       : group.mode === 'OR'
-        ? Number(supported > 0)
+        ? supported > 0
+          ? 1
+          : group.context === 'proficiency' &&
+              components.some((item) => item.status === 'PARTIAL')
+            ? 0.5
+            : 0
         : supported / components.length;
   const status: CoverageStatus = conflict
     ? 'CONFLICT'
@@ -552,6 +1003,16 @@ export function evaluateCoverage(
       : credit > 0
         ? 'PARTIAL'
         : 'NOT_EVIDENCED';
+  const workLabels = components
+    .filter((component) =>
+      component.observations?.some((item) => item.kind === 'experience'),
+    )
+    .map((component) => component.label);
+  const proficiencyReason = workLabels.length
+    ? `${workLabels.join(', ')} project experience is evidenced; proficiency at the requested level remains unverified.`
+    : components.some((component) => component.observations?.length)
+      ? 'Database mentions are present in the CV; proficiency at the requested level remains unverified.'
+      : 'Proficiency in one database alternative is not evidenced; names or ordinary use alone do not establish the requested level.';
   return {
     mode: group.mode,
     components,
@@ -562,9 +1023,11 @@ export function evaluateCoverage(
         ? 'Compound meaning needs review.'
         : conflict
           ? 'Contradictory CV statements need review.'
-          : group.personalDelivery && !credit
-            ? 'Personal delivery beyond prototype is not evidenced.'
-            : 'Review the selected component evidence.',
+          : group.context === 'proficiency' && credit < 1
+            ? proficiencyReason
+            : group.personalDelivery && !credit
+              ? 'Personal delivery beyond prototype is not evidenced.'
+              : 'Review the selected component evidence.',
   };
 }
 

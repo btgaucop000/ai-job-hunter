@@ -129,3 +129,82 @@ export function cvQuoteChoices(source: string): string[] {
   }
   return [...choices];
 }
+
+// Database-only continuation: a preposition/database tail may wrap, but a new
+// bullet, sentence, heading or blank line is not a continuation of the action.
+function databaseContinuation(before: string, after: string): boolean {
+  return (
+    !!before.trim() &&
+    !!after.trim() &&
+    !/[.!?;:]\s*$/u.test(before) &&
+    !/^\s*(?:[-*•‣▪–—]|\d+[.)]|#)/u.test(after) &&
+    !/:\s*$/u.test(after) &&
+    (/^\s*(?:using|with|on)\s+/iu.test(after) ||
+      (/\b(?:using|with|on)(?:\s+(?:Microsoft\s+)?SQL)?\s*$/iu.test(before) &&
+        /^\s*(?:SQL\s+Server|Server|MySQL|Oracle|PostgreSQL|MariaDB)\b/iu.test(
+          after,
+        )))
+  );
+}
+
+// Semantic views only. Callers always return the unchanged original source span.
+export function databaseSemanticClauses(quote: string): string[] {
+  const lines = quote.split(/\r\n|[\r\n\u2028\u2029]/u);
+  return lines.flatMap((line, index) => [
+    line,
+    ...(index + 1 < lines.length &&
+    databaseContinuation(line, lines[index + 1]!)
+      ? [`${line} ${lines[index + 1]!}`.replace(/\s+/gu, ' ').trim()]
+      : []),
+  ]);
+}
+
+// Add at most 20 exact database-work spans: up to three adjacent attribution
+// headers and one work line plus its optional soft continuation. The generic
+// three-span quote window and attribution validation remain unchanged.
+export function databaseAttributedQuoteChoices(source: string): string[] {
+  const lines = [...source.matchAll(/[^\r\n\u2028\u2029]+/gu)].map((match) => {
+    const text = match[0].trim();
+    const start = match.index + match[0].indexOf(text);
+    return { text, start, end: start + text.length };
+  });
+  const adjacent = (left: number, right: number) =>
+    /^[ \t]*(?:\r\n|[\r\n\u2028\u2029])[ \t]*$/u.test(
+      source.slice(lines[left]!.end, lines[right]!.start),
+    );
+  const header = /^(employer|company|role|project)\s*:/iu;
+  const choices = new Set<string>();
+  for (let index = 0; index < lines.length && choices.size < 20; index++) {
+    if (
+      !/^(?:[-*•]\s*)?(?:(?:(?:I|Personally|Independently)\s+)?(?:developed|built|implemented|delivered|designed|tuned|optimized|administered|troubleshot)\b|(?:development|implementation)\s+of\b|responsible\s+for\s+(?:developing|implementing)\b)/iu.test(
+        lines[index]!.text,
+      )
+    )
+      continue;
+    let start = index;
+    const seen = new Set<string>();
+    while (start > 0 && index - start < 3 && adjacent(start - 1, start)) {
+      const kind = header
+        .exec(lines[start - 1]!.text)?.[1]
+        ?.toLowerCase()
+        .replace('company', 'employer');
+      if (!kind || seen.has(kind)) break;
+      seen.add(kind);
+      start--;
+    }
+    let end = index;
+    const namedDatabase =
+      /\b(?:SQL\s+Server|MySQL|Oracle|PostgreSQL|MariaDB)\b/iu;
+    if (
+      !namedDatabase.test(lines[index]!.text) &&
+      index + 1 < lines.length &&
+      adjacent(index, index + 1) &&
+      databaseContinuation(lines[index]!.text, lines[index + 1]!.text)
+    )
+      end++;
+    if (end - start < 3) continue; // Already covered by the existing window.
+    const quote = source.slice(lines[start]!.start, lines[end]!.end);
+    if (quote.length <= 2000 && namedDatabase.test(quote)) choices.add(quote);
+  }
+  return [...choices];
+}

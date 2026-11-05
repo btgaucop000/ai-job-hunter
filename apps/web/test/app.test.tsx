@@ -46,6 +46,8 @@ test.each(['/dashboard', '/jobs'])(
       </ThemeProvider>,
     );
     const user = userEvent.setup();
+    if (path === '/dashboard')
+      await user.click(screen.getByRole('link', { name: 'Go to Jobs' }));
     await user.click(await screen.findByRole('link', { name: job.title }));
     expect(
       await screen.findByRole('heading', { name: job.title }),
@@ -54,7 +56,7 @@ test.each(['/dashboard', '/jobs'])(
       'aria-selected',
       'true',
     );
-    await user.click(screen.getByRole('link', { name: 'Back to Job Inbox' }));
+    await user.click(screen.getByRole('link', { name: 'Back to Jobs' }));
     expect(await screen.findByRole('link', { name: job.title })).toBeVisible();
   },
 );
@@ -78,21 +80,37 @@ beforeEach(() => {
     ),
   );
 });
-test('renders the dashboard and honest empty state', async () => {
+test('Dashboard is an honest placeholder and Go to Jobs opens the sole listing', async () => {
   show('/dashboard');
+  expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  expect(screen.getByRole('heading', { name: 'Coming soon' })).toBeVisible();
   expect(
-    screen.getByRole('heading', { name: 'Job Inbox' }),
-  ).toBeInTheDocument();
+    screen.getByText(/Job-search charts and statistics will be available/),
+  ).toBeVisible();
+  expect(screen.queryByRole('table')).toBeNull();
   expect(
-    await screen.findByText('No saved opportunities yet'),
-  ).toBeInTheDocument();
-  expect(await screen.findByText('API ready')).toBeInTheDocument();
-});
-test('redirects the root route to dashboard', async () => {
-  show('/');
-  expect(screen.getByLabelText('Current route')).toHaveTextContent(
-    '/dashboard',
+    vi
+      .mocked(fetch)
+      .mock.calls.some(([url]) => url === '/api/v1/opportunities'),
+  ).toBe(false);
+  expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+    'aria-current',
+    'page',
   );
+  await userEvent
+    .setup()
+    .click(screen.getByRole('link', { name: 'Go to Jobs' }));
+  expect(screen.getByLabelText('Current route')).toHaveTextContent('/jobs');
+  expect(screen.getByRole('heading', { name: 'Jobs' })).toBeVisible();
+  expect(await screen.findByText('No saved opportunities yet')).toBeVisible();
+  expect(screen.getByRole('link', { name: 'Jobs' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+});
+test('root defaults to the canonical Jobs page', async () => {
+  show('/');
+  expect(screen.getByLabelText('Current route')).toHaveTextContent('/jobs');
   expect(await screen.findByText('API ready')).toBeInTheDocument();
 });
 test.each(['Candidates', 'Matches', 'Settings'])(
@@ -117,10 +135,8 @@ test('unknown routes show not found and allow navigation home', async () => {
   ).toBeInTheDocument();
   await userEvent
     .setup()
-    .click(screen.getByRole('link', { name: 'Back to dashboard' }));
-  expect(
-    screen.getByRole('heading', { name: 'Job Inbox' }),
-  ).toBeInTheDocument();
+    .click(screen.getByRole('link', { name: 'Back to Jobs' }));
+  expect(screen.getByRole('heading', { name: 'Jobs' })).toBeInTheDocument();
 });
 
 test('keeps CV review accessible and discovery off the inbox', async () => {
@@ -217,11 +233,11 @@ test('Discover Jobs supports direct links, navigation, retained results and hist
     'polite',
   );
   await user.click(screen.getByRole('button', { name: 'Run details' }));
-  const viewInbox = await screen.findByRole('link', { name: 'View Job Inbox' });
+  const viewInbox = await screen.findByRole('link', { name: 'View Jobs' });
   expect(router.state.location.pathname).toBe('/discover');
 
   await user.click(viewInbox);
-  expect(router.state.location.pathname).toBe('/dashboard');
+  expect(router.state.location.pathname).toBe('/jobs');
   expect(
     await screen.findByRole('link', { name: 'Existing synthetic job' }),
   ).toBeVisible();
@@ -236,7 +252,7 @@ test('Discover Jobs supports direct links, navigation, retained results and hist
   expect(
     screen.getByRole('button', { name: 'Edit preferences' }),
   ).toBeVisible();
-  await user.click(within(navigation).getByRole('link', { name: 'Job Inbox' }));
+  await user.click(within(navigation).getByRole('link', { name: 'Jobs' }));
   await user.click(
     within(navigation).getByRole('link', { name: 'Discover Jobs' }),
   );

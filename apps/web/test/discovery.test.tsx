@@ -85,9 +85,9 @@ test('preferences expand while discovery remains accessible and sends unchanged 
   });
   expect(completion.closest('section')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Run details' }));
-  expect(screen.getByRole('link', { name: 'View Job Inbox' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'View Jobs' })).toHaveAttribute(
     'href',
-    '/dashboard',
+    '/jobs',
   );
   fireEvent.click(screen.getByRole('button', { name: 'Close run details' }));
   expect(
@@ -148,7 +148,7 @@ test('partial-source errors retain success counts, remaining guidance and cache 
     screen.getByText(/Run again to discover the remaining candidates/),
   ).toBeVisible();
   expect(screen.getByText(/cached for five minutes/)).toBeVisible();
-  expect(screen.getByRole('link', { name: 'View Job Inbox' })).toHaveClass(
+  expect(screen.getByRole('link', { name: 'View Jobs' })).toHaveClass(
     'MuiButton-outlined',
   );
 });
@@ -179,7 +179,7 @@ test('zero results offer preference guidance, Add Job and Inbox links', async ()
     'href',
     '/jobs/new',
   );
-  expect(screen.getByRole('link', { name: 'View Job Inbox' })).toHaveClass(
+  expect(screen.getByRole('link', { name: 'View Jobs' })).toHaveClass(
     'MuiButton-outlined',
   );
 });
@@ -210,14 +210,12 @@ test('request failure preserves edited preferences and supports a manual retry',
     'Vietnam',
   );
   expect(
-    screen.queryByRole('link', { name: 'View Job Inbox' }),
+    screen.queryByRole('link', { name: 'View Jobs' }),
   ).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Discover Jobs' }));
   await screen.findByText(/5 eligible · 3 added/);
   fireEvent.click(screen.getByRole('button', { name: 'Run details' }));
-  expect(
-    await screen.findByRole('link', { name: 'View Job Inbox' }),
-  ).toBeVisible();
+  expect(await screen.findByRole('link', { name: 'View Jobs' })).toBeVisible();
   expect(
     screen.queryByText(/Discovery is already running/),
   ).not.toBeInTheDocument();

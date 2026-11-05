@@ -12,11 +12,16 @@ of missing ability.
 - `/jobs/new` imports a job, then presents Review & Save. Manual entry, pasted
   text, PDF/DOCX, supported URL import, and supported open-page bookmarklets feed
   the same review/save flow. Extraction is an explicit action.
-- `/jobs/:id` provides Overview, CV Match, Application, and Edit JD tabs.
+- `/jobs/:id` provides Overview, CV Match, Improve CV, Application, and Edit JD tabs.
 - Application status, notes, recruiter/contact notes, contact dates, and follow-up
   dates persist in PostgreSQL. P4.1 adds applied date and application channel.
 - CV Match saves parsed CV text locally and analyzes the latest saved CV/job only
   when requested. Results are shown in the UI, not written into tracking fields.
+- Improve CV is always accessible. Upload/save a CV and successfully analyze
+  the saved job in CV Match before explicitly requesting suggestions. Review up to four
+  action-first suggestions initially, use Review evidence to inspect CV Match or
+  Show all to see the remainder, and copy only supported original wording. CV/job edits and expired matches require fresh analysis.
+  See the [P7 design and API contract](docs/audits/p7-cv-improvement-design.md).
 - On-demand discovery queues candidates from the configured Axon, Backbase,
   Temus and Go1 Vietnam Greenhouse boards for explicit review and Save. Discovery ranking is not CV suitability scoring.
 - `/cv` retains the CV/JD parsing and review dashboard. Candidates, Matches, and

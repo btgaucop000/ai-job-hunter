@@ -17,6 +17,7 @@ import {
   recoveredCvQuote,
   resolveCvQuote,
   cvQuoteChoices,
+  databaseAttributedQuoteChoices,
 } from './cv-match.evidence.js';
 import { normalize } from './matching.policy.js';
 import type { Opportunity } from '../opportunities/opportunity.entity.js';
@@ -71,7 +72,22 @@ export const MATCH_SCHEMA = {
     },
   },
 };
-export function matchOutputSchema(cv: string) {
+export function matchOutputSchema(
+  cv: string,
+  canonical: readonly MatchRequirement[] = [],
+) {
+  const choices = [
+    ...new Set([
+      ...cvQuoteChoices(cv),
+      ...(canonical.some(
+        (item) =>
+          requirementGroup(item.requirement, item.category).context ===
+          'proficiency',
+      )
+        ? databaseAttributedQuoteChoices(cv)
+        : []),
+    ]),
+  ];
   const requirements = MATCH_SCHEMA.properties.requirements;
   return {
     ...MATCH_SCHEMA,
@@ -88,13 +104,13 @@ export function matchOutputSchema(cv: string) {
                 ...requirements.items.properties.components.items,
                 properties: {
                   ...requirements.items.properties.components.items.properties,
-                  cvQuote: { type: 'string', enum: cvQuoteChoices(cv) },
+                  cvQuote: { type: 'string', enum: choices },
                 },
               },
             },
             cvQuote: {
               ...requirements.items.properties.cvQuote,
-              enum: cvQuoteChoices(cv),
+              enum: choices,
             },
           },
         },
@@ -234,7 +250,8 @@ PostgreSQL and SQL Server are SQL database evidence. AI-assisted coding-tool use
 Preserve alternative groups as ONE requirement with the full JD quote, including Vietnamese ít nhất một trong / một trong clauses. An explicitly stated one-of requirement accepts an evidenced alternative; respect quantities such as multiple languages rather than assuming one language satisfies them. Never turn search tags or role titles into mandatory requirements.
 An explicit technical skills declaration is CV evidence; Java Spring Boot development supports Java backend experience. AI-assisted coding tools are not production AI/ML experience.
 Seniority preferences are not qualifications and must not change the CV score. Do not infer duration or skills from a seniority label.
-An isolated keyword outside a skills declaration, negation, aspiration, uncertain statement or insufficient duration is NOT support. Use an empty cvQuote when not fully evidenced.
+For the exact familiarity-or-interest AI-assisted development family, contextual development-tool use or explicitly relevant interest is acceptable; interest is not professional experience. Keep its two predicates scoped to the supplied activities, not a demand for every activity. For recognized database-proficiency requirements, select concrete professional use even if the level remains unverified; the server distinguishes Partial from Matched.
+An isolated keyword outside a skills declaration, negation, aspiration (except explicitly permitted relevant interest), uncertain statement or insufficient duration is NOT support. Use an empty cvQuote when not fully evidenced.
 A missing CV quote means not evidenced, never that the person lacks the skill. Do not infer years, domains or experience from job titles.
 Return only canonical parents; extra requirements never receive scoring weight. Include each parentId unchanged. For each supplied group component return components [{componentId, jdQuote, cvQuote}], selecting a separate allowed CV passage or empty string. Keep component IDs and JD spans exactly; never invent components. AND requires every component, OR requires one alternative plus all shared constraints. Personal delivery beyond prototype requires explicit personal build and production delivery, not team contribution or a prototype. Flag gaps with empty quotes, never with unrelated passages.
 Return JSON only, with requirements; priority required/preferred; category skill/experience/domain.

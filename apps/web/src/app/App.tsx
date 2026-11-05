@@ -28,11 +28,11 @@ const UiAcceptancePreview = import.meta.env.DEV
   : null;
 
 const navigation = [
-  { label: 'Job Inbox', path: '/dashboard' },
+  { label: 'Dashboard', path: '/dashboard' },
+  { label: 'Jobs', path: '/jobs' },
   { label: 'Discover Jobs', path: '/discover' },
   { label: 'CV & Review', path: '/cv' },
   { label: 'Candidates', path: '/candidates' },
-  { label: 'Jobs', path: '/jobs' },
   { label: 'Matches', path: '/matches' },
   { label: 'Settings', path: '/settings' },
 ];
@@ -51,10 +51,30 @@ function ComingSoon({ title }: { title: string }) {
     </Stack>
   );
 }
+function DashboardPlaceholder() {
+  return (
+    <Stack spacing={2}>
+      <PageHeader title="Dashboard" />
+      <Paper variant="outlined" sx={{ p: { xs: 3, sm: 4 } }}>
+        <Stack spacing={2} sx={{ alignItems: 'flex-start', maxWidth: '42rem' }}>
+          <Typography variant="h6" component="h2">
+            Coming soon
+          </Typography>
+          <Typography color="text.secondary">
+            Job-search charts and statistics will be available here in the
+            future. Manage your saved jobs in Jobs.
+          </Typography>
+          <Button component={Link} to="/jobs" variant="contained">
+            Go to Jobs
+          </Button>
+        </Stack>
+      </Paper>
+    </Stack>
+  );
+}
 export function App() {
-  const dashboardMatch = useMatch('/dashboard');
   const jobsMatch = useMatch('/jobs');
-  const inbox = Boolean(dashboardMatch || jobsMatch);
+  const inbox = Boolean(jobsMatch);
   const discoveryPage = Boolean(useMatch('/discover'));
   const [discoveryViewport, setDiscoveryViewport] = useState(false);
   const newJob = Boolean(useMatch('/jobs/new'));
@@ -164,8 +184,8 @@ export function App() {
           }}
         >
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<JobInbox />} />
+            <Route path="/" element={<Navigate to="/jobs" replace />} />
+            <Route path="/dashboard" element={<DashboardPlaceholder />} />
             <Route
               path="/discover"
               element={
@@ -227,8 +247,8 @@ export function App() {
                   <Typography color="text.secondary">
                     This page does not exist in your workspace.
                   </Typography>
-                  <Button component={Link} to="/dashboard" variant="contained">
-                    Back to dashboard
+                  <Button component={Link} to="/jobs" variant="contained">
+                    Back to Jobs
                   </Button>
                 </Stack>
               }

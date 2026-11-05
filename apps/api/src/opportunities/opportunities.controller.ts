@@ -1,3 +1,4 @@
+import { CvSuggestionsError } from '../matching/cv-suggestions.error.js';
 import { importTopcvPage } from './topcv-page-import.js';
 import { PinnedJobPageTransport } from './job-url.transport.js';
 import { JobUrlImportService } from './job-url-import.js';
@@ -41,7 +42,7 @@ export class OpportunityErrors implements ExceptionFilter {
     response.end(
       JSON.stringify({
         statusCode: status,
-        ...(error instanceof CvMatchError
+        ...(error instanceof CvMatchError || error instanceof CvSuggestionsError
           ? { errorCode: error.errorCode }
           : {}),
         ...(error instanceof JobDocumentError
@@ -125,6 +126,17 @@ export class OpportunitiesController {
   ) {
     localWrite(req);
     return this.matches.analyze(id);
+  }
+  @Post(':id/cv-improvement-suggestions')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  suggest(
+    @Req() req: IncomingMessage,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() body: unknown,
+  ) {
+    localWrite(req);
+    return this.matches.suggest(id, body);
   }
   @Get(':id') @Header('Cache-Control', 'no-store') get(
     @Param('id', new ParseUUIDPipe()) id: string,
