@@ -1,0 +1,232 @@
+{
+  "description": "Single P6.7 live local matching capture; synthetic CV/JD only. Original model output retained without edits.",
+  "model": "qwen3:4b",
+  "fixture": {
+    "cv": "Designed REST APIs.\nDesigned service integrations using RabbitMQ.\nDesigned GitLab CI/CD pipelines.\nBuilt MCP servers.",
+    "required": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices.",
+    "preferred": "MCP or knowledge graphs."
+  },
+  "serviceCalls": 1,
+  "providerCalls": 1,
+  "databaseConnections": 0,
+  "databaseWrites": 0,
+  "transport": [
+    {
+      "path": "/api/version",
+      "httpStatus": 200,
+      "elapsedMs": 12
+    },
+    {
+      "path": "/api/tags",
+      "httpStatus": 200,
+      "elapsedMs": 8
+    },
+    {
+      "path": "/api/generate",
+      "outputTokenLimit": 1,
+      "httpStatus": 200,
+      "elapsedMs": 2960,
+      "model": "qwen3:4b",
+      "done": true,
+      "done_reason": "length",
+      "prompt_eval_count": 842,
+      "eval_count": 1
+    },
+    {
+      "path": "/api/ps",
+      "httpStatus": 200,
+      "elapsedMs": 1
+    },
+    {
+      "path": "/api/generate",
+      "outputTokenLimit": 4096,
+      "httpStatus": 200,
+      "elapsedMs": 6205,
+      "model": "qwen3:4b",
+      "done": true,
+      "done_reason": "stop",
+      "prompt_eval_count": 842,
+      "eval_count": 407
+    },
+    {
+      "path": "/api/ps",
+      "httpStatus": 200,
+      "elapsedMs": 1
+    }
+  ],
+  "ollamaVersion": "0.40.10",
+  "result": {
+    "score": 70,
+    "recommendation": "Consider",
+    "requirements": [
+      {
+        "parentId": "p1",
+        "requirement": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices.",
+        "priority": "required",
+        "category": "skill",
+        "jdQuote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices.",
+        "cvQuote": "Designed REST APIs.",
+        "status": "PARTIAL",
+        "credit": 0.6,
+        "coverage": {
+          "mode": "AND",
+          "components": [
+            {
+              "id": "c1",
+              "label": "cloud-based architectures",
+              "jdQuote": "cloud-based architectures",
+              "status": "NOT_EVIDENCED",
+              "cvQuote": "",
+              "conflictingQuotes": []
+            },
+            {
+              "id": "c2",
+              "label": "APIs",
+              "jdQuote": "APIs",
+              "status": "EVIDENCED",
+              "cvQuote": "Designed REST APIs.",
+              "conflictingQuotes": []
+            },
+            {
+              "id": "c3",
+              "label": "integrations",
+              "jdQuote": "integrations",
+              "status": "EVIDENCED",
+              "cvQuote": "Designed service integrations using RabbitMQ.",
+              "conflictingQuotes": []
+            },
+            {
+              "id": "c4",
+              "label": "data flows",
+              "jdQuote": "data flows",
+              "status": "NOT_EVIDENCED",
+              "cvQuote": "",
+              "conflictingQuotes": []
+            },
+            {
+              "id": "c5",
+              "label": "CI/CD practices",
+              "jdQuote": "CI/CD practices",
+              "status": "EVIDENCED",
+              "cvQuote": "Designed GitLab CI/CD pipelines.",
+              "conflictingQuotes": []
+            }
+          ],
+          "credit": 0.6,
+          "status": "PARTIAL",
+          "reason": "Review the selected component evidence."
+        }
+      },
+      {
+        "parentId": "p2",
+        "requirement": "MCP or knowledge graphs.",
+        "priority": "preferred",
+        "category": "skill",
+        "jdQuote": "MCP or knowledge graphs.",
+        "cvQuote": "Built MCP servers.",
+        "status": "EVIDENCED",
+        "credit": 1,
+        "coverage": {
+          "mode": "OR",
+          "components": [
+            {
+              "id": "c1",
+              "label": "MCP",
+              "jdQuote": "MCP",
+              "status": "EVIDENCED",
+              "cvQuote": "Built MCP servers.",
+              "conflictingQuotes": []
+            },
+            {
+              "id": "c2",
+              "label": "knowledge graphs",
+              "jdQuote": "knowledge graphs",
+              "status": "NOT_EVIDENCED",
+              "cvQuote": "",
+              "conflictingQuotes": []
+            }
+          ],
+          "credit": 1,
+          "status": "EVIDENCED",
+          "reason": "Review the selected component evidence."
+        }
+      }
+    ],
+    "explanation": "Heuristic documented-evidence coverage: one canonical parent weight 3 if required, 1 if preferred; AND credit is proportional, OR needs one supported alternative and shared constraints. Unknown/conflict earns zero. AI links and requirement completeness need human review; this is not a hiring probability.",
+    "advice": "Verify the required evidence gaps before applying. Add only accurate supporting experience to your CV.",
+    "cvUpdatedAt": "2026-11-05T00:00:00.000Z",
+    "jobUpdatedAt": "2026-11-05T00:00:00.000Z",
+    "analyzedAt": "2026-11-05T04:35:23.001Z"
+  },
+  "status": "SERVICE_SUCCESS",
+  "expectations": {
+    "partialThreeOfFive": true,
+    "exactSupportedComponents": true,
+    "noCloudOrDataFlowInference": true,
+    "orUnchanged": true,
+    "score70Consider": true,
+    "sourceBackedEvidence": true
+  },
+  "acceptance": "PASS",
+  "elapsedMs": 9209,
+  "rawModelOutput": {
+    "requirements": [
+      {
+        "requirement": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices.",
+        "priority": "required",
+        "category": "skill",
+        "jdQuote": "Experience designing cloud-based architectures, APIs, integrations, data flows, and CI/CD practices.",
+        "cvQuote": "Designed REST APIs.\nDesigned service integrations using RabbitMQ.\nDesigned GitLab CI/CD pipelines.",
+        "parentId": "p1",
+        "components": [
+          {
+            "componentId": "c1",
+            "jdQuote": "cloud-based architectures",
+            "cvQuote": ""
+          },
+          {
+            "componentId": "c2",
+            "jdQuote": "APIs",
+            "cvQuote": "Designed REST APIs."
+          },
+          {
+            "componentId": "c3",
+            "jdQuote": "integrations",
+            "cvQuote": "Designed service integrations using RabbitMQ."
+          },
+          {
+            "componentId": "c4",
+            "jdQuote": "data flows",
+            "cvQuote": ""
+          },
+          {
+            "componentId": "c5",
+            "jdQuote": "CI/CD practices",
+            "cvQuote": "Designed GitLab CI/CD pipelines."
+          }
+        ]
+      },
+      {
+        "requirement": "MCP or knowledge graphs.",
+        "priority": "preferred",
+        "category": "skill",
+        "jdQuote": "MCP or knowledge graphs.",
+        "cvQuote": "",
+        "parentId": "p2",
+        "components": [
+          {
+            "componentId": "c1",
+            "jdQuote": "MCP",
+            "cvQuote": ""
+          },
+          {
+            "componentId": "c2",
+            "jdQuote": "knowledge graphs",
+            "cvQuote": ""
+          }
+        ]
+      }
+    ]
+  },
+  "schemaValid": true
+}

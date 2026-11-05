@@ -90,6 +90,7 @@ export class JobMatchService {
         );
       const jd = matchJobText(job);
       const canonical = canonicalRequirements(job);
+      if (!canonical.length) throw new CvMatchError('CV_MATCH_INCOMPLETE');
       const prompt = matchPrompt(cv.text, jd, canonical);
       if (Buffer.byteLength(prompt) > 64 * 1024)
         throw new BadRequestException(

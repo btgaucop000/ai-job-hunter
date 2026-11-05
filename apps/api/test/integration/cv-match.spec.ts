@@ -40,8 +40,13 @@ beforeAll(async () => {
           canonicalRequirements: MatchRequirement[];
         };
         return JSON.stringify({
+          // Prompt-only group metadata is input context, not model output.
           requirements: data.canonicalRequirements.map((item) => ({
-            ...item,
+            parentId: item.parentId,
+            requirement: item.requirement,
+            priority: item.priority,
+            category: item.category,
+            jdQuote: item.jdQuote,
             cvQuote: data.cv.includes(`Built ${item.requirement} services.`)
               ? `Built ${item.requirement} services.`
               : '',
