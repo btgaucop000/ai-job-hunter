@@ -1,11 +1,16 @@
 import {
+  evaluateCoverage,
+  requirementGroup,
+  simpleSkillList,
+  simpleEvidenceStatus,
+  simpleContradictions,
+  type ComponentEvidence,
+} from './cv-match.coverage.js';
+import {
   emitMatchEvidenceRejection,
   type MatchEvidenceReason,
 } from './cv-match.diagnostics.js';
-import {
-  jdRequirementLines,
-  alternativeRequirement,
-} from '../extraction/jd-requirements.js';
+import { jdRequirementLines } from '../extraction/jd-requirements.js';
 import { supportedStacks } from '../discovery/discovery.js';
 import { CvMatchError } from './cv-match.error.js';
 import {
@@ -17,6 +22,8 @@ import { normalize } from './matching.policy.js';
 import type { Opportunity } from '../opportunities/opportunity.entity.js';
 
 export interface MatchRequirement {
+  parentId?: string;
+  components?: ComponentEvidence[];
   requirement: string;
   priority: 'required' | 'preferred';
   category: 'skill' | 'experience' | 'domain';
@@ -44,6 +51,21 @@ export const MATCH_SCHEMA = {
           category: { type: 'string', enum: ['skill', 'experience', 'domain'] },
           jdQuote: { type: 'string', minLength: 1, maxLength: 2000 },
           cvQuote: { type: 'string', maxLength: 2000 },
+          parentId: { type: 'string', minLength: 2, maxLength: 10 },
+          components: {
+            type: 'array',
+            maxItems: 20,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['componentId', 'jdQuote', 'cvQuote'],
+              properties: {
+                componentId: { type: 'string', minLength: 2, maxLength: 10 },
+                jdQuote: { type: 'string', minLength: 1, maxLength: 2000 },
+                cvQuote: { type: 'string', maxLength: 2000 },
+              },
+            },
+          },
         },
       },
     },
@@ -60,6 +82,16 @@ export function matchOutputSchema(cv: string) {
           ...requirements.items,
           properties: {
             ...requirements.items.properties,
+            components: {
+              ...requirements.items.properties.components,
+              items: {
+                ...requirements.items.properties.components.items,
+                properties: {
+                  ...requirements.items.properties.components.items.properties,
+                  cvQuote: { type: 'string', enum: cvQuoteChoices(cv) },
+                },
+              },
+            },
             cvQuote: {
               ...requirements.items.properties.cvQuote,
               enum: cvQuoteChoices(cv),
@@ -147,7 +179,7 @@ export function canonicalRequirements(job: Opportunity): MatchRequirement[] {
           .flatMap((line) =>
             (priority === 'required'
               ? generatedRequired
-              : generatedPreferred) || alternativeRequirement(line)
+              : generatedPreferred) || !simpleSkillList(line)
               ? [line]
               : line.split(/[,;]+/u),
           )
@@ -181,7 +213,10 @@ export function canonicalRequirements(job: Opportunity): MatchRequirement[] {
         cvQuote: '',
       });
   }
-  return rows;
+  return rows.map((row, index) => ({
+    ...row,
+    parentId: `p${index + 1}`,
+  }));
 }
 export function matchPrompt(
   cv: string,
@@ -201,15 +236,17 @@ An explicit technical skills declaration is CV evidence; Java Spring Boot develo
 Seniority preferences are not qualifications and must not change the CV score. Do not infer duration or skills from a seniority label.
 An isolated keyword outside a skills declaration, negation, aspiration, uncertain statement or insufficient duration is NOT support. Use an empty cvQuote when not fully evidenced.
 A missing CV quote means not evidenced, never that the person lacks the skill. Do not infer years, domains or experience from job titles.
+Return only canonical parents; extra requirements never receive scoring weight. Include each parentId unchanged. For each supplied group component return components [{componentId, jdQuote, cvQuote}], selecting a separate allowed CV passage or empty string. Keep component IDs and JD spans exactly; never invent components. AND requires every component, OR requires one alternative plus all shared constraints. Personal delivery beyond prototype requires explicit personal build and production delivery, not team contribution or a prototype. Flag gaps with empty quotes, never with unrelated passages.
 Return JSON only, with requirements; priority required/preferred; category skill/experience/domain.
-${JSON.stringify({ cv, job: jd, canonicalRequirements: canonical.map((item) => ({ requirement: item.requirement, priority: item.priority, category: item.category, jdQuote: item.jdQuote })) })}`;
+${JSON.stringify({ cv, job: jd, canonicalRequirements: canonical.map((item) => ({ parentId: item.parentId, requirement: item.requirement, priority: item.priority, category: item.category, jdQuote: item.jdQuote, group: requirementGroup(item.requirement, item.category) })) })}`;
 }
 export const linksCanonicalRequirement = (
   candidate: MatchRequirement,
   seed: MatchRequirement,
 ) =>
-  normalize(candidate.requirement) === normalize(seed.requirement) ||
-  normalize(candidate.jdQuote) === normalize(seed.jdQuote);
+  (candidate.parentId === undefined || candidate.parentId === seed.parentId) &&
+  (normalize(candidate.requirement) === normalize(seed.requirement) ||
+    normalize(candidate.jdQuote) === normalize(seed.jdQuote));
 
 // An omitted or rejected model assessment is not evidence of a poor fit.
 export function validateMatchAssessment(
@@ -230,6 +267,33 @@ export function validateMatchAssessment(
     )
   )
     throw new CvMatchError('CV_MATCH_INCOMPLETE');
+  for (const proposal of proposals) {
+    const parent = canonical.find((seed) =>
+      linksCanonicalRequirement(proposal, seed),
+    );
+    if (proposal.parentId && !parent)
+      throw new CvMatchError('CV_MATCH_INVALID_OUTPUT');
+    const ids = new Set<string>();
+    for (const component of proposal.components ?? []) {
+      const seed =
+        parent &&
+        requirementGroup(parent.requirement, parent.category).components.find(
+          (item) => item.id === component.componentId,
+        );
+      if (
+        !seed ||
+        ids.has(component.componentId) ||
+        seed.jdQuote !== component.jdQuote
+      )
+        throw new CvMatchError('CV_MATCH_INVALID_OUTPUT');
+      ids.add(component.componentId);
+      if (
+        !jd.includes(component.jdQuote) ||
+        (component.cvQuote.trim() && !resolveCvQuote(cv, component.cvQuote))
+      )
+        throw new CvMatchError('CV_MATCH_EVIDENCE_REJECTED');
+    }
+  }
   const tooling =
     /copilot|cursor|claude code|codeium|tabnine|chatgpt|ai[- ]assisted|coding (?:tools?|assistants?)/iu;
   const production =
@@ -271,6 +335,12 @@ export function validateMatchAssessment(
     return {
       ...item,
       cvQuote: quote ?? '',
+      components: item.components?.map((component) => ({
+        ...component,
+        cvQuote: toolingRejected({ ...item, cvQuote: component.cvQuote })
+          ? ''
+          : (resolveCvQuote(cv, component.cvQuote) ?? ''),
+      })),
       ...(item.cvQuote.trim() && quote === null
         ? { cvEvidenceUnverified: true as const }
         : {}),
@@ -278,7 +348,11 @@ export function validateMatchAssessment(
   });
   if (
     verified.some((item) => item.cvEvidenceUnverified) &&
-    !verified.some((item) => item.cvQuote.trim())
+    !verified.some(
+      (item) =>
+        item.cvQuote.trim() ||
+        item.components?.some((component) => component.cvQuote.trim()),
+    )
   ) {
     emitMatchEvidenceRejection(
       toolingIndex >= 0
@@ -325,6 +399,11 @@ export function scoreCvMatch(
     const quote = proposal?.cvQuote ?? '';
     return {
       ...item,
+      components: linked.flatMap((candidate) => candidate.components ?? []),
+      selectedQuotes: linked
+        .filter((candidate) => !candidate.cvEvidenceUnverified)
+        .map((candidate) => candidate.cvQuote)
+        .filter((quote) => quote.trim() && cv.includes(quote)),
       ...(proposal?.cvEvidenceUnverified
         ? { cvEvidenceUnverified: true as const }
         : {}),
@@ -335,11 +414,6 @@ export function scoreCvMatch(
           : recoveredCvQuote(item, cv),
     };
   });
-  merged.push(
-    ...proposals
-      .filter((item) => !canonical.some((seed) => belongsTo(item, seed)))
-      .map((item) => ({ ...item, requirement: item.jdQuote })),
-  );
   const requirements = merged
     .filter((item) => {
       const key = item.requirement.trim().toLocaleLowerCase();
@@ -349,27 +423,83 @@ export function scoreCvMatch(
       return true;
     })
     .map((item) => {
-      const supported = Boolean(
-        item.cvQuote.trim() && cv.includes(item.cvQuote),
-      );
-      const evidence = { ...item };
-      delete evidence.cvEvidenceUnverified;
+      const group = requirementGroup(item.requirement, item.category);
+      const selected = [
+        ...item.selectedQuotes,
+        item.cvQuote,
+        ...(item.components ?? [])
+          .filter(
+            (component) =>
+              group.components.some(
+                (seed) =>
+                  seed.id === component.componentId &&
+                  seed.jdQuote === component.jdQuote,
+              ) && cv.includes(component.cvQuote),
+          )
+          .map((component) => component.cvQuote),
+      ].filter((quote) => quote.trim() && cv.includes(quote));
+      const simpleQuote = item.cvQuote || selected[0] || '';
+      const coverage =
+        group.mode === 'SINGLE'
+          ? null
+          : evaluateCoverage(group, selected, cv, !item.cvEvidenceUnverified);
+      const status =
+        coverage?.status ??
+        simpleEvidenceStatus(
+          item.requirement,
+          simpleQuote.trim() && cv.includes(simpleQuote) ? simpleQuote : '',
+          cv,
+          item.category,
+        );
       return {
-        ...evidence,
-        cvQuote: supported ? item.cvQuote : '',
-        status: supported ? ('EVIDENCED' as const) : ('NOT_EVIDENCED' as const),
+        parentId: item.parentId,
+        requirement: item.requirement,
+        priority: item.priority,
+        category: item.category,
+        jdQuote: item.jdQuote,
+        cvQuote: coverage
+          ? (coverage.components.find((component) => component.cvQuote)
+              ?.cvQuote ?? '')
+          : status === 'EVIDENCED' || status === 'CONFLICT'
+            ? simpleQuote
+            : '',
+        status,
+        credit: coverage?.credit ?? Number(status === 'EVIDENCED'),
+        coverage: coverage ?? {
+          mode: 'SINGLE' as const,
+          credit: Number(status === 'EVIDENCED'),
+          status,
+          reason:
+            status === 'CONFLICT'
+              ? 'Contradictory CV statements need review.'
+              : 'Review the selected evidence.',
+          components: [
+            {
+              ...group.components[0]!,
+              status,
+              cvQuote:
+                status === 'EVIDENCED' || status === 'CONFLICT'
+                  ? simpleQuote
+                  : '',
+              conflictingQuotes:
+                status === 'CONFLICT'
+                  ? simpleContradictions(item.requirement, cv)
+                  : [],
+            },
+          ],
+        },
       };
     });
   const weight = (item: MatchRequirement) =>
     item.priority === 'required' ? 3 : 1;
   const total = requirements.reduce((sum, item) => sum + weight(item), 0);
   const earned = requirements.reduce(
-    (sum, item) => sum + (item.status === 'EVIDENCED' ? weight(item) : 0),
+    (sum, item) => sum + item.credit * weight(item),
     0,
   );
   const score = total ? Math.round((100 * earned) / total) : null;
   const requiredGap = requirements.some(
-    (item) => item.priority === 'required' && item.status === 'NOT_EVIDENCED',
+    (item) => item.priority === 'required' && item.status !== 'EVIDENCED',
   );
   const recommendation =
     score === null
@@ -384,7 +514,7 @@ export function scoreCvMatch(
     recommendation,
     requirements,
     explanation:
-      'Heuristic documented-evidence coverage: required requirements weight 3, preferred weight 1. AI links and requirement completeness need human review; this is not a hiring probability.',
+      'Heuristic documented-evidence coverage: one canonical parent weight 3 if required, 1 if preferred; AND credit is proportional, OR needs one supported alternative and shared constraints. Unknown/conflict earns zero. AI links and requirement completeness need human review; this is not a hiring probability.',
     advice:
       score === null
         ? 'No grounded requirements could be evaluated. Review the saved JD and retry.'

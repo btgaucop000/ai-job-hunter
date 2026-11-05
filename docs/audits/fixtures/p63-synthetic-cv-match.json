@@ -1,0 +1,81 @@
+{
+  "description": "Sanitized single P6.3 live saved-CV matching capture; synthetic data only. Raw model output is unchanged.",
+  "model": "qwen3:4b",
+  "ollamaVersion": "0.40.10",
+  "fixture": {
+    "cv": "Designed APIs.\nBuilt MCP servers.",
+    "required": "Experience designing cloud-based architectures, APIs, integrations, and CI/CD practices.",
+    "preferred": "MCP or knowledge graphs."
+  },
+  "rawModelOutput": {
+    "requirements": [
+      {
+        "requirement": "Experience designing cloud-based architectures, APIs, integrations, and CI/CD practices.",
+        "priority": "required",
+        "category": "skill",
+        "jdQuote": "Experience designing cloud-based architectures, APIs, integrations, and CI/CD practices.",
+        "cvQuote": "Designed APIs.",
+        "parentId": "p1",
+        "components": [
+          {
+            "componentId": "c1",
+            "jdQuote": "cloud-based architectures",
+            "cvQuote": ""
+          },
+          {
+            "componentId": "c2",
+            "jdQuote": "APIs",
+            "cvQuote": "Designed APIs."
+          },
+          {
+            "componentId": "c3",
+            "jdQuote": "integrations",
+            "cvQuote": ""
+          },
+          {
+            "componentId": "c4",
+            "jdQuote": "CI/CD practices",
+            "cvQuote": ""
+          }
+        ]
+      },
+      {
+        "requirement": "MCP or knowledge graphs.",
+        "priority": "preferred",
+        "category": "skill",
+        "jdQuote": "MCP or knowledge graphs.",
+        "cvQuote": "",
+        "parentId": "p2",
+        "components": [
+          {
+            "componentId": "c1",
+            "jdQuote": "MCP",
+            "cvQuote": ""
+          },
+          {
+            "componentId": "c2",
+            "jdQuote": "knowledge graphs",
+            "cvQuote": ""
+          }
+        ]
+      }
+    ]
+  },
+  "elapsedMs": 8672,
+  "originalResult": {
+    "score": 19,
+    "recommendation": "Low Fit",
+    "requirements": [
+      {
+        "parentId": "p1",
+        "status": "PARTIAL",
+        "credit": 0.25
+      },
+      {
+        "parentId": "p2",
+        "status": "NOT_EVIDENCED",
+        "credit": 0
+      }
+    ]
+  }
+}

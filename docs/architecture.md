@@ -44,6 +44,72 @@ CV quotes are selected from bounded source passages and validated against saved
 text; missing/unverified evidence must not be described as proof of missing skill.
 Browser matching results do not alter application status, dates, or notes.
 
+Saved-CV compound matching uses shallow request-local parent/component identifiers
+inside the existing matching module (`cv-match.coverage.ts`). Contextual source
+clauses retain one required/preferred weight (3/1); only bare comma/semicolon
+technology lists create independent parents. The server derives explicit flat
+AND/OR components and common constraints, so model-selected passages cannot alter
+the denominator, operator or component count. Optional per-component quotations
+support evidence on separate CV lines while legacy parent-only proposals remain
+valid. AND earns proportional component credit; OR needs one supported alternative
+and any recognized shared constraints. Unknown and conflicting coverage earns zero;
+any non-full required parent blocks Apply. Generic-duration and Domain weights
+remain unchanged. Extra model requirements are validated but excluded from scoring.
+
+Evidence provenance is checked separately from bounded semantic support. Explicit
+term/alias and action/knowledge checks, personal production-delivery guards,
+minimum-duration guards and source-backed negative/contradictory passages constrain
+compound credit. Ambiguous/nested forms remain Unknown rather than being flattened
+into an invented logic tree. This deliberately conservative parser is not universal
+natural-language entailment or a new requirements AST; uncommon synonyms and
+unrecognized equivalence need human review. Model schema/evidence failures retain
+the existing typed failure paths. CV Match displays parent/component quotations,
+Partial, Unknown and Conflict alongside Matched; no entity or migration is needed.
+The separate Task 04 structured-extraction matcher keeps its existing policy.
+
+When a verified proposal omits an explicit OR alternative, deterministic recovery
+may select a positive original CV passage for a term in the existing alias registry.
+The same component support checks enforce common context, delivery and duration;
+negation, aspiration, contradictory evidence and coding-tool passages cannot become
+full OR credit. Recovery keeps an exact source span, never changes raw model output,
+and this OR path is disabled for rejected parent evidence, AND/SINGLE/ambiguous groups and
+unrecognized aliases. Existing Java/generic-duration recovery remains unchanged.
+
+Canonical Bachelor-level education OR groups have a separate degree recovery path,
+without adding education prose to technical aliases. An explicit degree assertion
+and a relevant named field are required. The scorer can retain a bounded original
+span containing a degree line, an immediately adjacent field-only continuation and
+nearby completion/status metadata (at most four lines, 2,000 characters). Blank
+lines, another qualification or intervening institutions prevent field stitching.
+Incomplete, pending, negative or contradictory degree evidence cannot earn full
+credit; selected degree-only quotes cannot hide adjacent pending status. Attendance
+and dates alone do not establish a degree, and generic work duration never recovers
+practical equivalence. Rejected evidence stays rejected; no general AND recovery,
+schema, score-weight or persistence change is involved.
+
+AND omission recovery is a separate bounded path for explicit design-context
+components: APIs, CI/CD practices, integrations, data flows and cloud-based
+architectures. Each component must match its own validated term and positive
+source context; non-CI/CD components require design context. Technology lists,
+AWS or RabbitMQ alone are insufficient.
+Future, incomplete, negative, contradictory and coding-tool evidence cannot earn
+recovery credit. Original source passages are retained (at most 2,000 characters),
+and rejected parent evidence disables recovery. Existing proportional credit and
+one canonical-parent weight remain; one component never satisfies a five-component
+parent. Knowledge/experience-only, unrecognized and ambiguous AND groups receive
+no new recovery. OR and education paths keep their existing semantics.
+
+The design-context AND component `CI/CD practices` has a narrow applied-work
+exception: explicit pipeline/automation design, implementation, configuration or
+optimization can satisfy that component. Implementation/configuration/optimization
+must act on a named CI/CD pipeline/workflow/automation context, its spelled-out
+continuous integration/delivery/deployment equivalent, or a bounded automated
+build-and-test/deployment pipeline form. Using a pipeline for unrelated work is
+not pipeline implementation evidence. Model-selected quotations and omission
+recovery use the same component-specific predicate and existing negative/conflict
+and rejected-evidence gates. Other component design predicates, OR and education
+semantics, source quotations, parent weights and recommendation rules are unchanged.
+
 `discovery` retrieves the configured Axon, Backbase, Temus and Go1 Vietnam public Greenhouse boards
 on demand, ranks using the supplied filters, and queues candidates for explicit
 Save through OpportunitiesService. Exact links preserve existing Inbox jobs. This is not

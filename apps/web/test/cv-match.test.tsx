@@ -47,13 +47,13 @@ test('loads saved CV, displays local analysis and clears stale results after job
   const requirements = screen.getByRole('region', { name: 'Requirements' });
   expect(screen.queryByLabelText('CV evidence')).toBeNull();
   expect(screen.getByText('Matched: 1')).toBeVisible();
-  expect(screen.getByText('Unverified: 1')).toBeVisible();
+  expect(screen.getByText('Unknown: 1')).toBeVisible();
   expect(screen.getByText('Total: 2')).toBeVisible();
   const matched = within(requirements).getByRole('button', {
     name: 'Matched: Python',
   });
   const gaps = within(requirements).getByRole('button', {
-    name: 'Unverified: Insurance',
+    name: 'Unknown: Insurance',
   });
   expect(matched).toHaveAttribute('aria-expanded', 'false');
   fireEvent.click(matched);
@@ -137,10 +137,10 @@ test('unknown score and long multiline evidence preserve exact source text', asy
   fireEvent.click(screen.getByRole('button', { name: 'Matched: Python' }));
   expect(screen.getByLabelText('CV evidence').textContent).toBe(quote);
   expect(screen.getByLabelText('CV evidence')).toHaveAttribute('tabindex', '0');
-  fireEvent.click(screen.getByRole('button', { name: 'Unverified' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Unknown' }));
   expect(
     within(screen.getByRole('region', { name: 'Requirements' })).getByText(
-      'No unverified requirements reported.',
+      'No unknown requirements reported.',
     ),
   ).toBeVisible();
 });
@@ -289,10 +289,10 @@ test('filters, stable priority/status ordering and keyboard disclosure use exist
       .getAllByRole('button')
       .filter((button) => button.hasAttribute('aria-expanded'));
   expect(rows().map((button) => button.getAttribute('aria-label'))).toEqual([
-    'Unverified: Required gap first',
-    'Unverified: Required gap second',
+    'Unknown: Required gap first',
+    'Unknown: Required gap second',
     'Matched: Required matched',
-    'Unverified: Preferred gap',
+    'Unknown: Preferred gap',
     'Matched: Preferred matched',
   ]);
   expect(
@@ -309,13 +309,13 @@ test('filters, stable priority/status ordering and keyboard disclosure use exist
   expect(rows()).toHaveLength(2);
   expect(within(list).queryByText('Required gap first')).toBeNull();
   expect(screen.getByText('Preferred')).toBeVisible();
-  await user.click(screen.getByRole('button', { name: 'Unverified' }));
+  await user.click(screen.getByRole('button', { name: 'Unknown' }));
   expect(rows()).toHaveLength(3);
   expect(within(list).queryByText('Required matched')).toBeNull();
   await user.click(screen.getByRole('button', { name: 'All' }));
   expect(rows()).toHaveLength(5);
   expect(screen.getByText('Matched: 2')).toBeVisible();
-  expect(screen.getByText('Unverified: 3')).toBeVisible();
+  expect(screen.getByText('Unknown: 3')).toBeVisible();
 });
 
 test('no saved CV keeps the initial empty state and analyze disabled', async () => {
@@ -385,7 +385,7 @@ test('overview surfaces source labels for strengths and required gaps with a neu
   const all = screen.getByRole('region', { name: 'Requirements' });
   expect(
     within(all).getByRole('button', {
-      name: 'Unverified: Preferred source gap',
+      name: 'Unknown: Preferred source gap',
     }),
   ).toBeVisible();
 });
@@ -421,7 +421,7 @@ test('preview links reveal the exact requirement across filters and support keyb
     name: 'Key strengths',
   });
   const gaps = screen.getByRole('region', { name: 'Required gaps' });
-  await user.click(screen.getByRole('button', { name: 'Unverified' }));
+  await user.click(screen.getByRole('button', { name: 'Unknown' }));
   const preview = within(strengths).getByRole('button', {
     name: 'View evidence: Same label',
   });
@@ -442,7 +442,7 @@ test('preview links reveal the exact requirement across filters and support keyb
   await user.click(
     within(gaps).getByRole('button', { name: 'View evidence: Same label' }),
   );
-  const gap = screen.getByRole('button', { name: 'Unverified: Same label' });
+  const gap = screen.getByRole('button', { name: 'Unknown: Same label' });
   await waitFor(() => expect(gap).toHaveFocus());
   expect(gap).toHaveAttribute('aria-current', 'true');
   expect(
@@ -455,13 +455,13 @@ test('preview links reveal the exact requirement across filters and support keyb
     'aria-pressed',
     'true',
   );
-  await user.click(screen.getByRole('button', { name: 'Unverified' }));
+  await user.click(screen.getByRole('button', { name: 'Unknown' }));
   expect(
-    screen.getByRole('button', { name: 'Unverified: Same label' }),
+    screen.getByRole('button', { name: 'Unknown: Same label' }),
   ).toHaveAttribute('aria-current', 'true');
   await user.click(screen.getByRole('button', { name: 'All' }));
   expect(
-    screen.getByRole('button', { name: 'Unverified: Same label' }),
+    screen.getByRole('button', { name: 'Unknown: Same label' }),
   ).toHaveAttribute('aria-current', 'true');
   gap.focus();
   await user.keyboard(' ');
@@ -494,7 +494,7 @@ test('preferred gap previews retain their actual priority and disclose no requir
   fireEvent.click(
     within(gaps).getByRole('button', { name: 'View evidence: Insurance' }),
   );
-  const row = screen.getByRole('button', { name: 'Unverified: Insurance' });
+  const row = screen.getByRole('button', { name: 'Unknown: Insurance' });
   expect(row).toHaveAttribute('aria-expanded', 'true');
   expect(within(row).getByText('Preferred · Domain')).toBeVisible();
 });
@@ -557,4 +557,145 @@ test('a result arriving after a saved-job revision change stays invalidated and 
   fetch.mockResolvedValueOnce(Response.json(result));
   fireEvent.click(screen.getByRole('button', { name: 'Analyze CV Match' }));
   expect(await screen.findByLabelText(/Fit score: 75\/100/)).toBeVisible();
+});
+
+test('compound states, component evidence and conflict passages survive filtering and keyboard reveal', async () => {
+  const user = userEvent.setup();
+  const component = (
+    label: string,
+    status: string,
+    cvQuote = '',
+    conflictingQuotes: string[] = [],
+  ) => ({
+    id: label,
+    label,
+    status,
+    jdQuote: label,
+    cvQuote,
+    conflictingQuotes,
+  });
+  const requirements = [
+    {
+      ...result.requirements[0],
+      requirement: 'APIs and integrations',
+      status: 'PARTIAL',
+      cvQuote: 'Designed APIs.',
+      coverage: {
+        mode: 'AND',
+        reason: 'Review the selected component evidence.',
+        credit: 0.5,
+        components: [
+          component('APIs', 'EVIDENCED', 'Designed APIs.'),
+          component('integrations', 'NOT_EVIDENCED'),
+        ],
+      },
+    },
+    {
+      ...result.requirements[0],
+      requirement: 'MCP or knowledge graphs',
+      status: 'CONFLICT',
+      cvQuote: 'Built MCP servers.',
+      coverage: {
+        mode: 'OR',
+        reason: 'Contradictory CV statements need review.',
+        credit: 0,
+        components: [
+          component('MCP', 'CONFLICT', 'Built MCP servers.', [
+            'I have never used MCP.',
+          ]),
+          component('knowledge graphs', 'NOT_EVIDENCED'),
+        ],
+      },
+    },
+    {
+      ...result.requirements[1],
+      requirement: 'RAG knowledge',
+      status: 'NOT_EVIDENCED',
+    },
+    result.requirements[0],
+  ];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) =>
+      Response.json(
+        url.endsWith('/cv/current')
+          ? { fileName: 'synthetic.pdf' }
+          : { ...result, score: 38, recommendation: 'Low Fit', requirements },
+      ),
+    ),
+  );
+  const view = render(<CvMatchPanel jobId="synthetic" revision="1" />);
+  await screen.findByText('Saved CV: synthetic.pdf');
+  await user.click(screen.getByRole('button', { name: 'Analyze CV Match' }));
+  await screen.findByText('Partial: 1');
+  expect(screen.getByText('Unknown: 1')).toBeVisible();
+  expect(screen.getByText('Conflict / Needs review: 1')).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Partial' }));
+  const partial = screen.getByRole('button', {
+    name: 'Partial: APIs and integrations',
+  });
+  partial.focus();
+  await user.keyboard('{Enter}');
+  expect(partial).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByText('AND · 1/2 components supported')).toBeVisible();
+  expect(screen.getByLabelText('CV evidence: APIs').textContent).toBe(
+    'Designed APIs.',
+  );
+  expect(screen.getByLabelText('JD evidence: integrations').textContent).toBe(
+    'integrations',
+  );
+  expect(screen.getByText('Not evidenced in CV')).toBeVisible();
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Conflict / Needs review',
+    }),
+  );
+  const conflict = screen.getByRole('button', {
+    name: 'Conflict / Needs review: MCP or knowledge graphs',
+  });
+  conflict.focus();
+  await user.keyboard(' ');
+  expect(
+    screen.getByLabelText('Conflicting CV evidence: MCP').textContent,
+  ).toBe('I have never used MCP.');
+  expect(screen.getByLabelText('Conflicting CV evidence: MCP')).toHaveAttribute(
+    'tabindex',
+    '0',
+  );
+  await user.click(screen.getByRole('button', { name: 'Unknown' }));
+  expect(
+    screen.queryByRole('button', { name: 'Partial: APIs and integrations' }),
+  ).toBeNull();
+  expect(
+    screen.getByRole('button', { name: 'Unknown: RAG knowledge' }),
+  ).toBeVisible();
+  view.rerender(<CvMatchPanel jobId="synthetic" revision="2" />);
+  expect(screen.queryByLabelText(/Fit score:/)).toBeNull();
+});
+
+test('partial response with malformed component evidence is rejected rather than rendered', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) =>
+      Response.json(
+        url.endsWith('/cv/current')
+          ? { fileName: 'synthetic.pdf' }
+          : {
+              ...result,
+              requirements: [
+                {
+                  ...result.requirements[0],
+                  status: 'PARTIAL',
+                  coverage: { mode: 'AND', components: [null] },
+                },
+              ],
+            },
+      ),
+    ),
+  );
+  render(<CvMatchPanel jobId="synthetic" revision="1" />);
+  await screen.findByText('Saved CV: synthetic.pdf');
+  fireEvent.click(screen.getByRole('button', { name: 'Analyze CV Match' }));
+  await screen.findByText(/API returned an invalid matching result/);
+  expect(screen.queryByLabelText(/Fit score:/)).toBeNull();
 });

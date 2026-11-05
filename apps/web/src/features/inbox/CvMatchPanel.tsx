@@ -33,9 +33,30 @@ interface MatchResult {
     category: string;
     jdQuote: string;
     cvQuote: string;
-    status: 'EVIDENCED' | 'NOT_EVIDENCED';
+    status: 'EVIDENCED' | 'PARTIAL' | 'NOT_EVIDENCED' | 'CONFLICT';
+    coverage?: {
+      mode: 'SINGLE' | 'AND' | 'OR' | 'UNKNOWN';
+      reason: string;
+      credit: number;
+      components: {
+        id: string;
+        label: string;
+        jdQuote: string;
+        cvQuote: string;
+        status: 'EVIDENCED' | 'NOT_EVIDENCED' | 'CONFLICT';
+        conflictingQuotes: string[];
+      }[];
+    };
   }[];
 }
+const statusLabel = (status: MatchResult['requirements'][number]['status']) =>
+  ({
+    EVIDENCED: 'Matched',
+    PARTIAL: 'Partial',
+    NOT_EVIDENCED: 'Unknown',
+    CONFLICT: 'Conflict / Needs review',
+  })[status];
+
 export function CvMatchPanel({
   jobId,
   revision,
@@ -333,7 +354,7 @@ function MatchOverview({
 }) {
   const rows = result.requirements.map((item, index) => ({ item, index }));
   const matched = rows.filter(({ item }) => item.status === 'EVIDENCED');
-  const gaps = rows.filter(({ item }) => item.status === 'NOT_EVIDENCED');
+  const gaps = rows.filter(({ item }) => item.status !== 'EVIDENCED');
   const requiredGaps = gaps.filter(({ item }) => item.priority === 'required');
   const preferredGaps = gaps.filter(
     ({ item }) => item.priority === 'preferred',
@@ -404,7 +425,14 @@ function MatchOverview({
               sx={{ flexWrap: 'wrap', mb: 1.5 }}
             >
               <Typography variant="body2">Matched: {matched.length}</Typography>
-              <Typography variant="body2">Unverified: {gaps.length}</Typography>
+              {(['PARTIAL', 'NOT_EVIDENCED', 'CONFLICT'] as const).map(
+                (status) => (
+                  <Typography key={status} variant="body2">
+                    {statusLabel(status)}:{' '}
+                    {rows.filter(({ item }) => item.status === status).length}
+                  </Typography>
+                ),
+              )}
               <Typography variant="body2" color="text.secondary">
                 Total: {rows.length}
               </Typography>
@@ -479,7 +507,7 @@ function MatchOverview({
         <RequirementPreview
           title={requiredGaps.length ? 'Required gaps' : 'Preferred gaps'}
           items={requiredGaps.length ? requiredGaps : preferredGaps}
-          empty="No unverified requirements reported."
+          empty="No unknown requirements reported."
           hint={
             requiredGaps.length
               ? 'Required qualifications not evidenced in your CV'
@@ -564,6 +592,34 @@ function RequirementPreview({
   );
 }
 
+function validCoverage(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as NonNullable<
+    MatchResult['requirements'][number]['coverage']
+  >;
+  return (
+    ['SINGLE', 'AND', 'OR', 'UNKNOWN'].includes(row.mode) &&
+    typeof row.reason === 'string' &&
+    typeof row.credit === 'number' &&
+    row.credit >= 0 &&
+    row.credit <= 1 &&
+    Array.isArray(row.components) &&
+    row.components.length > 0 &&
+    row.components.every(
+      (component) =>
+        component &&
+        typeof component.id === 'string' &&
+        typeof component.label === 'string' &&
+        typeof component.jdQuote === 'string' &&
+        typeof component.cvQuote === 'string' &&
+        ['EVIDENCED', 'NOT_EVIDENCED', 'CONFLICT'].includes(component.status) &&
+        (component.status !== 'EVIDENCED' || component.cvQuote.trim()) &&
+        Array.isArray(component.conflictingQuotes) &&
+        component.conflictingQuotes.every((quote) => typeof quote === 'string'),
+    )
+  );
+}
+
 function isMatchResult(value: unknown): value is MatchResult {
   if (!value || typeof value !== 'object') return false;
   const row = value as Partial<MatchResult>;
@@ -587,8 +643,13 @@ function isMatchResult(value: unknown): value is MatchResult {
         typeof item.cvQuote === 'string' &&
         ['required', 'preferred'].includes(item.priority) &&
         ['skill', 'experience', 'domain'].includes(item.category) &&
-        (item.status === 'NOT_EVIDENCED' ||
-          (item.status === 'EVIDENCED' && item.cvQuote.trim())),
+        ['EVIDENCED', 'PARTIAL', 'NOT_EVIDENCED', 'CONFLICT'].includes(
+          item.status,
+        ) &&
+        (item.status !== 'EVIDENCED' || item.cvQuote.trim()) &&
+        (item.coverage === undefined || validCoverage(item.coverage)) &&
+        (!['PARTIAL', 'CONFLICT'].includes(item.status) ||
+          item.coverage !== undefined),
     )
   );
 }
@@ -617,16 +678,22 @@ function RequirementsList({
     .filter(
       ({ item }) =>
         filter === 'all' ||
-        (filter === 'matched'
-          ? item.status === 'EVIDENCED'
-          : item.status === 'NOT_EVIDENCED'),
+        item.status ===
+          (
+            {
+              matched: 'EVIDENCED',
+              partial: 'PARTIAL',
+              unknown: 'NOT_EVIDENCED',
+              conflict: 'CONFLICT',
+            } as Record<string, string>
+          )[filter],
     )
     .sort(
       (a, b) =>
         Number(b.item.priority === 'required') -
           Number(a.item.priority === 'required') ||
-        Number(b.item.status === 'NOT_EVIDENCED') -
-          Number(a.item.status === 'NOT_EVIDENCED') ||
+        Number(b.item.status !== 'EVIDENCED') -
+          Number(a.item.status !== 'EVIDENCED') ||
         a.index - b.index,
     );
   return (
@@ -663,19 +730,26 @@ function RequirementsList({
           Matched (
           {requirements.filter((item) => item.status === 'EVIDENCED').length})
         </ToggleButton>
-        <ToggleButton value="unverified" aria-label="Unverified">
-          Unverified (
-          {
-            requirements.filter((item) => item.status === 'NOT_EVIDENCED')
-              .length
-          }
-          )
-        </ToggleButton>
+        {(
+          [
+            ['partial', 'PARTIAL'],
+            ['unknown', 'NOT_EVIDENCED'],
+            ['conflict', 'CONFLICT'],
+          ] as const
+        ).map(([value, status]) => (
+          <ToggleButton
+            key={value}
+            value={value}
+            aria-label={statusLabel(status)}
+          >
+            {statusLabel(status)} (
+            {requirements.filter((item) => item.status === status).length})
+          </ToggleButton>
+        ))}
       </ToggleButtonGroup>
       {items.length === 0 && (
         <Typography variant="body2" color="text.secondary">
-          No {filter === 'matched' ? 'matched' : 'unverified'} requirements
-          reported.
+          No {filter} requirements reported.
         </Typography>
       )}
       <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
@@ -756,7 +830,7 @@ function RequirementCard({
         aria-current={selected ? 'true' : undefined}
         id={`${id}-summary`}
         aria-controls={`${id}-evidence`}
-        aria-label={`${matched ? 'Matched' : 'Unverified'}: ${item.requirement}`}
+        aria-label={`${statusLabel(item.status)}: ${item.requirement}`}
         expandIcon={<MatchIcon kind="expand" />}
         sx={{
           px: 1,
@@ -783,7 +857,7 @@ function RequirementCard({
         >
           <Box
             role="img"
-            aria-label={matched ? 'Matched' : 'Unverified'}
+            aria-label={statusLabel(item.status)}
             sx={{ display: 'flex', pt: 0.25 }}
           >
             <MatchIcon kind={matched ? 'matched' : 'gap'} />
@@ -814,7 +888,7 @@ function RequirementCard({
                 variant="body2"
                 color={matched ? 'success.main' : 'text.secondary'}
               >
-                {matched ? 'Matched' : 'Unverified'}
+                {statusLabel(item.status)}
               </Typography>
             </Stack>
           </Box>
@@ -840,7 +914,7 @@ function RequirementCard({
           }}
         >
           <EvidenceQuote source="JD evidence" quote={item.jdQuote} />
-          {matched ? (
+          {item.cvQuote ? (
             <EvidenceQuote source="CV evidence" quote={item.cvQuote} />
           ) : (
             <Box>
@@ -853,6 +927,57 @@ function RequirementCard({
             </Box>
           )}
         </Box>
+        {item.coverage && (
+          <Box
+            component="section"
+            aria-label={`Component coverage: ${item.requirement}`}
+            sx={{ mt: 2 }}
+          >
+            <Typography variant="subtitle2">
+              {item.coverage.mode} ·{' '}
+              {
+                item.coverage.components.filter(
+                  (component) => component.status === 'EVIDENCED',
+                ).length
+              }
+              /{item.coverage.components.length} components supported
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {item.coverage.reason}
+            </Typography>
+            {item.coverage.components.map((component) => (
+              <Box key={component.id} sx={{ mt: 2, overflowWrap: 'anywhere' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {component.label} · {statusLabel(component.status)}
+                </Typography>
+                <EvidenceQuote
+                  source="JD evidence"
+                  label={`JD evidence: ${component.label}`}
+                  quote={component.jdQuote}
+                />
+                {component.cvQuote ? (
+                  <EvidenceQuote
+                    source="CV evidence"
+                    label={`CV evidence: ${component.label}`}
+                    quote={component.cvQuote}
+                  />
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Not evidenced in CV
+                  </Typography>
+                )}
+                {component.conflictingQuotes.map((quote, index) => (
+                  <EvidenceQuote
+                    key={index}
+                    source="CV evidence"
+                    label={`Conflicting CV evidence: ${component.label}`}
+                    quote={quote}
+                  />
+                ))}
+              </Box>
+            ))}
+          </Box>
+        )}
       </AccordionDetails>
     </Accordion>
   );
@@ -860,7 +985,9 @@ function RequirementCard({
 function EvidenceQuote({
   source,
   quote,
+  label,
 }: {
+  label?: string;
   source: 'CV evidence' | 'JD evidence';
   quote: string;
 }) {
@@ -871,7 +998,7 @@ function EvidenceQuote({
       </Typography>
       <Box
         component="blockquote"
-        aria-label={source}
+        aria-label={label ?? source}
         tabIndex={0}
         sx={{
           m: 0,
