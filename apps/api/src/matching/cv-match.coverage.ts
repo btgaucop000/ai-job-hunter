@@ -36,6 +36,10 @@ export function simpleSkillList(line: string): boolean {
   );
 }
 
+// A single named language is an atomic qualification, not an ambiguous list.
+const singleManagedLanguage =
+  /^Backend service experience in managed languages including ([\w+#.-]+)$/iu;
+
 export function requirementGroup(
   requirement: string,
   category: string,
@@ -101,6 +105,7 @@ export function requirementGroup(
       'experience',
       true,
     );
+  if (singleManagedLanguage.test(text)) return group('SINGLE', [text]);
   const languages = /\bat least one managed language such as (.+)$/iu.exec(
     text,
   );
@@ -180,6 +185,11 @@ const aliases: readonly [RegExp, RegExp][] = [
 ];
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 function mentions(label: string, text: string): boolean {
+  // Explicit integration action, not mere LLM API usage or a tool declaration.
+  if (/^LLM API integration$/iu.test(label))
+    return /\b(?:integrat(?:ed|ing) LLM APIs?|LLM API integration)\b/iu.test(
+      text,
+    );
   const alias = aliases.find(([pattern]) => pattern.test(label));
   if (alias) return alias[1].test(text);
   // A small spelling normalization, not fuzzy entailment or a skill ontology.
@@ -318,7 +328,7 @@ function supports(
     );
   return (
     active(text) ||
-    /^\s*(?:technical skills[:\s]*|backend\s*[:—–-])/iu.test(text)
+    /^\s*(?:technical skills[:\s]*|(?:backend|databases)\s*[:—–-])/iu.test(text)
   );
 }
 
@@ -567,12 +577,12 @@ export function simpleEvidenceStatus(
   category = 'skill',
 ): CoverageStatus {
   if (!quote) return 'NOT_EVIDENCED';
-  if (
+  // Legacy generic Experience rows are semantic duration assessments, not a skill token.
+  const bareSkill =
     category === 'skill' &&
     /^[\w+#./-]+$/u.test(requirement) &&
-    !mentions(requirement, quote)
-  )
-    return 'NOT_EVIDENCED';
+    !/^experience$/iu.test(requirement);
+  if (bareSkill && !mentions(requirement, quote)) return 'NOT_EVIDENCED';
   const minimum =
     /^(?:(?:minimum|at least|min\.?)\s+)?(\d+)\+?\s+(?:years?|yrs?)$/iu.exec(
       requirement.trim(),
@@ -588,10 +598,15 @@ export function simpleEvidenceStatus(
       return 'NOT_EVIDENCED';
     return 'EVIDENCED';
   }
-  const label = requirement.replace(
-    /^(?:experience (?:with|in)|backend|knowledge of)\s+/iu,
-    '',
-  );
+  const language = singleManagedLanguage.exec(
+    requirement.trim().replace(/\.$/u, ''),
+  )?.[1];
+  const label =
+    language ??
+    requirement.replace(
+      /^(?:experience (?:with|in)|backend|knowledge of)\s+/iu,
+      '',
+    );
   const selected = passages(quote).filter(
     (line) => !negative(line) && !uncertain(line),
   );
@@ -599,9 +614,8 @@ export function simpleEvidenceStatus(
     (line) => mentions(label, line) && negative(line),
   );
   if (
-    category === 'skill' &&
-    /^[\w+#./-]+$/u.test(requirement) &&
-    !selected.some((line) => mentions(requirement, line))
+    (language !== undefined || bareSkill) &&
+    !selected.some((line) => mentions(label, line))
   )
     return 'NOT_EVIDENCED';
   if (negatives.length && selected.some((line) => mentions(label, line)))
@@ -613,9 +627,14 @@ export function simpleContradictions(
   requirement: string,
   cv: string,
 ): string[] {
-  const label = requirement.replace(
-    /^(?:experience (?:with|in)|backend|knowledge of)\s+/iu,
-    '',
-  );
+  const language = singleManagedLanguage.exec(
+    requirement.trim().replace(/\.$/u, ''),
+  )?.[1];
+  const label =
+    language ??
+    requirement.replace(
+      /^(?:experience (?:with|in)|backend|knowledge of)\s+/iu,
+      '',
+    );
   return passages(cv).filter((line) => mentions(label, line) && negative(line));
 }

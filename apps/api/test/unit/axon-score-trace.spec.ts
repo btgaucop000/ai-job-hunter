@@ -71,7 +71,7 @@ function trace(proposals: MatchRequirement[]) {
   const verified = validateMatchAssessment(proposals, sourceCv, jd, canonical);
   return { verified, result: scoreCvMatch(verified, sourceCv, jd, canonical) };
 }
-test.each(['experience', 'Java backend', 'SQL databases', 'AI-assisted tools'])(
+test.each(['experience', 'Java backend', 'SQL databases'])(
   '%s evidence survives proposal → linkage → original-span resolution → scoring',
   (kind) => {
     const index = [
@@ -103,10 +103,14 @@ test('reordered model rows and renamed labels retain linkage through exact JD ev
     result.requirements
       .filter((row) => row.status === 'EVIDENCED')
       .map((row) => row.requirement),
-  ).toEqual(facts.slice(0, 4));
+  ).toEqual(facts.slice(0, 3));
+  expect(result.requirements[3]).toMatchObject({
+    status: 'NOT_EVIDENCED',
+    cvQuote: '',
+  });
   expect(result.score).toBeGreaterThan(0);
 });
-test('a rejected SQL quote does not erase verified Java, experience or tooling matches', () => {
+test('a rejected SQL quote does not erase verified Java or experience matches', () => {
   const rows = proposed();
   rows[2]!.cvQuote = 'Invented SQL expertise';
   const { verified, result } = trace(rows);
@@ -119,7 +123,11 @@ test('a rejected SQL quote does not erase verified Java, experience or tooling m
     result.requirements
       .filter((row) => row.status === 'EVIDENCED')
       .map((row) => row.requirement),
-  ).toEqual([facts[0], facts[1], facts[3]]);
+  ).toEqual([facts[0], facts[1]]);
+  expect(result.requirements[3]).toMatchObject({
+    status: 'NOT_EVIDENCED',
+    cvQuote: '',
+  });
   expect(result.score).toBeGreaterThan(0);
 });
 test('all rejected positive quotations fail instead of masquerading as a negative-fit assessment', () => {
@@ -175,9 +183,99 @@ test('the service sends verified rows to scoring and returns nonzero API-shaped 
   expect(result.score).toBeGreaterThan(0);
   expect(
     result.requirements.filter((row) => row.status === 'EVIDENCED'),
-  ).toHaveLength(4);
+  ).toHaveLength(3);
+  expect(result.requirements[3]).toMatchObject({
+    status: 'NOT_EVIDENCED',
+    cvQuote: '',
+  });
   expect(spy.mock.calls[0]![0][0]!.cvQuote).toBe(
     'Summary: 6+ years of\nprofessional software engineering.',
   );
   expect(provider.generate).toHaveBeenCalledTimes(1); // Mock only.
+});
+
+test('a source-valid tool list is not evidence of evaluating and integrating tooling', () => {
+  const { verified, result } = trace(proposed());
+  // Provenance succeeds; semantic activity coverage does not.
+  expect(verified[3]!.cvQuote).toBe(evidence[3]);
+  expect(verified[3]!.cvEvidenceUnverified).toBeUndefined();
+  expect(result.requirements[3]).toMatchObject({
+    status: 'NOT_EVIDENCED',
+    cvQuote: '',
+    credit: 0,
+  });
+  expect(
+    result.requirements[3]!.coverage.components.map((c) => c.status),
+  ).toEqual(['NOT_EVIDENCED', 'NOT_EVIDENCED']);
+  expect(result).toMatchObject({ score: 60, recommendation: 'Consider' });
+});
+
+const toolingActivity =
+  'Experience evaluating AI-assisted development tools, including GitHub Copilot, and integrating AI-assisted development tools into engineering workflows through code-review automation.';
+function toolingAssessment(cv: string, quote: string) {
+  const parent = canonical[3]!;
+  const proposals = [{ ...parent, cvQuote: quote }];
+  return scoreCvMatch(
+    validateMatchAssessment(proposals, cv, jd, [parent]),
+    cv,
+    jd,
+    [parent],
+  );
+}
+test('explicit evaluation AND workflow integration retains its exact original activity quote', () => {
+  const result = toolingAssessment(toolingActivity, toolingActivity);
+  expect(result).toMatchObject({
+    score: 100,
+    recommendation: 'Apply',
+    requirements: [
+      { status: 'EVIDENCED', credit: 1, cvQuote: toolingActivity },
+    ],
+  });
+  expect(
+    result.requirements[0]!.coverage.components.map((c) => ({
+      status: c.status,
+      cvQuote: c.cvQuote,
+    })),
+  ).toEqual([
+    { status: 'EVIDENCED', cvQuote: toolingActivity },
+    { status: 'EVIDENCED', cvQuote: toolingActivity },
+  ]);
+});
+test.each([
+  `I can't claim ${toolingActivity.toLowerCase()}`,
+  `I can’t claim ${toolingActivity.toLowerCase()}`,
+  `Seeking ${toolingActivity.toLowerCase()}`,
+  `Aspiring to gain ${toolingActivity.toLowerCase()}`,
+])(
+  'negative/aspirational activity declarations remain unsupported: %s',
+  (quote) => {
+    expect(toolingAssessment(quote, quote)).toMatchObject({
+      score: 0,
+      recommendation: 'Low Fit',
+      requirements: [{ status: 'NOT_EVIDENCED', credit: 0, cvQuote: '' }],
+    });
+  },
+);
+test('evaluation activity alone cannot satisfy both tooling activities', () => {
+  const quote =
+    'Experience evaluating AI-assisted development tools including GitHub Copilot.';
+  const result = toolingAssessment(quote, quote);
+  expect(result).toMatchObject({
+    score: 50,
+    recommendation: 'Consider',
+    requirements: [{ status: 'PARTIAL', credit: 0.5 }],
+  });
+  expect(
+    result.requirements[0]!.coverage.components.map((c) => c.status),
+  ).toEqual(['EVIDENCED', 'NOT_EVIDENCED']);
+});
+test('contradictory tooling activity remains Conflict with zero credit', () => {
+  const denial = `I can't claim ${toolingActivity.toLowerCase()}`;
+  expect(
+    toolingAssessment(`${toolingActivity}\n${denial}`, toolingActivity),
+  ).toMatchObject({
+    score: 0,
+    recommendation: 'Low Fit',
+    requirements: [{ status: 'CONFLICT', credit: 0 }],
+  });
 });
