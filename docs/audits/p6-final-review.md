@@ -412,3 +412,43 @@ remain; this is not a large-scale accuracy benchmark or a new live model/browser
 acceptance run. GitHub Actions has not been rerun because these corrections are
 uncommitted. No private CV/Ollama access, database writes, commit, push or PR
 mutation occurred. Stop for review.
+
+## Post-P6.11 integration CI failure — mock output contract
+
+The reported GitHub Actions failure was reproduced with
+`pnpm --filter @ai-job-hunter/api test:integration --testPathPatterns cv-match`:
+one lifecycle test failed with HTTP 503 rather than 200; the migration test passed.
+Testing used only the existing isolated test PostgreSQL identity/role on port
+5433 (`databaseOptions('test')` enforces it), synthetic fixtures and a mocked
+provider. No development database or private CV was accessed; no Ollama ran.
+
+Root cause: P6 adds derived `group` metadata to canonical requirement objects in
+`matchPrompt`. The integration mock spread those input objects into simulated
+model output. The output schema intentionally has `additionalProperties: false`
+and no `group` output field. A direct synthetic schema probe confirmed rejection
+at `/requirements/0`, keyword `additionalProperties`, additional property `group`.
+`AiService` raises `SCHEMA_VALIDATION_FAILURE`; `JobMatchService` maps it to the
+typed `CV_MATCH_INVALID_OUTPUT` response (HTTP 503). Scoring was never reached.
+This is a stale mock contract, not an evidence or scoring defect.
+
+Exact changed files for this correction:
+
+- `apps/api/test/integration/cv-match.spec.ts`: replace input-object spreading with explicit allowed parent output fields (`parentId`, requirement, priority, category, JD quote and selected CV quote). Input-only group metadata is not echoed. All upload/revision, source quotation, tracker-preservation, rejection and 200/score assertions remain intact.
+- `docs/audits/p6-final-review.md`: this diagnosis and verification report.
+
+Production prompt/schema, evidence validation and scoring are unchanged. No
+schema relaxation, test skip, timeout increase, migration or dependency is added.
+
+Verification: **PASS — `pnpm test:integration`: 8 suites, 53 tests**, including
+synthetic CV replacement and the original scores **100 / Apply → 50 → 50** with
+updated job/CV evidence and unchanged tracker fields. Before fix: one failing
+integration test; after fix: none. Existing unit/frontend passes remain applicable
+to unchanged production code; the integration suite also recompiles API test code.
+The prior full workspace test command excludes the separately configured
+integration suites, so its successful run could not detect this mock mismatch.
+The previously reported local verification explicitly did not run database
+integration; that coverage gap is now closed locally for this correction.
+
+API typecheck, scoped lint/format and whitespace checks are recorded with the
+checkpoint response. The disposable test database started for reproduction is
+stopped afterward. No commit, push or PR update for this correction; stop for review.
