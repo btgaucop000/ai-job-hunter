@@ -52,21 +52,20 @@ For small, localized changes:
 
 For changes involving migrations, security boundaries, authentication, or significant data integrity risks, use proportionate broader verification.
 
-Full verification should be reserved for release checkpoints or explicitly requested work.
+Full verification is reserved for the Pre-PR CI Gate below, release checkpoints, or explicitly requested work.
 
 Never report unrun checks as passed.
 
 Preserve existing work and Git state. Do not commit or push without approval.
 
-### Pre-Push CI Parity
+### Pre-PR CI Gate
 
-- Before pushing PR-bound changes, run `pnpm format:check`, `pnpm lint`, `pnpm typecheck` (backend and frontend), and relevant focused tests through `pnpm --filter @ai-job-hunter/api test` or `pnpm --filter @ai-job-hunter/web test` with the appropriate test selectors. These pre-push checks apply even when the fast iteration guidance above allows deferring them during development.
-- Before pushing a PR that modifies shared matching, scoring or evidence validation, run the exact CI workspace test command `pnpm -r --workspace-concurrency=1 run test` once on the final revision. Full suites are not required repeatedly during development.
-- Fix the actual cause of any failed check before pushing; do not suppress lint rules or weaken tests.
-- Run database integration tests (`pnpm test:integration`) or Playwright only when the changed behavior warrants them; follow the database isolation and browser smoke testing rules.
-- Reuse checks already passed against the same code revision; do not rerun them unnecessarily.
-- Do not introduce Git hooks, dependencies, or new CI infrastructure for these checks.
-- Report PASS / FAIL / BLOCKED results before pushing, identifying any checks not run and why. Commit and push approval is still required.
+- During development, use the focused tests and scoped checks above; avoid repeated full workspace suites. Before committing or pushing PR-bound changes, inspect the current `.github/workflows/*` commands and referenced package scripts/configuration; the workflows are authoritative. See [the CI parity audit](docs/audits/dev-02-pre-pr-ci-gate.md).
+- Run every locally reproducible required CI check on the final intended revision, including setup, build, migrations and integration tests where required by the workflow. Never substitute focused tests for required full tests. For shared matching, scoring, evidence, common libraries or test infrastructure changes, explicitly run the exact full workspace test command (currently `pnpm -r --workspace-concurrency=1 run test`). Verify workspace concurrency and test worker settings against CI; do not add local overrides and call that parity.
+- Reuse prior passing results only when the affected code, dependencies and configuration remain unchanged; record their scope and why they still apply. Documentation-only development review may use scoped formatting and whitespace checks, but does not establish the complete pre-PR gate.
+- Review the complete intended diff before staging, then the complete staged diff with `git diff --cached` and whitespace with `git diff --cached --check`; include new files and exclude unrelated work or secrets.
+- Report exact commands and PASS / FAIL / BLOCKED results, identifying reused results and unverified CI-only steps. Stop before commit/push if a required local check fails or cannot be verified; fix causes without weakening assertions or suppressing lint rules. Database isolation and browser smoke rules still apply; a blocked database check is not an optional skip.
+- Do not introduce scripts, Git hooks, dependencies or CI infrastructure for this gate. Commit and push still require explicit approval.
 
 ### Browser Smoke Testing
 
