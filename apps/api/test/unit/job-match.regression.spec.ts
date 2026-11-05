@@ -350,3 +350,71 @@ test('evidence rejection logs once, never scores, and never writes saved records
     score.mockRestore();
   }
 });
+
+test('successful match adds an opaque context without changing the assessment; replacement invalidates identity', async () => {
+  const { service, provider } = setup(async () =>
+    JSON.stringify({ requirements: output() }),
+  );
+  const first = await service.analyze('synthetic');
+  const snapshot = await service.requireSnapshot('synthetic', first.matchId);
+  const { matchId, cvUpdatedAt, jobUpdatedAt, analyzedAt, ...assessment } =
+    first;
+  expect(matchId).toMatch(/^[0-9a-f-]{36}$/u);
+  expect(cvUpdatedAt).toEqual(job.updatedAt);
+  expect(jobUpdatedAt).toEqual(job.updatedAt);
+  expect(typeof analyzedAt).toBe('string');
+  expect(snapshot.assessment).toEqual(assessment);
+  const second = await service.analyze('synthetic');
+  expect(second.matchId).not.toBe(first.matchId);
+  expect(second.score).toBe(first.score);
+  expect(second.requirements).toEqual(first.requirements);
+  await expect(
+    service.requireSnapshot('synthetic', first.matchId),
+  ).rejects.toThrow(/stale/);
+  await expect(
+    service.requireSnapshot('other', second.matchId),
+  ).rejects.toThrow(/stale/);
+  expect(provider.generate).toHaveBeenCalledTimes(2);
+});
+
+test('context retrieval rechecks saved CV and job revisions without inference or writes', async () => {
+  const { service, provider, cvs, jobs } = setup(async () =>
+    JSON.stringify({ requirements: output() }),
+  );
+  const result = await service.analyze('synthetic');
+  cvs.findOneBy.mockResolvedValueOnce({
+    text: cvText,
+    fileName: 'synthetic.pdf',
+    updatedAt: new Date('2026-11-01T00:00:00Z'),
+  });
+  await expect(
+    service.requireSnapshot('synthetic', result.matchId),
+  ).rejects.toThrow(/stale/);
+  jobs.get.mockResolvedValueOnce({
+    ...job,
+    updatedAt: new Date('2026-11-01T00:00:00Z'),
+  });
+  await expect(
+    service.requireSnapshot('synthetic', result.matchId),
+  ).rejects.toThrow(/stale/);
+  cvs.findOneBy.mockResolvedValueOnce(null);
+  await expect(
+    service.requireSnapshot('synthetic', result.matchId),
+  ).rejects.toThrow(/unavailable/);
+  expect(provider.generate).toHaveBeenCalledTimes(1);
+  // The repository mock intentionally has no write methods: analyze and lookup
+  // must work with source reads only.
+  expect(Object.keys(cvs).sort()).toEqual(['findOne', 'findOneBy']);
+});
+
+test('failed reanalysis leaves the previous successful snapshot usable', async () => {
+  const { service, provider } = setup(async () =>
+    JSON.stringify({ requirements: output() }),
+  );
+  const first = await service.analyze('synthetic');
+  provider.generate.mockRejectedValueOnce(new AiError('TIMEOUT'));
+  await expect(service.analyze('synthetic')).rejects.toThrow();
+  expect(
+    (await service.requireSnapshot('synthetic', first.matchId)).matchId,
+  ).toBe(first.matchId);
+});

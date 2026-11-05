@@ -357,8 +357,8 @@ export function DiscoverJobs({ onDiscovered }: { onDiscovered: () => void }) {
                 time. Retry later after source failures.
               </Typography>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                <Button component={Link} to="/dashboard" variant="outlined">
-                  View Job Inbox
+                <Button component={Link} to="/jobs" variant="outlined">
+                  View Jobs
                 </Button>
                 {summary.eligible === 0 && (
                   <Button component={Link} to="/jobs/new" variant="outlined">

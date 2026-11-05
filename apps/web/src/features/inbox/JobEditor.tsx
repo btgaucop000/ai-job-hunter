@@ -76,6 +76,7 @@ export function JobEditor({
       : 'overview';
   const [entryKey, setEntryKey] = useState(location.key);
   const [view, setView] = useState(requestedView);
+  const [savedRevision, setSavedRevision] = useState(0);
   if (entryKey !== location.key) {
     setEntryKey(location.key);
     setView(requestedView);
@@ -84,11 +85,10 @@ export function JobEditor({
   const [importMethod, setImportMethod] = useState<ImportMethod>('url');
   const theme = useTheme();
   const applicationPanel = useRef<HTMLDivElement>(null);
+  const editPanel = useRef<HTMLDivElement>(null);
   const jobDetailsHeading = useRef<HTMLHeadingElement>(null);
-  const [applicationHeight, setApplicationHeight] = useState<number | null>(
-    null,
-  );
-  const usesViewport = !id || view === 'edit';
+  const [formHeight, setFormHeight] = useState<number | null>(null);
+  const usesViewport = !id;
   useLayoutEffect(() => {
     onViewportLayoutChange?.(usesViewport);
     return () => onViewportLayoutChange?.(false);
@@ -439,6 +439,7 @@ export function JobEditor({
           file || record.length > 20000 ? importUpload(payload, file) : record,
       });
       if (id) {
+        setSavedRevision((value) => value + 1);
         baseline.current = JSON.stringify({
           ...form,
           contactDates: row.contactDates,
@@ -532,13 +533,20 @@ export function JobEditor({
     return () => cancelAnimationFrame(frame);
   }, [id, view, loading]);
   useLayoutEffect(() => {
-    const panel = applicationPanel.current;
+    const panel =
+      view === 'edit' ? editPanel.current : applicationPanel.current;
     const main = panel?.closest('main');
     const actions = panel?.querySelector<HTMLElement>(
       '[aria-label="Job save actions"]',
     );
-    if (!id || view !== 'application' || !panel || !main || !actions) {
-      setApplicationHeight(null);
+    if (
+      !id ||
+      (view !== 'application' && view !== 'edit') ||
+      !panel ||
+      !main ||
+      !actions
+    ) {
+      setFormHeight(null);
       return;
     }
     const measure = () => {
@@ -557,7 +565,7 @@ export function JobEditor({
         parseFloat(style.borderBottomWidth) +
         actions.getBoundingClientRect().height;
       // Keep a usable form region; narrow/short windows use one document scroller.
-      setApplicationHeight(
+      setFormHeight(
         window.innerWidth >= theme.breakpoints.values.md &&
           available - chrome >= 12 * rem
           ? available
@@ -787,6 +795,47 @@ export function JobEditor({
       )}
     </Box>
   );
+  const saveActions = (
+    <Stack
+      spacing={1}
+      direction={{ xs: 'column', sm: 'row' }}
+      sx={{
+        display: id
+          ? view === 'edit'
+            ? undefined
+            : 'none'
+          : step === 1
+            ? undefined
+            : 'none',
+        bgcolor: 'background.paper',
+        ...(id
+          ? {
+              alignItems: 'flex-end',
+              justifyContent: 'flex-end',
+            }
+          : { '& > .MuiButton-root': { flex: 1, minWidth: 0 } }),
+      }}
+    >
+      {!id && (
+        <Button
+          variant="outlined"
+          disabled={disabled}
+          onClick={() => setStep(0)}
+        >
+          Back to Import sources
+        </Button>
+      )}
+      <Button
+        type="submit"
+        form="job-editor-form"
+        variant="contained"
+        disabled={disabled || conflicts.length > 0}
+        sx={id ? { minHeight: { xs: 44, sm: 36 } } : undefined}
+      >
+        {busy ? 'Saving…' : id ? 'Save changes' : 'Confirm and save job'}
+      </Button>
+    </Stack>
+  );
   return (
     <Stack
       spacing={3}
@@ -797,50 +846,13 @@ export function JobEditor({
         scrollable={usesViewport}
         scrollKey={id ? view : String(step)}
         feedbackKey={error}
-        active={id ? view === 'edit' : step === 1}
-        actions={
-          <Stack
-            spacing={1}
-            direction={{ xs: 'column', sm: 'row' }}
-            sx={{
-              display: id
-                ? view === 'edit'
-                  ? undefined
-                  : 'none'
-                : step === 1
-                  ? undefined
-                  : 'none',
-              bgcolor: 'background.paper',
-              ...(id
-                ? { alignItems: 'flex-end', justifyContent: 'flex-end' }
-                : { '& > .MuiButton-root': { flex: 1, minWidth: 0 } }),
-            }}
-          >
-            {!id && (
-              <Button
-                variant="outlined"
-                disabled={disabled}
-                onClick={() => setStep(0)}
-              >
-                Back to Import sources
-              </Button>
-            )}
-            <Button
-              type="submit"
-              form="job-editor-form"
-              variant="contained"
-              disabled={disabled || conflicts.length > 0}
-              sx={id ? { minHeight: { xs: 44, sm: 36 } } : undefined}
-            >
-              {busy ? 'Saving…' : id ? 'Save changes' : 'Confirm and save job'}
-            </Button>
-          </Stack>
-        }
+        active={!id && step === 1}
+        actions={!id ? saveActions : null}
       >
-        <Stack spacing={3} sx={{ minWidth: 0 }}>
+        <Stack spacing={id ? 1.5 : 3} sx={{ minWidth: 0 }}>
           <Button
             component={Link}
-            to="/dashboard"
+            to="/jobs"
             variant="outlined"
             startIcon={
               <SvgIcon aria-hidden="true" sx={{ fontSize: 20 }}>
@@ -849,15 +861,15 @@ export function JobEditor({
             }
             sx={{ alignSelf: 'flex-start', minHeight: { xs: 44, sm: 36 } }}
           >
-            Back to Job Inbox
+            Back to Jobs
           </Button>
           <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
             <Typography variant="h4" component="h1">
               {id ? form.title || 'Job details' : 'Add Job'}
             </Typography>
-            <Typography color="text.secondary">
+            <Typography variant={id ? 'body2' : 'body1'} color="text.secondary">
               {id
-                ? `${form.company || 'Unknown company'} · ${form.location || 'Unknown location'}`
+                ? [form.company, form.location].filter(Boolean).join(' · ')
                 : 'Import your sources, then review and save. You can also enter a job manually.'}
             </Typography>
             {id && (
@@ -869,18 +881,22 @@ export function JobEditor({
               >
                 {[
                   form.status.replaceAll('_', ' '),
-                  form.seniority || 'Unknown seniority',
-                  form.workMode || 'Unknown work mode',
-                  form.salary || 'Unknown salary',
-                ].map((value, index) => (
-                  <Chip key={index} label={value} size="small" />
-                ))}
+                  form.seniority,
+                  form.workMode,
+                  form.salary,
+                ]
+                  .filter(
+                    (value) => value.trim() && !/^unknown\b/iu.test(value),
+                  )
+                  .map((value, index) => (
+                    <Chip key={index} label={value} size="small" />
+                  ))}
                 <Chip
                   label="Unsaved changes"
                   size="small"
                   color="warning"
                   aria-hidden={!dirty}
-                  sx={{ visibility: dirty ? 'visible' : 'hidden' }}
+                  sx={{ display: dirty ? 'inline-flex' : 'none' }}
                 />
               </Stack>
             )}
@@ -892,6 +908,37 @@ export function JobEditor({
                 sx={{ mt: 1 }}
               />
             )}
+            {id &&
+              (discovery ||
+                (form.originalLink && jobUrlInfo(form.originalLink).valid)) && (
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  useFlexGap
+                  sx={{ flexWrap: 'wrap', alignItems: 'center', mt: 0.5 }}
+                  aria-label={discovery ? 'Discovery provenance' : 'Job source'}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    {discovery
+                      ? `Source: ${discovery.sourceName} · ${new Date(discovery.discoveredAt).toLocaleDateString()}`
+                      : `Source: ${form.source}`}
+                  </Typography>
+                  {form.originalLink && jobUrlInfo(form.originalLink).valid && (
+                    <MuiLink
+                      href={form.originalLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        minHeight: { xs: 44, sm: 24 },
+                      }}
+                    >
+                      Open original job
+                    </MuiLink>
+                  )}
+                </Stack>
+              )}
           </Box>
           {id ? (
             <Tabs
@@ -912,17 +959,25 @@ export function JobEditor({
               }}
               aria-label="Job sections"
             >
-              {['Overview', 'CV Match', 'Application', 'Edit JD'].map(
-                (label, index) => (
-                  <Tab
-                    key={label}
-                    label={label}
-                    value={['overview', 'match', 'application', 'edit'][index]}
-                    id={`job-tab-${index}`}
-                    aria-controls={`job-panel-${index}`}
-                  />
-                ),
-              )}
+              {[
+                'Overview',
+                'CV Match',
+                'Improve CV',
+                'Application',
+                'Edit JD',
+              ].map((label, index) => (
+                <Tab
+                  key={label}
+                  label={label}
+                  value={
+                    ['overview', 'match', 'improve', 'application', 'edit'][
+                      index
+                    ]
+                  }
+                  id={`job-tab-${index}`}
+                  aria-controls={`job-panel-${index}`}
+                />
+              ))}
             </Tabs>
           ) : (
             <Stepper activeStep={step}>
@@ -933,28 +988,6 @@ export function JobEditor({
                 <StepLabel>Review &amp; Save</StepLabel>
               </Step>
             </Stepper>
-          )}
-          {id && discovery && (
-            <Alert
-              severity="info"
-              aria-label="Discovery provenance"
-              sx={{ overflowWrap: 'anywhere' }}
-            >
-              Discovered from {discovery.sourceName} on{' '}
-              {new Date(discovery.discoveredAt).toLocaleString()}.
-              {form.originalLink && jobUrlInfo(form.originalLink).valid && (
-                <>
-                  {' '}
-                  <MuiLink
-                    href={form.originalLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open original job
-                  </MuiLink>
-                </>
-              )}
-            </Alert>
           )}
           {id && (
             <Box
@@ -1051,18 +1084,25 @@ export function JobEditor({
             </Alert>
           )}
           {id && !loading && !loadFailed && (
-            <Box
-              role="tabpanel"
-              id="job-panel-1"
-              aria-labelledby="job-tab-1"
-              hidden={view !== 'match'}
-            >
-              <CvMatchPanel
-                key={id}
-                jobId={id}
-                revision={JSON.stringify(form)}
-              />
-            </Box>
+            <CvMatchPanel
+              key={id}
+              jobId={id}
+              revision={`${savedRevision}:${JSON.stringify(form)}`}
+              jobDirty={dirty}
+              view={
+                view === 'match'
+                  ? 'match'
+                  : view === 'improve'
+                    ? 'improve'
+                    : 'hidden'
+              }
+              onGoToMatch={() => {
+                setView('match');
+                document
+                  .getElementById('job-tab-1')
+                  ?.focus({ preventScroll: true });
+              }}
+            />
           )}
           <Box
             component="form"
@@ -1081,284 +1121,341 @@ export function JobEditor({
               component="fieldset"
               disabled={extracting || loadFailed || saving.current}
               spacing={3}
+              useFlexGap
               sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}
             >
               <Stack
+                ref={editPanel}
                 role={id ? 'tabpanel' : undefined}
-                id="job-panel-3"
-                aria-labelledby={id ? 'job-tab-3' : undefined}
+                id="job-panel-4"
+                aria-labelledby={id ? 'job-tab-4' : undefined}
                 spacing={3}
-                sx={{ display: id && view !== 'edit' ? 'none' : undefined }}
+                sx={{
+                  display: id && view !== 'edit' ? 'none' : undefined,
+                  ...(id && {
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    bgcolor: 'background.paper',
+                    p: { xs: 2, sm: 3 },
+                    minWidth: 0,
+                    height: formHeight ?? undefined,
+                  }),
+                }}
               >
-                {!id && importSources}
-                <Stack
-                  spacing={2}
-                  sx={{
-                    display: (id ? view === 'edit' : step === 1)
-                      ? undefined
-                      : 'none',
-                  }}
+                <JobActionLayout
+                  active={Boolean(id) && view === 'edit'}
+                  scrollable={
+                    Boolean(id) && view === 'edit' && formHeight !== null
+                  }
+                  feedbackKey={error}
+                  actions={id ? saveActions : null}
                 >
-                  <Typography
-                    ref={jobDetailsHeading}
-                    variant="h6"
-                    component="h2"
-                  >
-                    {id ? 'Job details' : 'Review & Save'}
-                  </Typography>
-                  <Typography color="text.secondary">
-                    Unknown values can stay blank. Only job title is required.
-                    Quotes show textual support; verify that each value
-                    describes this job.
-                  </Typography>
-                  <Box
+                  {!id && importSources}
+                  <Stack
+                    spacing={2}
                     sx={{
-                      display: 'grid',
-                      gridTemplateColumns: {
-                        xs: '1fr',
-                        sm: 'repeat(2, minmax(0, 1fr))',
-                      },
-                      gap: 2,
+                      display: (id ? view === 'edit' : step === 1)
+                        ? undefined
+                        : 'none',
                     }}
                   >
-                    {importFields.map((field) => {
-                      const review = form.importReview.find(
-                        (item) => item.field === field,
-                      );
-                      const conflict = review?.status === 'CONFLICT';
-                      const multiline = [
-                        'contactNotes',
-                        'skills',
-                        'preferredSkills',
-                      ].includes(field);
-                      const maxLength =
-                        field === 'title' || field === 'company'
-                          ? 300
-                          : field === 'originalLink'
-                            ? 2048
-                            : multiline
-                              ? 10000
-                              : 2000;
-                      return (
-                        <Stack
-                          spacing={1}
-                          key={field}
-                          sx={{
-                            minWidth: 0,
-                            gridColumn: multiline ? '1 / -1' : undefined,
-                          }}
-                        >
-                          {field === 'skills' || field === 'preferredSkills' ? (
-                            <RequirementInputs
-                              label={fieldLabels[field]}
-                              value={form[field]}
-                              maxLength={maxLength}
-                              error={Boolean(conflict && !review.reviewed)}
-                              helperText={
-                                conflict
-                                  ? 'Review conflicting source values below.'
-                                  : review?.status === 'MISSING'
-                                    ? 'Missing / unknown — no supported value found.'
-                                    : undefined
-                              }
-                              onChange={(value) => {
-                                change(field, value);
-                                if (conflict)
-                                  change(
-                                    'importReview',
-                                    form.importReview.map((item) =>
-                                      item.field === field
-                                        ? { ...item, reviewed: false }
-                                        : item,
-                                    ),
-                                  );
-                              }}
-                            />
-                          ) : (
-                            <TextField
-                              label={fieldLabels[field]}
-                              placeholder={
-                                field === 'title' ? undefined : 'Unknown'
-                              }
-                              required={field === 'title'}
-                              type={field === 'originalLink' ? 'url' : 'text'}
-                              multiline={multiline}
-                              minRows={multiline ? 2 : undefined}
-                              maxRows={multiline ? 8 : undefined}
-                              value={form[field]}
-                              onChange={(e) => {
-                                change(field, e.target.value);
-                                if (conflict)
-                                  change(
-                                    'importReview',
-                                    form.importReview.map((item) =>
-                                      item.field === field
-                                        ? { ...item, reviewed: false }
-                                        : item,
-                                    ),
-                                  );
-                              }}
-                              slotProps={{ htmlInput: { maxLength } }}
-                              error={Boolean(conflict && !review.reviewed)}
-                              helperText={
-                                conflict
-                                  ? 'Conflicting source values. Choose a value, type a correction, or leave unknown; acknowledge below.'
-                                  : review?.status === 'MISSING'
-                                    ? 'Missing / unknown — no supported value found.'
-                                    : review
-                                      ? field === 'company'
-                                        ? 'Suggested company or JD issuer. This does not identify an unnamed end-client.'
-                                        : undefined
+                    <Typography
+                      ref={jobDetailsHeading}
+                      variant="h6"
+                      component="h2"
+                    >
+                      {id ? 'Job details' : 'Review & Save'}
+                    </Typography>
+                    <Typography color="text.secondary">
+                      Unknown values can stay blank. Only job title is required.
+                      Quotes show textual support; verify that each value
+                      describes this job.
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {
+                          xs: '1fr',
+                          sm: 'repeat(2, minmax(0, 1fr))',
+                        },
+                        gap: 2,
+                      }}
+                    >
+                      {importFields.map((field) => {
+                        const review = form.importReview.find(
+                          (item) => item.field === field,
+                        );
+                        const conflict = review?.status === 'CONFLICT';
+                        const multiline = [
+                          'contactNotes',
+                          'skills',
+                          'preferredSkills',
+                        ].includes(field);
+                        const maxLength =
+                          field === 'title' || field === 'company'
+                            ? 300
+                            : field === 'originalLink'
+                              ? 2048
+                              : multiline
+                                ? 10000
+                                : 2000;
+                        return (
+                          <Stack
+                            spacing={1}
+                            key={field}
+                            sx={{
+                              minWidth: 0,
+                              gridColumn: multiline ? '1 / -1' : undefined,
+                            }}
+                          >
+                            {field === 'skills' ||
+                            field === 'preferredSkills' ? (
+                              <RequirementInputs
+                                label={fieldLabels[field]}
+                                value={form[field]}
+                                maxLength={maxLength}
+                                error={Boolean(conflict && !review.reviewed)}
+                                helperText={
+                                  conflict
+                                    ? 'Review conflicting source values below.'
+                                    : review?.status === 'MISSING'
+                                      ? 'Missing / unknown — no supported value found.'
                                       : undefined
-                              }
-                            />
-                          )}
-                          {review && review.candidates.length > 0 && (
-                            <Box component="details" open={conflict}>
-                              <Typography
-                                component="summary"
-                                variant="subtitle2"
-                              >
-                                {conflict
-                                  ? 'Conflicting evidence'
-                                  : 'Source evidence'}
-                              </Typography>
-                              <Stack spacing={1}>
-                                {review.candidates.map((candidate, index) => (
-                                  <Box
-                                    key={index}
-                                    sx={{
-                                      p: 1,
-                                      bgcolor: 'action.hover',
-                                      overflowWrap: 'anywhere',
-                                    }}
-                                  >
-                                    <Typography variant="body2">
-                                      {candidate.source === 'post'
-                                        ? 'Recruitment post'
-                                        : 'JD document'}
-                                      : {candidate.value}
-                                    </Typography>
-                                    <Typography
-                                      component="blockquote"
-                                      variant="body2"
-                                      sx={{ m: 1, whiteSpace: 'pre-wrap' }}
-                                    >
-                                      {candidate.quote}
-                                    </Typography>
-                                    {conflict && (
-                                      <Button
-                                        variant="outlined"
-                                        type="button"
-                                        onClick={() => {
-                                          change(field, candidate.value);
-                                          change(
-                                            'importReview',
-                                            form.importReview.map((item) =>
-                                              item.field === field
-                                                ? { ...item, reviewed: true }
-                                                : item,
-                                            ),
-                                          );
-                                        }}
-                                      >
-                                        Use this value for {fieldLabels[field]}
-                                      </Button>
-                                    )}
-                                  </Box>
-                                ))}
-                              </Stack>
-                            </Box>
-                          )}
-                          {conflict && (
-                            <FormControlLabel
-                              control={
-                                <Checkbox
-                                  checked={review.reviewed}
-                                  onChange={(e) =>
+                                }
+                                onChange={(value) => {
+                                  change(field, value);
+                                  if (conflict)
                                     change(
                                       'importReview',
                                       form.importReview.map((item) =>
                                         item.field === field
-                                          ? {
-                                              ...item,
-                                              reviewed: e.target.checked,
-                                            }
+                                          ? { ...item, reviewed: false }
                                           : item,
                                       ),
-                                    )
-                                  }
-                                />
-                              }
-                              label={`I reviewed the conflict for ${fieldLabels[field]}`}
-                            />
-                          )}
-                        </Stack>
-                      );
-                    })}
-                  </Box>
-                  {id && (
+                                    );
+                                }}
+                              />
+                            ) : (
+                              <TextField
+                                label={fieldLabels[field]}
+                                placeholder={
+                                  field === 'title' ? undefined : 'Unknown'
+                                }
+                                required={field === 'title'}
+                                type={field === 'originalLink' ? 'url' : 'text'}
+                                multiline={multiline}
+                                minRows={multiline ? 2 : undefined}
+                                maxRows={multiline ? 8 : undefined}
+                                value={form[field]}
+                                onChange={(e) => {
+                                  change(field, e.target.value);
+                                  if (conflict)
+                                    change(
+                                      'importReview',
+                                      form.importReview.map((item) =>
+                                        item.field === field
+                                          ? { ...item, reviewed: false }
+                                          : item,
+                                      ),
+                                    );
+                                }}
+                                slotProps={{ htmlInput: { maxLength } }}
+                                error={Boolean(conflict && !review.reviewed)}
+                                helperText={
+                                  conflict
+                                    ? 'Conflicting source values. Choose a value, type a correction, or leave unknown; acknowledge below.'
+                                    : review?.status === 'MISSING'
+                                      ? 'Missing / unknown — no supported value found.'
+                                      : review
+                                        ? field === 'company'
+                                          ? 'Suggested company or JD issuer. This does not identify an unnamed end-client.'
+                                          : undefined
+                                        : undefined
+                                }
+                              />
+                            )}
+                            {review && review.candidates.length > 0 && (
+                              <Box component="details" open={conflict}>
+                                <Typography
+                                  component="summary"
+                                  variant="subtitle2"
+                                >
+                                  {conflict
+                                    ? 'Conflicting evidence'
+                                    : 'Source evidence'}
+                                </Typography>
+                                <Stack spacing={1}>
+                                  {review.candidates.map((candidate, index) => (
+                                    <Box
+                                      key={index}
+                                      sx={{
+                                        p: 1,
+                                        bgcolor: 'action.hover',
+                                        overflowWrap: 'anywhere',
+                                      }}
+                                    >
+                                      <Typography variant="body2">
+                                        {candidate.source === 'post'
+                                          ? 'Recruitment post'
+                                          : 'JD document'}
+                                        : {candidate.value}
+                                      </Typography>
+                                      <Typography
+                                        component="blockquote"
+                                        variant="body2"
+                                        sx={{ m: 1, whiteSpace: 'pre-wrap' }}
+                                      >
+                                        {candidate.quote}
+                                      </Typography>
+                                      {conflict && (
+                                        <Button
+                                          variant="outlined"
+                                          type="button"
+                                          onClick={() => {
+                                            change(field, candidate.value);
+                                            change(
+                                              'importReview',
+                                              form.importReview.map((item) =>
+                                                item.field === field
+                                                  ? { ...item, reviewed: true }
+                                                  : item,
+                                              ),
+                                            );
+                                          }}
+                                        >
+                                          Use this value for{' '}
+                                          {fieldLabels[field]}
+                                        </Button>
+                                      )}
+                                    </Box>
+                                  ))}
+                                </Stack>
+                              </Box>
+                            )}
+                            {conflict && (
+                              <FormControlLabel
+                                control={
+                                  <Checkbox
+                                    checked={review.reviewed}
+                                    onChange={(e) =>
+                                      change(
+                                        'importReview',
+                                        form.importReview.map((item) =>
+                                          item.field === field
+                                            ? {
+                                                ...item,
+                                                reviewed: e.target.checked,
+                                              }
+                                            : item,
+                                        ),
+                                      )
+                                    }
+                                  />
+                                }
+                                label={`I reviewed the conflict for ${fieldLabels[field]}`}
+                              />
+                            )}
+                          </Stack>
+                        );
+                      })}
+                    </Box>
+                    {id && (
+                      <TextField
+                        select
+                        label="Source"
+                        value={form.source}
+                        onChange={(e) =>
+                          change(
+                            'source',
+                            e.target.value as OpportunityInput['source'],
+                          )
+                        }
+                        helperText="Where this job was originally found."
+                      >
+                        {sources.map((value) => (
+                          <MenuItem key={value} value={value}>
+                            {value}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    )}
+                    {form.originalLink &&
+                      jobUrlInfo(form.originalLink).valid && (
+                        <MuiLink
+                          href={form.originalLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View Original Job
+                        </MuiLink>
+                      )}
                     <TextField
-                      select
-                      label="Source"
-                      value={form.source}
-                      onChange={(e) =>
-                        change(
-                          'source',
-                          e.target.value as OpportunityInput['source'],
-                        )
+                      label="Job description"
+                      multiline
+                      minRows={6}
+                      maxRows={14}
+                      value={form.description}
+                      onChange={(e) => change('description', e.target.value)}
+                      slotProps={{ htmlInput: { maxLength: 26000 } }}
+                      helperText={
+                        id
+                          ? 'Edit this job description manually. Original imported source text and documents are preserved separately.'
+                          : 'Both source texts are included after extraction; edit the description as needed. The original sources are preserved separately.'
                       }
-                      helperText="Where this job was originally found."
-                    >
-                      {sources.map((value) => (
-                        <MenuItem key={value} value={value}>
-                          {value}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  )}
-                  {form.originalLink && jobUrlInfo(form.originalLink).valid && (
-                    <MuiLink
-                      href={form.originalLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      View Original Job
-                    </MuiLink>
-                  )}
-                  <TextField
-                    label="Job description"
-                    multiline
-                    minRows={6}
-                    maxRows={14}
-                    value={form.description}
-                    onChange={(e) => change('description', e.target.value)}
-                    slotProps={{ htmlInput: { maxLength: 26000 } }}
-                    helperText={
-                      id
-                        ? 'Edit this job description manually. Original imported source text and documents are preserved separately.'
-                        : 'Both source texts are included after extraction; edit the description as needed. The original sources are preserved separately.'
-                    }
-                  />
-                </Stack>
+                    />
+                  </Stack>
+                  <Stack
+                    spacing={2}
+                    sx={{
+                      display: id
+                        ? view === 'edit'
+                          ? undefined
+                          : 'none'
+                        : step === 1
+                          ? undefined
+                          : 'none',
+                    }}
+                  >
+                    {conflicts.length > 0 && (
+                      <Alert severity="warning">
+                        Review {conflicts.length} conflicting field(s) before
+                        saving.
+                        {id && view !== 'edit' && (
+                          <Button
+                            variant="outlined"
+                            onClick={() => setView('edit')}
+                          >
+                            Review conflicts in Edit JD
+                          </Button>
+                        )}
+                      </Alert>
+                    )}
+                    <Typography variant="body2" color="text.secondary">
+                      Save confirms your reviewed values. Nothing is sent to
+                      recruiters and no application is submitted. Changes across
+                      sections are saved together.
+                    </Typography>
+                  </Stack>
+                </JobActionLayout>
               </Stack>
               <Paper
                 ref={applicationPanel}
                 role="tabpanel"
-                id="job-panel-2"
-                aria-labelledby="job-tab-2"
+                id="job-panel-3"
+                aria-labelledby="job-tab-3"
                 variant="outlined"
                 sx={{
                   display: id && view === 'application' ? 'flex' : 'none',
                   flexDirection: 'column',
-                  height: applicationHeight ?? undefined,
+                  height: formHeight ?? undefined,
                   p: { xs: 2, sm: 3 },
                   minWidth: 0,
                 }}
               >
                 <JobActionLayout
                   active={Boolean(id) && view === 'application'}
-                  scrollable={applicationHeight !== null}
+                  scrollable={formHeight !== null}
                   feedbackKey={error}
                   actions={
                     <Stack spacing={2}>
@@ -1499,38 +1596,6 @@ export function JobEditor({
                   </Stack>
                 </JobActionLayout>
               </Paper>
-              <Stack
-                spacing={2}
-                sx={{
-                  display: id
-                    ? view === 'edit'
-                      ? undefined
-                      : 'none'
-                    : step === 1
-                      ? undefined
-                      : 'none',
-                }}
-              >
-                {conflicts.length > 0 && (
-                  <Alert severity="warning">
-                    Review {conflicts.length} conflicting field(s) before
-                    saving.
-                    {id && view !== 'edit' && (
-                      <Button
-                        variant="outlined"
-                        onClick={() => setView('edit')}
-                      >
-                        Review conflicts in Edit JD
-                      </Button>
-                    )}
-                  </Alert>
-                )}
-                <Typography variant="body2" color="text.secondary">
-                  Save confirms your reviewed values. Nothing is sent to
-                  recruiters and no application is submitted. Changes across
-                  sections are saved together.
-                </Typography>
-              </Stack>
             </Stack>
           </Box>
         </Stack>

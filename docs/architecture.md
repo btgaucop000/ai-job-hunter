@@ -747,3 +747,187 @@ guidance; URL changes abort pending requests and ignore late success/failure.
 Create's transactional duplicate enforcement remains authoritative, including
 when early lookup fails or another job is saved after checking. P5.4a replacement
 confirmation, manual-edit protection and upload recovery remain in place.
+
+### P7.2 Trusted CV Match context and evidence boundary
+
+Saved-CV matching now returns an additive opaque matchId backed by an immutable,
+process-local assessment snapshot: 15-minute monotonic TTL, maximum 20 entries,
+latest per owner/job. Lookup checks source revisions and identity; no database
+migration, duplicate full-CV storage or durable suggestion history is introduced.
+This avoids trusting browser-supplied evidence or rerunning matching for future
+suggestions, at the cost of reanalysis after expiry, eviction or restart.
+
+Matching-owned evidence references identify exact saved parsed-CV text or canonical
+saved-job requirement quotes, immutable source revisions and parent/component
+linkage. Unique CV anchors use UTF-16 offsets; duplicate quotes have no unique
+anchor. Pure policy preserves P6 scores/statuses, orders conflicts first and
+returns up to five extractive-wording or clarification candidates. Wording is
+restricted to complete self-contained source entries; arbitrary paraphrases and
+uncertain attribution require clarification. No suggestions endpoint or AI
+selection is implemented in this checkpoint.
+
+The [P7 design and P8 boundary](audits/p7-cv-improvement-design.md) documents the
+full policy and tradeoffs. P8 may reuse provenance concepts but must independently
+validate durable source revisions and user-approved content. Ephemeral matchId,
+parsed-text anchors and suggestions are not a structured CV profile, file-layout
+model or verified employment facts.
+
+### P7.3 On-demand CV improvement selection API
+
+`POST /api/v1/opportunities/:id/cv-improvement-suggestions` accepts only a bounded
+opaque matchId. The existing controller retains UUID/local-write/no-store
+protections and exposes allowlisted `CV_SUGGESTIONS_*` errors. JobMatchService
+loads saved sources, resolves the P7.2 owner/job-scoped context, verifies revisions
+and shares its existing admission flag between matching and suggestions. It
+rechecks source revisions and the current snapshot identity before selection and
+after success or failure. A job deleted after initial resolution is stale; an
+initially unknown job is 404. No CV/job/tracker writes or suggestion persistence.
+
+The matching-owned CvSuggestionsService uses existing AiService structured
+validation and provider budgets to select only unique eligible candidate IDs.
+Model output cannot supply wording, evidence, status or explanations. The server
+keeps P7.2 eligibility, conflict-first order, exact source passages and five-card
+limit; an empty candidate set bypasses AI. Prompts include candidate evidence as
+untrusted JSON data, not the full CV or raw JD, and refuse oversized input rather
+than truncating context. A route-scoped global exception fallback registered at bootstrap sanitizes
+JSON/body-parser failures before controller dispatch; unrelated routes use the
+existing Nest behavior. No global queue, provider changes or new dependencies.
+The shared guard covers CV Match/suggestions, not unrelated extraction workflows.
+P6 scoring and evidence semantics remain unchanged; P7.4 UI and P8 remain deferred.
+
+### P7.4 CV improvement suggestions in CV Match
+
+The existing CV Match document flow hosts a compact suggestions section between
+Requirements and Application advice. It explicitly requests selection using the
+successful matchId and validates the response against the displayed match's
+source revisions, parent/component linkage and exact evidence before enabling
+copy. The UI preserves server ordering and wording; it does not generate claims,
+compute scores or reinterpret requirement satisfaction.
+
+Snapshot/component keys and abort/generation guards discard late results.
+Reanalysis, CV replacement and relevant job/form changes clear cards immediately;
+expired/replaced contexts require explicit Reanalyze. Source-changing actions are
+disabled during selection. Evidence navigation reuses the existing reveal,
+instant-scroll and focus callback. Clipboard errors leave exact wording available
+for manual copy. Parsed-text and canonical-requirement provenance labels avoid
+claiming original-file positions or verbatim uploaded-JD traceability.
+
+The browser has excerpts only: its runtime checks establish source identity,
+evidence equality, safe offset shape/length and wording/clarification exclusivity;
+full-source span equality and unique-anchor validation remain backend-owned.
+No schema library, backend correction, new persistence or P8 model is needed.
+
+### P7.4.1 Dedicated Improve CV and shared match owner
+
+Improve CV is now a separate, always-accessible Job Details tab. The already
+mounted CvMatchPanel remains the single owner of saved-CV/match state and renders
+sibling CV Match/Improve CV panels selected by JobEditor. This avoids lifting all
+matching state into the editor or adding a global provider/store. Switching tabs
+preserves one result/identity and does not invoke analysis or selection. A small
+inspection handle reuses the existing exact-parent reveal/scroll/focus flow.
+
+Suggestions require a successful current analysis. Dirty job forms, reanalysis,
+CV replacement, saved-job revision changes and rejected/expired snapshots disable
+selection and clear actionable cards. An owner-local save revision invalidates
+matches even when saving leaves editable form JSON unchanged. A client lifetime
+timer is conservative UX; backend snapshot/revision checks remain authoritative.
+Cards default to two, with Show all/less and optional evidence/provenance details.
+Only the neutral server clarification template was shortened; factual wording,
+provenance contracts and copy validation remain server-owned and unchanged.
+
+The Vietnamese database proficiency one-of family now parses before P6's generic
+unresolved-quantity guard. Exact alternatives retain a shared proficiency context;
+explicit level declarations or narrowly demonstrated production administration
+with multiple database responsibilities can support one alternative. Bare names,
+ordinary use, aspirations and negatives cannot. Recovery is restricted to this
+recognized family and still respects rejected-evidence suppression and conflict
+precedence. Existing P6 parent weights, AND/OR aggregation and other requirement
+families are unchanged. The [P7 audit](audits/p7-cv-improvement-design.md) records
+synthetic evidence cases, grammar bounds, shared-state tradeoffs and verification.
+
+### P7.4.2 Database observations versus qualification support
+
+Database/proficiency coverage now retains bounded original-source observations
+(`mention` or `experience`) when the requested proficiency remains unverified.
+These additive component fields and qualification reasons prevent ordinary
+SQL Server project evidence from disappearing merely because it does not satisfy
+a higher level predicate. Qualification-support quotes, OR credit and P6 weights
+are unchanged; observations cannot authorize matching credit or copyable wording.
+An explicit use denial can conflict with documented work, while a statement of
+insufficient proficiency does not itself contradict ordinary use. Source text,
+negation, rejected-evidence safeguards and project attribution remain intact.
+Detailed observation rendering and compact Improve CV redesign are deferred;
+the [P7 audit](audits/p7-cv-improvement-design.md) records the synthetic pipeline
+trace and the boundary between documented work and verified requirement support.
+
+### P6 reliability: recover managed-language work context
+
+The recognized managed-language experience OR family now reuses bounded original
+CV passage choices and exact quote resolution to recover a stronger professional
+work passage after weak or empty model selection. It requires explicit language,
+software development and professional context together; adjacent recognized
+employment/role/project attribution is retained rather than truncated or borrowed
+across entries. Bare lists, learning, aspirations and unrelated technologies cannot
+authorize experience credit. Existing invalid-evidence suppression, negation,
+minimum duration and conflict precedence still apply. Generic matching families,
+P6 weights and aggregation remain unchanged. A broader matcher or prompt rewrite
+was unnecessary for the confirmed recovery gap. The [P7 audit](audits/p7-cv-improvement-design.md)
+records synthetic regressions, real-provider acceptance and bounded-context limits.
+
+### P6 targeted proficiency and AI familiarity semantics
+
+Recognized database-proficiency OR groups now use three bounded evidence levels:
+mentions remain Unknown (0), exact substantive professional use is Partial (0.5),
+and credible declarations or directly attributed practical database responsibilities
+can be Matched (1). OR uses the strongest alternative, never sums evidence across
+alternatives; required/preferred weights remain 3:1. The same exact-span, attribution,
+negation, aspiration and conflict gates apply to selection and bounded recovery.
+Generic MyBatis optimization cannot establish SQL Server responsibility/proficiency.
+
+The exact Axon familiarity-or-interest sentence has two scoped OR predicates;
+contextual development-tool use or explicitly relevant interest may satisfy it.
+Interest does not establish professional experience, code generation or automation
+experience, and this exception does not weaken other aspiration or AND policies.
+Both families reuse existing bounded source choices, quote resolution and recovery.
+CV Match renders exact source observations separately from qualification support,
+including Partial reasons; uncredited mentions remain visible. No P7 redesign,
+persistence, dependency or infrastructure change is needed. The [P7 implementation
+record](audits/p7-cv-improvement-design.md) records acceptance and remaining bounds.
+
+### P6 database PDF line and attribution recovery
+
+Database-use classification now creates a temporary semantic view for a recognized
+soft-wrapped preposition/database continuation, retaining the original source span
+for every result. Sentence, bullet, blank-line and heading boundaries prevent joining.
+Recognized database-proficiency matching may add up to 20 exact attributed work
+candidates (2,000 characters each): three adjacent employer/role/project headers
+plus one work line and its optional continuation. Both the model allowlist and
+server recovery use these candidates. The generic three-span window, attribution
+guards, database qualification levels, OR credit, weights and accepted Axon policies
+are unchanged. The [SQL layout report](audits/p6-sql-server-layout-diagnosis.md)
+records the focused regressions and bounded real-provider acceptance.
+
+### P6 nominal database development responsibilities
+
+Database observations now recognize bounded “Development of”, “Implementation of”
+and “Responsible for developing/implementing” software responsibilities with an
+explicit using/with/on relationship to a named database, including an explicit
+coordinated use list. The software object and tool clause are bounded; raw stack
+co-occurrence is insufficient. Professional context must come from the statement
+or preceding recognized attribution, never an unrelated work bullet or a later role.
+The existing exact-span resolver, continuation rules and candidate bounds are reused;
+only database attributed-candidate starts gain these nominal forms. Experience earns
+the existing Partial credit, not proficiency. Explicit denial of the same development
+responsibility retains conflict precedence; lack of proficiency or administration
+responsibility does not contradict ordinary use. No other requirement family,
+weight, UI or infrastructure changes. The [SQL layout implementation record](audits/p6-sql-server-layout-diagnosis.md)
+contains synthetic regressions and real-provider acceptance.
+
+### P6 nominal database leadership prefix
+
+The database-only nominal responsibility grammar accepts a past-tense leadership
+verb and definite article before its existing development/implementation-of form.
+This is a prefix alternative only: object/use parsing, attribution, negation,
+continuation boundaries, Partial credit and proficiency qualification are unchanged.
+Synthetic prefix regressions live in `cv-match.database-prefix.spec.ts`; no private
+source text or diagnostic payload is retained in repository files.

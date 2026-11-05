@@ -27,7 +27,7 @@ const makeJob = (
   createdAt: '',
   updatedAt: '',
 });
-function mount(rows: ReturnType<typeof makeJob>[], path = '/dashboard') {
+function mount(rows: ReturnType<typeof makeJob>[], path = '/jobs') {
   const fetch = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
     async (url) => {
       if (url.endsWith('/cv/current')) return Response.json(null);
@@ -42,7 +42,7 @@ function mount(rows: ReturnType<typeof makeJob>[], path = '/dashboard') {
   const view = render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/dashboard" element={<JobInbox />} />
+        <Route path="/jobs" element={<JobInbox />} />
         <Route path="/jobs/:id" element={<JobEditor />} />
       </Routes>
     </MemoryRouter>,
@@ -257,7 +257,7 @@ test('Inbox has no discovery panel and keeps grouped controls and bottom paginat
     within(section).getByRole('button', { name: 'All jobs' }),
   ).toHaveAttribute('aria-pressed', 'true');
   const table = within(section).getByRole('table');
-  const pagination = within(section).getByLabelText('Job Inbox pagination');
+  const pagination = within(section).getByLabelText('Jobs pagination');
   expect(
     table.compareDocumentPosition(pagination) &
       Node.DOCUMENT_POSITION_FOLLOWING,
@@ -304,9 +304,7 @@ test('compact rows omit missing follow-ups and discovery detail controls', async
   expect(row.querySelector('details')).toBeNull();
   const region = screen.getByRole('region', { name: 'Scrollable saved jobs' });
   expect(region).toContainElement(row);
-  expect(region).not.toContainElement(
-    screen.getByLabelText('Job Inbox pagination'),
-  );
+  expect(region).not.toContainElement(screen.getByLabelText('Jobs pagination'));
   expect(region).not.toContainElement(
     screen.getByRole('button', { name: 'Due follow-ups' }),
   );

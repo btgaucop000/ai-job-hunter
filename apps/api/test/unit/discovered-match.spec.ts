@@ -101,7 +101,7 @@ test('title/search stack mentions never become automatic requirements and source
     ['Java', 'SQL'],
   );
 });
-test('an explicit Java declaration or Java Spring Boot work satisfies one language alternative with a verbatim quote', () => {
+test('only professional Java work satisfies the managed-language experience alternative', () => {
   const job = savedJob();
   for (const evidence of [
     cv.split('\n')[0]!,
@@ -125,9 +125,10 @@ test('an explicit Java declaration or Java Spring Boot work satisfies one langua
     expect(result.requirements).toHaveLength(1);
     expect(result.requirements[0]).toMatchObject({
       requirement: alternative,
-      status: 'EVIDENCED',
-      cvQuote: evidence,
+      status: evidence === cv.split('\n')[1] ? 'EVIDENCED' : 'NOT_EVIDENCED',
+      cvQuote: evidence === cv.split('\n')[1] ? evidence : '',
     });
+    expect(result.score).toBe(evidence === cv.split('\n')[1] ? 100 : 0);
     expect(evidence).toContain(result.requirements[0]!.cvQuote);
   }
 });
@@ -204,7 +205,7 @@ test('full discovered JD → real matching service → API-shaped result retains
   expect(result.requirements[0]).toMatchObject({
     requirement: alternative,
     status: 'EVIDENCED',
-    cvQuote: cv.split('\n')[0],
+    cvQuote: cv.split('\n')[1],
   });
   expect(result.requirements.some((item) => item.requirement === 'Java')).toBe(
     false,
@@ -214,7 +215,7 @@ test('full discovered JD → real matching service → API-shaped result retains
 
 test('an alternative supported by Scala evidence is one matched requirement, not four mandatory languages', () => {
   const job = savedJob();
-  const quote = 'Technical Skills: Scala, Go';
+  const quote = 'Professional experience: Developed production Scala services.';
   const result = scoreCvMatch(
     [
       {

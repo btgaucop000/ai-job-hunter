@@ -49,7 +49,7 @@ export function DuplicateJobNotice({ url }: { url: string }) {
   if (!result.match) return null;
   return (
     <Alert severity="warning" sx={{ overflowWrap: 'anywhere' }}>
-      This URL is already saved in Job Inbox
+      This URL is already saved in Jobs
       {result.match.title || result.match.company
         ? `: ${[result.match.title, result.match.company].filter(Boolean).join(' · ')}`
         : ''}

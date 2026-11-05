@@ -15,7 +15,26 @@ import {
   importFields,
 } from '../src/features/inbox/opportunities-api';
 vi.mock('../src/features/inbox/CvMatchPanel', () => ({
-  CvMatchPanel: () => <div>Saved CV matching workflow</div>,
+  CvMatchPanel: ({ view }: { view: string }) => (
+    <>
+      <div
+        role="tabpanel"
+        id="job-panel-1"
+        aria-labelledby="job-tab-1"
+        hidden={view !== 'match'}
+      >
+        Saved CV matching workflow
+      </div>
+      <div
+        role="tabpanel"
+        id="job-panel-2"
+        aria-labelledby="job-tab-2"
+        hidden={view !== 'improve'}
+      >
+        CV improvement workflow
+      </div>
+    </>
+  ),
 }));
 const id = '00000000-0000-4000-8000-123456789012';
 const row = () => ({
@@ -36,14 +55,14 @@ function mount(path = '/jobs/new') {
         path: '*',
         element: (
           <Routes>
-            <Route path="/dashboard" element={<div>Inbox destination</div>} />
+            <Route path="/jobs" element={<div>Inbox destination</div>} />
             <Route path="/jobs/new" element={<JobEditor key="new" />} />
             <Route path="/jobs/:id" element={<JobEditor />} />
           </Routes>
         ),
       },
     ],
-    { initialEntries: ['/dashboard', path], initialIndex: 1 },
+    { initialEntries: ['/jobs', path], initialIndex: 1 },
   );
   const mounted = render(
     <ThemeProvider theme={theme}>
@@ -182,7 +201,7 @@ test('detail defaults to overview, match stays mounted, application and JD edits
   expect(screen.getByLabelText('Application notes')).toHaveValue(
     'Synthetic note',
   );
-  fireEvent.click(screen.getByRole('link', { name: 'Back to Job Inbox' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Back to Jobs' }));
   expect(await screen.findByText('Inbox destination')).toBeVisible();
 });
 
@@ -192,7 +211,7 @@ test('manual creation validates title and keeps fields after save failure', asyn
   expect(
     screen.getByRole('button', { name: 'Continue to Review & Save' }),
   ).toHaveClass('MuiButton-contained');
-  const back = screen.getByRole('link', { name: 'Back to Job Inbox' });
+  const back = screen.getByRole('link', { name: 'Back to Jobs' });
   expect(back).toHaveClass('MuiButton-outlined');
   expect(back.querySelector('.MuiButton-startIcon svg')).toHaveAttribute(
     'aria-hidden',
@@ -233,7 +252,7 @@ test('unsaved link navigation, browser back, and refresh are guarded; stay retai
   const unload = new Event('beforeunload', { cancelable: true });
   window.dispatchEvent(unload);
   expect(unload.defaultPrevented).toBe(true);
-  fireEvent.click(screen.getByRole('link', { name: 'Back to Job Inbox' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Back to Jobs' }));
   expect(await screen.findByRole('dialog')).toBeVisible();
   const stay = screen.getByRole('button', { name: 'Stay and edit' });
   const discard = screen.getByRole('button', { name: 'Discard and leave' });
@@ -444,7 +463,7 @@ test('missing work-mode evidence clears obsolete automatic values but preserves 
   );
 });
 
-test('narrow tab strip supports all four tabs and keyboard selection without losing edits', async () => {
+test('narrow tab strip supports all five tabs and keyboard selection without losing edits', async () => {
   vi.stubGlobal('innerWidth', 360);
   mockApi();
   mount(`/jobs/${id}`);
@@ -454,6 +473,7 @@ test('narrow tab strip supports all four tabs and keyboard selection without los
   expect(tabs.map((tab) => tab.textContent)).toEqual([
     'Overview',
     'CV Match',
+    'Improve CV',
     'Application',
     'Edit JD',
   ]);
@@ -463,7 +483,9 @@ test('narrow tab strip supports all four tabs and keyboard selection without los
   expect(strip).toHaveStyle({ maxWidth: '100%', minWidth: '0' });
   expect(strip.querySelector('.MuiTabs-scrollButtonsHideMobile')).toBeNull();
   await user.click(tabs[0]!);
-  await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}{Enter}');
+  await user.keyboard(
+    '{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{Enter}',
+  );
   expect(screen.getByRole('tab', { name: 'Edit JD' })).toHaveAttribute(
     'aria-selected',
     'true',
@@ -505,7 +527,7 @@ test('Overview external job navigation stays an inline MUI link while Back is an
   expect(original).not.toHaveClass('MuiButton-root');
   expect(original).toHaveAttribute('href', 'https://example.com/synthetic-job');
   expect(original).toHaveAttribute('rel', 'noopener noreferrer');
-  expect(screen.getByRole('link', { name: 'Back to Job Inbox' })).toHaveClass(
+  expect(screen.getByRole('link', { name: 'Back to Jobs' })).toHaveClass(
     'MuiButton-outlined',
   );
 });
@@ -529,17 +551,25 @@ test('discovery provenance appears once between the tabs and every active panel'
   );
   mount(`/jobs/${id}`);
   await screen.findByRole('heading', { name: 'Synthetic engineer' });
-  for (const name of ['Overview', 'CV Match', 'Application', 'Edit JD']) {
+  for (const name of [
+    'Overview',
+    'CV Match',
+    'Improve CV',
+    'Application',
+    'Edit JD',
+  ]) {
     tab(name);
-    const banner = screen.getByRole('alert', { name: 'Discovery provenance' });
+    const banner = screen.getByLabelText('Discovery provenance');
     expect(screen.getAllByLabelText('Discovery provenance')).toHaveLength(1);
     expect(banner).toHaveTextContent('Axon · Greenhouse');
-    expect(banner).toHaveTextContent(new Date(discoveredAt).toLocaleString());
+    expect(banner).toHaveTextContent(
+      new Date(discoveredAt).toLocaleDateString(),
+    );
     expect(banner.closest('[role="tabpanel"]')).toBeNull();
     const strip = screen.getByRole('tablist', { name: 'Job sections' });
     const panel = screen.getByRole('tabpanel', { name });
     expect(
-      strip.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING,
+      banner.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
       banner.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -570,9 +600,7 @@ test.each(['', 'javascript:alert(1)', 'https://user:secret@example.com/job'])(
       ),
     );
     mount(`/jobs/${id}`);
-    expect(
-      await screen.findByRole('alert', { name: 'Discovery provenance' }),
-    ).toBeVisible();
+    expect(await screen.findByLabelText('Discovery provenance')).toBeVisible();
     expect(
       screen.queryByRole('link', { name: 'Open original job' }),
     ).not.toBeInTheDocument();
@@ -583,10 +611,33 @@ test('jobs without discovery provenance have no banner on any tab', async () => 
   mockApi();
   mount(`/jobs/${id}`);
   await screen.findByRole('heading', { name: 'Synthetic engineer' });
-  for (const name of ['Overview', 'CV Match', 'Application', 'Edit JD']) {
+  for (const name of [
+    'Overview',
+    'CV Match',
+    'Improve CV',
+    'Application',
+    'Edit JD',
+  ]) {
     tab(name);
     expect(
       screen.queryByLabelText('Discovery provenance'),
     ).not.toBeInTheDocument();
   }
+});
+
+test('Edit JD contains its heading, fields and save guidance in one outlined surface', async () => {
+  mockApi();
+  mount(`/jobs/${id}`);
+  await screen.findByDisplayValue('Synthetic engineer');
+  fireEvent.click(screen.getByRole('tab', { name: 'Edit JD' }));
+  const panel = screen.getByRole('tabpanel', { name: 'Edit JD' });
+  expect(panel).toHaveStyle({ borderWidth: '1px', borderStyle: 'solid' });
+  expect(panel).toContainElement(
+    screen.getByRole('heading', { name: 'Job details' }),
+  );
+  expect(panel).toContainElement(screen.getByLabelText('Job description'));
+  expect(panel).toHaveTextContent('Save confirms your reviewed values.');
+  const save = screen.getByRole('button', { name: 'Save changes' });
+  expect(save).toHaveAttribute('form', 'job-editor-form');
+  expect(panel).toContainElement(save);
 });

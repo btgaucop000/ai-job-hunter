@@ -72,7 +72,7 @@ export function JobInbox() {
       sx={{ flex: 1, minHeight: 0, minWidth: 0, overflowY: 'auto' }}
     >
       <PageHeader
-        title="Job Inbox"
+        title="Jobs"
         description="Your opportunities, conversations, and next steps."
         actions={
           <Button component={Link} to="/jobs/new" variant="contained">
@@ -357,7 +357,7 @@ export function JobInbox() {
         {!loading && !error && (
           <TablePagination
             component="div"
-            aria-label="Job Inbox pagination"
+            aria-label="Jobs pagination"
             count={visibleRows.length}
             page={currentPage}
             rowsPerPage={10}

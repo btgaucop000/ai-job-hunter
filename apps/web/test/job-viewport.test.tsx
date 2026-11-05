@@ -91,12 +91,25 @@ test.each([360, 1280])(
   },
 );
 
-test('Edit JD retains its shell while Application bounds only its form and save still works', async () => {
+test('Edit JD and Application scroll only their form while preserving edits and save', async () => {
+  vi.stubGlobal('innerWidth', 1440);
+  vi.stubGlobal('innerHeight', 900);
+  applicationGeometry();
   mount(`/jobs/${id}`);
   await screen.findByRole('heading', { name: 'Synthetic engineer' });
   expect(shell().style.height).toBe('');
   fireEvent.click(screen.getByRole('tab', { name: 'Edit JD' }));
-  expectSingleFormScroll();
+  const editFields = screen.getByRole('region', {
+    name: 'Scrollable job fields',
+  });
+  expect(editFields.closest('[role="tabpanel"]')).toBe(
+    screen.getByRole('tabpanel', { name: 'Edit JD' }),
+  );
+  expect(editFields).not.toContainElement(screen.getByRole('tablist'));
+  expect(editFields).not.toContainElement(
+    screen.getByRole('button', { name: 'Save changes' }),
+  );
+  expect(shell().style.height).toBe('');
   fireEvent.change(screen.getByLabelText('Job description'), {
     target: { value: 'Reviewed synthetic JD' },
   });
@@ -117,7 +130,9 @@ test('Edit JD retains its shell while Application bounds only its form and save 
     screen.getByRole('button', { name: 'Save changes' }),
   );
   fireEvent.click(screen.getByRole('tab', { name: 'Edit JD' }));
-  expectSingleFormScroll();
+  expect(
+    screen.getByRole('region', { name: 'Scrollable job fields' }),
+  ).toContainElement(screen.getByLabelText('Job description'));
   expect(screen.getByLabelText('Job description')).toHaveValue(
     'Reviewed synthetic JD',
   );
@@ -126,7 +141,14 @@ test('Edit JD retains its shell while Application bounds only its form and save 
 function applicationGeometry() {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
     function (this: HTMLElement) {
-      const top = this.id === 'job-panel-2' ? 430 : 0;
+      const tab = document.getElementById(
+        this.getAttribute('aria-labelledby') ?? '',
+      );
+      const top =
+        this.getAttribute('role') === 'tabpanel' &&
+        ['Application', 'Edit JD'].includes(tab?.textContent ?? '')
+          ? 430
+          : 0;
       const height =
         this.getAttribute('aria-label') === 'Job save actions' ? 64 : 440;
       return {
@@ -153,7 +175,9 @@ test('Application keeps header and footer outside its desktop form scroller, pre
   const fields = screen.getByRole('region', { name: 'Scrollable job fields' });
   const save = screen.getByRole('button', { name: 'Save changes' });
   expect(fields).toHaveStyle({ overflowY: 'auto' });
-  expect(fields.closest('#job-panel-2')).not.toBeNull();
+  expect(fields.closest('[role="tabpanel"]')).toBe(
+    screen.getByRole('tabpanel', { name: 'Application' }),
+  );
   expect(fields).not.toContainElement(screen.getByRole('tablist'));
   expect(fields).not.toContainElement(save);
   expect(save.closest('form')).toHaveAttribute('id', 'job-editor-form');
@@ -185,23 +209,30 @@ test('Application keeps header and footer outside its desktop form scroller, pre
 });
 
 test.each([
-  { width: 390, height: 844 },
-  { width: 1440, height: 600 },
+  { width: 390, height: 844, tab: 'Application' },
+  { width: 1440, height: 600, tab: 'Application' },
+  { width: 390, height: 844, tab: 'Edit JD' },
+  { width: 1440, height: 600, tab: 'Edit JD' },
 ])(
-  'Application falls back to document scrolling at $width × $height',
-  async ({ width, height }) => {
+  '$tab falls back to document scrolling at $width × $height',
+  async ({ width, height, tab }) => {
     vi.stubGlobal('innerWidth', width);
     vi.stubGlobal('innerHeight', height);
     applicationGeometry();
     mount(`/jobs/${id}?tab=application`);
     await screen.findByRole('heading', { name: 'Application details' });
+    fireEvent.click(screen.getByRole('tab', { name: tab }));
     expect(
       screen.queryByRole('region', { name: 'Scrollable job fields' }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('region', { name: 'Job save actions' }),
     ).toContainElement(screen.getByRole('button', { name: 'Save changes' }));
-    expect(screen.getByLabelText('Application notes')).toBeVisible();
+    expect(
+      screen.getByLabelText(
+        tab === 'Edit JD' ? 'Job description' : 'Application notes',
+      ),
+    ).toBeVisible();
     expect(shell().style.height).toBe('');
   },
 );
