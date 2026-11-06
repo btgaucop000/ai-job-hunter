@@ -931,3 +931,70 @@ This is a prefix alternative only: object/use parsing, attribution, negation,
 continuation boundaries, Partial credit and proficiency qualification are unchanged.
 Synthetic prefix regressions live in `cv-match.database-prefix.spec.ts`; no private
 source text or diagnostic payload is retained in repository files.
+
+### Calm Teal Workspace — checkpoint 1
+
+The shared shell retains the 230px desktop sidebar, `lg` content width and
+16/24px page gutters. Below MUI's `md` breakpoint, a temporary MUI Drawer
+replaces wrapping navigation. Its native modal focus trap, Escape dismissal and
+focus return avoid custom keyboard handling; route links and unsaved-change
+protection retain their existing behavior. The drawer is closed on link activation
+and hidden at desktop widths. The compact shared header retains readiness text,
+manual retry and polling while reducing their visual emphasis.
+
+The theme owns neutral palette tokens, 8px surface corners, 6px button/input
+corners and visible icon-button focus. Typography metrics, semantic warning fills,
+feature layouts and screen-specific scroll ownership remain unchanged. Existing
+MUI primitives provide the shell without new dependencies or an icon package.
+
+### Calm Teal Workspace — checkpoint 2
+
+Jobs uses non-growing, shrinkable panel and table flex items: short result sets
+size to their content, while longer pages retain the constrained row scroller
+and separate filter/pagination controls. No row-count threshold or viewport
+calculation is needed. Ten-row pagination, filtering and row order are unchanged.
+Local styling emphasizes job titles, distinguishes company from source, and adds
+row focus feedback with touch-sized links. Mobile status and follow-up information
+wrap together. The Dashboard placeholder keeps its existing copy and destination,
+with a compact responsive text/action composition and no new functionality.
+
+### Calm Teal Workspace — checkpoint 3
+
+Job Detail keeps its compact header and scroll ownership. Status retains a
+teal outlined chip while neutral metadata uses supporting text; company emphasis
+and smaller provenance links clarify the hierarchy without increasing header
+height. Local tab treatments use the existing selection token and an inset
+keyboard focus outline so the horizontal tab scroller does not clip focus.
+
+Application uses three application-detail columns at desktop widths, two at `sm`
+and one on mobile, with compact section headings, 44px single-line controls and
+helper text aligned to field edges. Its existing form-height measurement,
+independent Save footer, natural-scroll fallback, explicit Save and unsaved-change
+guard are unchanged. No matching or suggestion presentation is modified.
+
+### Calm Teal Workspace — checkpoint 4
+
+CV Match styling reinforces the documented-fit summary, coverage counts and
+requirement status labels. The score retains its original value, neutral progress
+bar and heuristic interpretation; nearby copy explicitly distinguishes CV evidence
+from the candidate's actual skills. Status text remains explicit alongside
+restrained semantic colors, with dark text on the pale amber Partial treatment.
+
+Requirement evidence keeps exact source strings, attribution, expansion state and
+existing targeted scroll/focus callbacks. Quotations have clearer source headings,
+comfortable line spacing and keyboard focus outlines. Component coverage uses
+separators rather than nested cards. No matching/classification logic, source
+selection, lifecycle states or P7 Improve CV content changed.
+
+### Calm Teal Workspace — checkpoint 5
+
+Improve CV presents each existing recommendation with its title, unchanged match
+status, explicit JD coverage label, next step, supported original wording and a
+shared action row. Static labels distinguish available CV wording, missing CV
+evidence and information needing confirmation. Suggestions remain separated by
+single dividers; supported wording uses a subtle surface and keyboard focus ring.
+Review evidence is outlined and precedes the secondary text Copy action.
+
+Suggestion summary rules, source validation, exact copied text, Copy eligibility,
+initial four-item limit, regeneration and prerequisite/error/stale behavior are
+unchanged. This checkpoint changes only presentation in CvSuggestionsSection.

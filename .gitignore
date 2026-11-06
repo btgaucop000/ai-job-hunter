@@ -149,3 +149,6 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Locally installed agent skills (not application source)
+/.agents/skills/

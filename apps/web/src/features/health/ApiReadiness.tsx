@@ -57,7 +57,9 @@ export function ApiReadiness() {
     >
       <span role="status" aria-live="polite">
         <Chip
+          variant={status === 'unavailable' ? 'filled' : 'outlined'}
           size="small"
+          sx={{ border: 0, fontWeight: 500, '& .MuiChip-label': { px: 0.5 } }}
           color={
             status === 'ready'
               ? 'success'
@@ -75,8 +77,9 @@ export function ApiReadiness() {
         />
       </span>
       <Button
-        variant="outlined"
+        variant="text"
         size="small"
+        sx={{ minHeight: { xs: 44, md: 32 } }}
         disabled={status === 'loading'}
         onClick={() => {
           setStatus('loading');

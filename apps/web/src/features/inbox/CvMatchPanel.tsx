@@ -27,7 +27,15 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { importUpload, opportunityRequest } from './opportunities-api';
+const requirementColors = {
+  EVIDENCED: 'success.dark',
+  PARTIAL: 'text.primary',
+  NOT_EVIDENCED: 'text.secondary',
+  CONFLICT: 'error.dark',
+} as const;
+
 interface SavedCv {
   fileName: string;
   updatedAt: string;
@@ -198,7 +206,11 @@ export function CvMatchPanel({
               }}
             >
               <Box sx={{ minWidth: 0 }}>
-                <Typography variant="h6" component="h2">
+                <Typography
+                  variant="h6"
+                  component="h2"
+                  sx={{ fontWeight: 600 }}
+                >
                   CV–JD match
                 </Typography>
                 <Typography
@@ -442,9 +454,7 @@ function MatchOverview({
   const explanationId = useId();
   return (
     <Stack spacing={3}>
-      <Box
-        sx={{ bgcolor: 'action.hover', borderRadius: 1, p: { xs: 2, sm: 3 } }}
-      >
+      <Box sx={{ bgcolor: 'action.selected', borderRadius: 1, p: 2 }}>
         <Box
           sx={{
             display: 'grid',
@@ -457,7 +467,13 @@ function MatchOverview({
           }}
         >
           <Box>
-            <Typography variant="subtitle2">Documented fit</Typography>
+            <Typography
+              variant="subtitle1"
+              component="h3"
+              sx={{ fontWeight: 600 }}
+            >
+              Documented fit
+            </Typography>
             <Stack
               direction="row"
               spacing={2}
@@ -492,17 +508,29 @@ function MatchOverview({
             </Typography>
           </Box>
           <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Requirement coverage
+            </Typography>
             <Stack
               direction="row"
-              spacing={2}
+              spacing={1}
               useFlexGap
               aria-label="Requirement counts"
               sx={{ flexWrap: 'wrap', mb: 1.5 }}
             >
-              <Typography variant="body2">Matched: {matched.length}</Typography>
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: 600, color: requirementColors.EVIDENCED }}
+              >
+                Matched: {matched.length}
+              </Typography>
               {(['PARTIAL', 'NOT_EVIDENCED', 'CONFLICT'] as const).map(
                 (status) => (
-                  <Typography key={status} variant="body2">
+                  <Typography
+                    key={status}
+                    variant="body2"
+                    sx={{ color: requirementColors[status], fontWeight: 500 }}
+                  >
                     {statusLabel(status)}:{' '}
                     {rows.filter(({ item }) => item.status === status).length}
                   </Typography>
@@ -532,6 +560,10 @@ function MatchOverview({
             )}
           </Box>
         </Box>
+        <Typography variant="body2" sx={{ mt: 1.5 }}>
+          This score reflects evidence in the saved CV, not the full extent of
+          your skills.
+        </Typography>
         <Accordion
           disableGutters
           elevation={0}
@@ -546,7 +578,15 @@ function MatchOverview({
             id={`${explanationId}-summary`}
             aria-controls={`${explanationId}-details`}
             expandIcon={<MatchIcon kind="expand" />}
-            sx={{ px: 0 }}
+            sx={{
+              px: 0,
+              minHeight: 44,
+              '&.Mui-focusVisible': {
+                outline: '2px solid',
+                outlineColor: 'primary.main',
+                outlineOffset: -2,
+              },
+            }}
           >
             <Typography variant="body2" color="text.secondary">
               How to read this analysis
@@ -818,7 +858,24 @@ function RequirementsList({
         sx={{
           mb: 1.5,
           flexWrap: 'wrap',
-          '& .MuiToggleButton-root': { textTransform: 'none' },
+          gap: 0.5,
+          '& .MuiToggleButton-root': {
+            textTransform: 'none',
+            minHeight: 44,
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: '6px',
+          },
+          '& .MuiToggleButton-root.Mui-selected': {
+            bgcolor: 'action.selected',
+            color: 'primary.main',
+            fontWeight: 600,
+          },
+          '& .Mui-focusVisible': {
+            outline: '2px solid',
+            outlineColor: 'primary.main',
+            outlineOffset: -3,
+          },
         }}
       >
         <ToggleButton value="all" aria-label="All">
@@ -931,7 +988,7 @@ function RequirementCard({
         aria-label={`${statusLabel(item.status)}: ${item.requirement}`}
         expandIcon={<MatchIcon kind="expand" />}
         sx={{
-          px: 1,
+          px: 1.5,
           minHeight: 64,
           bgcolor: selected ? 'action.selected' : undefined,
           boxShadow: selected
@@ -963,7 +1020,11 @@ function RequirementCard({
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography
               variant="body1"
-              sx={{ fontWeight: 500, overflowWrap: 'anywhere' }}
+              sx={{
+                fontWeight: 600,
+                overflowWrap: 'anywhere',
+                lineHeight: 1.5,
+              }}
             >
               {item.requirement}
             </Typography>
@@ -971,7 +1032,7 @@ function RequirementCard({
               direction="row"
               spacing={2}
               useFlexGap
-              sx={{ flexWrap: 'wrap', mt: 0.5 }}
+              sx={{ flexWrap: 'wrap', alignItems: 'center', mt: 0.5 }}
             >
               <Typography variant="body2" color="text.secondary">
                 {item.priority === 'required' ? 'Required' : 'Preferred'}
@@ -984,7 +1045,18 @@ function RequirementCard({
               </Typography>
               <Typography
                 variant="body2"
-                color={matched ? 'success.main' : 'text.secondary'}
+                sx={{
+                  color: requirementColors[item.status],
+                  fontWeight: 600,
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: 0.5,
+                  bgcolor: (theme) =>
+                    item.status === 'PARTIAL'
+                      ? alpha(theme.palette.warning.main, 0.14)
+                      : theme.palette.action.hover,
+                  ...(item.status === 'PARTIAL' && { color: 'grey.900' }),
+                }}
               >
                 {statusLabel(item.status)}
               </Typography>
@@ -996,7 +1068,7 @@ function RequirementCard({
         id={`${id}-evidence`}
         sx={{
           minWidth: 0,
-          px: { xs: 1.5, sm: 4 },
+          px: { xs: 1.5, sm: 3 },
           py: 1.5,
           bgcolor: 'action.hover',
         }}
@@ -1059,7 +1131,16 @@ function RequirementCard({
               {item.coverage.reason}
             </Typography>
             {item.coverage.components.map((component) => (
-              <Box key={component.id} sx={{ mt: 2, overflowWrap: 'anywhere' }}>
+              <Box
+                key={component.id}
+                sx={{
+                  mt: 2,
+                  pt: 1.5,
+                  borderTop: 1,
+                  borderColor: 'divider',
+                  overflowWrap: 'anywhere',
+                }}
+              >
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   {component.label} · {statusLabel(component.status)}
                 </Typography>
@@ -1128,7 +1209,7 @@ function EvidenceQuote({
 }) {
   return (
     <Box>
-      <Typography variant="subtitle2">
+      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
         {source === 'CV evidence'
           ? 'Your CV'
           : source === 'JD evidence'
@@ -1142,13 +1223,22 @@ function EvidenceQuote({
         sx={{
           m: 0,
           mt: 0.5,
-          p: 0,
-          color: 'text.secondary',
+          p: 1.5,
+          borderLeft: '2px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          color: 'text.primary',
           maxHeight: '12rem',
           overflowY: 'auto',
           overflowWrap: 'anywhere',
           whiteSpace: 'pre-wrap',
           typography: 'body2',
+          lineHeight: 1.6,
+          '&:focus-visible': {
+            outline: '2px solid',
+            outlineColor: 'primary.main',
+            outlineOffset: -2,
+          },
         }}
       >
         {quote}

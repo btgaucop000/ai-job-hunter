@@ -8,6 +8,8 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     ignores: [
+      // Locally installed agent skills, outside repository-owned source.
+      '.agents/skills/**',
       '**/node_modules/**',
       '**/dist/**',
       '**/.test-dist/**',

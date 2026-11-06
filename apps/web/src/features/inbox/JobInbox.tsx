@@ -84,11 +84,22 @@ export function JobInbox() {
         component="section"
         aria-labelledby="saved-jobs-heading"
         variant="outlined"
-        sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          flex: '0 1 auto',
+          minHeight: 0,
+        }}
       >
         <Stack
           spacing={1}
-          sx={{ p: 2, flexShrink: 0, borderBottom: 1, borderColor: 'divider' }}
+          sx={{
+            px: 2,
+            py: 1.5,
+            flexShrink: 0,
+            borderBottom: 1,
+            borderColor: 'divider',
+          }}
         >
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
@@ -102,7 +113,20 @@ export function JobInbox() {
               Saved Jobs{!loading && !error ? ` (${rows.length})` : ''}
             </Typography>
             <ToggleButtonGroup
-              sx={{ '& .MuiToggleButton-root': { px: 1.5, minHeight: 44 } }}
+              sx={{
+                '& .MuiToggleButton-root': { px: 1.5, minHeight: 44 },
+                '& .Mui-selected': {
+                  bgcolor: 'action.selected',
+                  color: 'primary.main',
+                  fontWeight: 600,
+                },
+                '& .Mui-focusVisible': {
+                  outline: '2px solid',
+                  outlineColor: 'primary.main',
+                  outlineOffset: 2,
+                  zIndex: 1,
+                },
+              }}
               exclusive
               size="small"
               value={dueOnly ? 'due' : 'all'}
@@ -147,10 +171,9 @@ export function JobInbox() {
               role="region"
               aria-label="Scrollable saved jobs"
               sx={{
-                flex: 1,
+                flex: '0 1 auto',
                 minHeight: 0,
                 overflow: 'auto',
-                scrollbarGutter: 'stable',
                 overflowAnchor: 'none',
               }}
             >
@@ -163,7 +186,7 @@ export function JobInbox() {
                   '& td, & th': {
                     overflowWrap: 'anywhere',
                     verticalAlign: 'top',
-                    py: 1,
+                    py: 1.5,
                     px: 2,
                   },
                 }}
@@ -181,7 +204,19 @@ export function JobInbox() {
                         .filter(Boolean)
                         .join(' · ');
                     return (
-                      <TableRow key={row.id} hover>
+                      <TableRow
+                        key={row.id}
+                        hover
+                        sx={{
+                          '&:focus-within': { bgcolor: 'action.selected' },
+                          '& .MuiLink-root:focus-visible': {
+                            outline: '2px solid',
+                            outlineColor: 'primary.main',
+                            outlineOffset: 2,
+                            borderRadius: 0.5,
+                          },
+                        }}
+                      >
                         <TableCell>
                           <Box
                             sx={{
@@ -203,7 +238,11 @@ export function JobInbox() {
                                 color="text.primary"
                                 variant="body1"
                                 sx={{
-                                  fontWeight: 500,
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  minHeight: { xs: 44, sm: 24 },
+                                  lineHeight: 1.5,
                                   overflowWrap: 'anywhere',
                                 }}
                               >
@@ -212,17 +251,30 @@ export function JobInbox() {
                               <Typography
                                 variant="body2"
                                 color="text.secondary"
-                                sx={{ mt: 0.5 }}
+                                sx={{ mt: { xs: 0, sm: 0.5 }, lineHeight: 1.5 }}
                               >
-                                {row.company || 'Unknown company'} · {source}
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    color: 'text.primary',
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  {row.company || 'Unknown company'}
+                                </Box>
+                                {' · '}
+                                <Box component="span">{source}</Box>
                               </Typography>
                             </Box>
                             <Stack
+                              direction={{ xs: 'row', sm: 'column' }}
+                              useFlexGap
                               spacing={0.5}
                               sx={{
                                 gridColumn: { xs: 1, sm: 2 },
+                                flexWrap: 'wrap',
                                 alignItems: {
-                                  xs: 'flex-start',
+                                  xs: 'center',
                                   sm: 'flex-end',
                                 },
                               }}
@@ -233,6 +285,9 @@ export function JobInbox() {
                                 label={label(row.status)}
                                 sx={{
                                   typography: 'caption',
+                                  bgcolor: 'action.hover',
+                                  borderColor: 'divider',
+                                  fontWeight: 500,
                                   maxWidth: '100%',
                                   height: 'auto',
                                   minHeight: 24,
@@ -249,15 +304,14 @@ export function JobInbox() {
                                     to={`/jobs/${row.id}?tab=application`}
                                     aria-label={`${urgency}: open Application for ${row.title}`}
                                     title={row.followUpDate}
-                                    color={
-                                      urgency === 'Overdue'
-                                        ? 'warning.dark'
-                                        : 'text.primary'
-                                    }
+                                    color="text.primary"
                                     underline="hover"
                                     sx={{
                                       typography: 'caption',
                                       fontWeight: 600,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      minHeight: { xs: 44, sm: 24 },
                                     }}
                                   >
                                     {urgency}
@@ -303,13 +357,20 @@ export function JobInbox() {
                   })}
                   {!visibleRows.length && (
                     <TableRow>
-                      <TableCell sx={{ py: 4 }}>
-                        <Typography variant="h6">
+                      <TableCell sx={{ '&&': { py: 3 } }}>
+                        <Typography
+                          variant="h6"
+                          component="h3"
+                          sx={{ fontWeight: 600, mb: 0.5 }}
+                        >
                           {dueOnly
                             ? 'No due follow-ups'
                             : 'No saved opportunities yet'}
                         </Typography>
-                        <Typography>
+                        <Typography
+                          color="text.secondary"
+                          sx={{ maxWidth: '52ch', mb: 2 }}
+                        >
                           {dueOnly
                             ? 'No active jobs have a follow-up due today or earlier. Clear the filter to see all jobs.'
                             : 'Add a job from a website, recruiter conversation, or email to start tracking it.'}
@@ -370,7 +431,15 @@ export function JobInbox() {
               flexShrink: 0,
               borderTop: 1,
               borderColor: 'divider',
-              '& .MuiTablePagination-toolbar': { px: 2, flexWrap: 'wrap' },
+              '& .MuiTablePagination-toolbar': {
+                px: 2,
+                flexWrap: 'wrap',
+                minHeight: 52,
+              },
+              '& .MuiTablePagination-actions .MuiIconButton-root': {
+                width: 44,
+                height: 44,
+              },
               '& .MuiTablePagination-displayedRows': { mr: 'auto' },
               '& .MuiTablePagination-spacer': { display: 'none' },
             }}

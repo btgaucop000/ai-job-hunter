@@ -3,9 +3,13 @@ import { createTheme } from '@mui/material/styles';
 export const theme = createTheme({
   palette: {
     primary: { main: '#176b5b' },
-    background: { default: '#f5f7f6' },
+    background: { default: '#f5f7f6', paper: '#ffffff' },
+    text: { primary: '#182823', secondary: '#53645d' },
+    divider: '#dce4df',
+    action: { selected: '#e8f2ee' },
   },
   spacing: 8,
+  shape: { borderRadius: 8 },
   typography: {
     fontFamily: 'Inter, system-ui, sans-serif',
     h4: { fontSize: '1.75rem', fontWeight: 600, lineHeight: 1.3 },
@@ -23,6 +27,7 @@ export const theme = createTheme({
       defaultProps: { disableElevation: true },
       styleOverrides: {
         root: ({ theme }) => ({
+          borderRadius: 6,
           '&.Mui-focusVisible': {
             outline: `2px solid ${theme.palette.primary.main}`,
             outlineOffset: 2,
@@ -33,6 +38,17 @@ export const theme = createTheme({
         sizeLarge: { minHeight: 44 },
       },
     },
+    MuiIconButton: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          '&.Mui-focusVisible': {
+            outline: `2px solid ${theme.palette.primary.main}`,
+            outlineOffset: 2,
+          },
+        }),
+      },
+    },
+    MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 6 } } },
     MuiChip: {
       styleOverrides: {
         root: ({ theme }) => ({
@@ -44,7 +60,7 @@ export const theme = createTheme({
       },
     },
     MuiToggleButton: {
-      styleOverrides: { root: { textTransform: 'none' } },
+      styleOverrides: { root: { textTransform: 'none', borderRadius: 6 } },
     },
   },
 });
