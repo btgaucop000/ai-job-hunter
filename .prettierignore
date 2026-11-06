@@ -3,3 +3,6 @@ dist
 coverage
 pnpm-lock.yaml
 .test-dist
+
+# Locally installed agent skills
+/.agents/skills/

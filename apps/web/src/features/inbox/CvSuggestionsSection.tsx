@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { alpha } from '@mui/material/styles';
 import {
   Alert,
   Box,
@@ -217,7 +218,12 @@ export function CvSuggestionsSection({
               useFlexGap
               sx={{ flexWrap: 'wrap', alignItems: 'baseline' }}
             >
-              <Typography id={heading} variant="h6" component="h2">
+              <Typography
+                id={heading}
+                variant="h6"
+                component="h2"
+                sx={{ fontWeight: 600 }}
+              >
                 Improve your CV
               </Typography>
               {visible && (
@@ -318,26 +324,69 @@ export function CvSuggestionsSection({
               sx={{
                 borderTop: 1,
                 borderColor: 'divider',
-                pt: 1.5,
+                pt: 2,
+                pb: 0.5,
                 minWidth: 0,
                 overflowWrap: 'anywhere',
               }}
             >
               <Stack spacing={1}>
-                <Box>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1}
+                  sx={{
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography
+                      variant="subtitle1"
+                      component="h3"
+                      sx={{ fontWeight: 600, lineHeight: 1.5 }}
+                    >
+                      {summary.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {card.priority === 'required' ? 'Required' : 'Preferred'}{' '}
+                      · {statusLabel(card.status)}
+                    </Typography>
+                  </Box>
                   <Typography
-                    variant="subtitle1"
-                    component="h3"
-                    sx={{ fontWeight: 600 }}
+                    component="span"
+                    variant="caption"
+                    sx={{
+                      flexShrink: 0,
+                      maxWidth: '100%',
+                      px: 1,
+                      py: 0.5,
+                      borderRadius: 0.5,
+                      fontWeight: 600,
+                      bgcolor: (theme) =>
+                        card.wording !== null
+                          ? theme.palette.action.selected
+                          : card.status === 'NOT_EVIDENCED'
+                            ? theme.palette.action.hover
+                            : alpha(theme.palette.warning.main, 0.14),
+                      color:
+                        card.wording !== null ? 'primary.main' : 'text.primary',
+                    }}
                   >
-                    {summary.title}
+                    {card.wording !== null
+                      ? 'CV wording available'
+                      : card.status === 'NOT_EVIDENCED'
+                        ? 'Missing CV evidence'
+                        : 'Confirmation needed'}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {card.priority === 'required' ? 'Required' : 'Preferred'} ·{' '}
-                    {statusLabel(card.status)}
-                  </Typography>
-                </Box>
-                <Typography variant="body2" color="text.secondary">
+                </Stack>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ lineHeight: 1.5 }}
+                >
+                  <Box component="span" sx={{ fontWeight: 600 }}>
+                    JD coverage:{' '}
+                  </Box>
                   {summary.gap}
                 </Typography>
                 <Typography variant="body2">
@@ -358,27 +407,34 @@ export function CvSuggestionsSection({
                       label="Supported original wording"
                       quote={card.wording}
                     />
+                  </Box>
+                ) : null}
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  useFlexGap
+                  sx={{ flexWrap: 'wrap', alignItems: 'center' }}
+                >
+                  <Button
+                    variant="outlined"
+                    onClick={() => onInspect(card.parentId)}
+                    sx={{ minHeight: 44 }}
+                  >
+                    Review evidence
+                  </Button>
+                  {card.wording !== null && (
                     <Button
-                      variant="outlined"
+                      variant="text"
                       disabled={
                         disabled || jobDirty || loading || stale || copying
                       }
                       onClick={() => void copy(card.wording!)}
-                      sx={{ minHeight: 44, mt: 1 }}
+                      sx={{ minHeight: 44 }}
                     >
                       Copy wording
                     </Button>
-                  </Box>
-                ) : null}
-                <Button
-                  onClick={() => onInspect(card.parentId)}
-                  sx={{
-                    alignSelf: 'flex-start',
-                    minHeight: { xs: 44, sm: 36 },
-                  }}
-                >
-                  Review evidence
-                </Button>
+                  )}
+                </Stack>
               </Stack>
             </Box>
           );
@@ -508,7 +564,21 @@ function Quote({ label, quote }: { label: string; quote: string }) {
       variant="body2"
       aria-label={label}
       tabIndex={0}
-      sx={{ m: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
+      sx={{
+        m: 0,
+        px: 1.5,
+        py: 1,
+        bgcolor: 'action.selected',
+        borderRadius: 0.5,
+        lineHeight: 1.6,
+        whiteSpace: 'pre-wrap',
+        overflowWrap: 'anywhere',
+        '&:focus-visible': {
+          outline: '2px solid',
+          outlineColor: 'primary.main',
+          outlineOffset: -2,
+        },
+      }}
     >
       {quote}
     </Typography>

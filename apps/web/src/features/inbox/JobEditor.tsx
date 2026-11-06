@@ -18,6 +18,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Alert,
   Box,
+  Breadcrumbs,
   Button,
   Checkbox,
   Chip,
@@ -850,34 +851,85 @@ export function JobEditor({
         actions={!id ? saveActions : null}
       >
         <Stack spacing={id ? 1.5 : 3} sx={{ minWidth: 0 }}>
-          <Button
-            component={Link}
-            to="/jobs"
-            variant="outlined"
-            startIcon={
-              <SvgIcon aria-hidden="true" sx={{ fontSize: 20 }}>
-                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
-              </SvgIcon>
-            }
-            sx={{ alignSelf: 'flex-start', minHeight: { xs: 44, sm: 36 } }}
-          >
-            Back to Jobs
-          </Button>
+          {id ? (
+            <Breadcrumbs
+              aria-label="Job breadcrumb"
+              sx={{ alignSelf: 'flex-start', minWidth: 0, maxWidth: '100%' }}
+            >
+              <MuiLink
+                component={Link}
+                to="/jobs"
+                aria-label="Back to Jobs"
+                color="text.secondary"
+                underline="hover"
+                variant="body2"
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  minHeight: { xs: 44, sm: 32 },
+                  '&:focus-visible': {
+                    outline: '2px solid',
+                    outlineColor: 'primary.main',
+                    outlineOffset: 2,
+                    borderRadius: 0.5,
+                  },
+                }}
+              >
+                <SvgIcon aria-hidden="true" sx={{ fontSize: 20 }}>
+                  <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                </SvgIcon>
+                Jobs
+              </MuiLink>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                aria-current="page"
+              >
+                Job details
+              </Typography>
+            </Breadcrumbs>
+          ) : (
+            <Button
+              component={Link}
+              to="/jobs"
+              variant="outlined"
+              startIcon={
+                <SvgIcon aria-hidden="true" sx={{ fontSize: 20 }}>
+                  <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                </SvgIcon>
+              }
+              sx={{ alignSelf: 'flex-start', minHeight: { xs: 44, sm: 36 } }}
+            >
+              Back to Jobs
+            </Button>
+          )}
           <Box sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
             <Typography variant="h4" component="h1">
               {id ? form.title || 'Job details' : 'Add Job'}
             </Typography>
             <Typography variant={id ? 'body2' : 'body1'} color="text.secondary">
-              {id
-                ? [form.company, form.location].filter(Boolean).join(' · ')
-                : 'Import your sources, then review and save. You can also enter a job manually.'}
+              {id ? (
+                <>
+                  <Box
+                    component="span"
+                    sx={{ color: 'text.primary', fontWeight: 500 }}
+                  >
+                    {form.company}
+                  </Box>
+                  {form.company && form.location ? ' · ' : ''}
+                  {form.location}
+                </>
+              ) : (
+                'Import your sources, then review and save. You can also enter a job manually.'
+              )}
             </Typography>
             {id && (
               <Stack
                 direction="row"
                 spacing={1}
                 useFlexGap
-                sx={{ flexWrap: 'wrap', mt: 1 }}
+                sx={{ flexWrap: 'wrap', alignItems: 'center', mt: 0.5 }}
               >
                 {[
                   form.status.replaceAll('_', ' '),
@@ -888,9 +940,31 @@ export function JobEditor({
                   .filter(
                     (value) => value.trim() && !/^unknown\b/iu.test(value),
                   )
-                  .map((value, index) => (
-                    <Chip key={index} label={value} size="small" />
-                  ))}
+                  .map((value, index) =>
+                    index === 0 ? (
+                      <Chip
+                        key={index}
+                        label={value}
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          bgcolor: 'action.selected',
+                          color: 'primary.main',
+                          borderColor: 'divider',
+                          fontWeight: 600,
+                        }}
+                      />
+                    ) : (
+                      <Typography
+                        key={index}
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ lineHeight: '1.5rem' }}
+                      >
+                        {value}
+                      </Typography>
+                    ),
+                  )}
                 <Chip
                   label="Unsaved changes"
                   size="small"
@@ -932,6 +1006,7 @@ export function JobEditor({
                         display: 'inline-flex',
                         alignItems: 'center',
                         minHeight: { xs: 44, sm: 24 },
+                        typography: 'body2',
                       }}
                     >
                       Open original job
@@ -945,7 +1020,7 @@ export function JobEditor({
               value={view}
               onChange={(_, value: string) => setView(value)}
               variant="scrollable"
-              scrollButtons="auto"
+              scrollButtons={true}
               allowScrollButtonsMobile
               sx={{
                 minWidth: 0,
@@ -953,8 +1028,39 @@ export function JobEditor({
                 '& .MuiTabs-scroller': {
                   overflowX: 'auto',
                   overscrollBehaviorX: 'contain',
+                  scrollPaddingInline: '2px',
                 },
-                '& .MuiTab-root': { flexShrink: 0 },
+                '& .MuiTabs-list': {
+                  width: 'max-content',
+                  minWidth: '100%',
+                  px: '2px',
+                },
+                minHeight: 44,
+                borderBottom: 1,
+                borderColor: 'divider',
+                '& .MuiTab-root': {
+                  flexShrink: 0,
+                  minHeight: 44,
+                  textTransform: 'none',
+                  px: 2,
+                  py: 1,
+                  fontWeight: 500,
+                  color: 'text.secondary',
+                },
+                '& .MuiTab-root.Mui-selected': {
+                  bgcolor: 'action.selected',
+                  color: 'primary.main',
+                  fontWeight: 600,
+                  borderRadius: '6px 6px 0 0',
+                },
+                '& .MuiTab-root.Mui-focusVisible': {
+                  outline: '2px solid',
+                  outlineColor: 'primary.main',
+                  outlineOffset: -3,
+                },
+                '& .MuiTabs-scrollButtons': {
+                  display: { xs: 'inline-flex', md: 'none' },
+                },
                 '& .MuiTabs-scrollButtons.Mui-disabled': { opacity: 0.3 },
               }}
               aria-label="Job sections"
@@ -998,7 +1104,11 @@ export function JobEditor({
             >
               <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
                 <Stack spacing={2}>
-                  <Typography variant="h6" component="h2">
+                  <Typography
+                    variant="h6"
+                    component="h2"
+                    sx={{ fontWeight: 600 }}
+                  >
                     Job overview
                   </Typography>
                   <Box
@@ -1018,7 +1128,11 @@ export function JobEditor({
                       ] as const
                     ).map((field) => (
                       <Box key={field}>
-                        <Typography variant="subtitle2">
+                        <Typography
+                          variant="subtitle2"
+                          color="text.secondary"
+                          sx={{ mb: 0.5 }}
+                        >
                           {fieldLabels[field]}
                         </Typography>
                         <Typography
@@ -1451,6 +1565,15 @@ export function JobEditor({
                   height: formHeight ?? undefined,
                   p: { xs: 2, sm: 3 },
                   minWidth: 0,
+                  '& .MuiInputLabel-root': { color: 'text.secondary' },
+                  '& .MuiInputLabel-root.Mui-focused': {
+                    color: 'primary.main',
+                  },
+                  '& .MuiInputLabel-root.Mui-error': { color: 'error.main' },
+                  '& .MuiOutlinedInput-root:not(.MuiInputBase-multiline)': {
+                    minHeight: 44,
+                  },
+                  '& .MuiFormHelperText-root': { mx: 0, mt: 0.5 },
                 }}
               >
                 <JobActionLayout
@@ -1487,7 +1610,11 @@ export function JobEditor({
                 >
                   <Stack spacing={2} divider={<Divider />}>
                     <Stack spacing={2}>
-                      <Typography variant="h6" component="h2">
+                      <Typography
+                        variant="subtitle1"
+                        component="h2"
+                        sx={{ fontWeight: 600, lineHeight: 1.5 }}
+                      >
                         Application details
                       </Typography>
                       <Box
@@ -1496,6 +1623,7 @@ export function JobEditor({
                           gridTemplateColumns: {
                             xs: 'minmax(0, 1fr)',
                             sm: 'repeat(2, minmax(0, 1fr))',
+                            md: 'repeat(3, minmax(0, 1fr))',
                           },
                           gap: 2,
                         }}
@@ -1542,7 +1670,11 @@ export function JobEditor({
                       </Box>
                     </Stack>
                     <Stack spacing={2}>
-                      <Typography variant="h6" component="h2">
+                      <Typography
+                        variant="subtitle1"
+                        component="h2"
+                        sx={{ fontWeight: 600, lineHeight: 1.5 }}
+                      >
                         Recruiter contact &amp; follow-up
                       </Typography>
                       <Box
@@ -1580,7 +1712,11 @@ export function JobEditor({
                       </Box>
                     </Stack>
                     <Stack spacing={2}>
-                      <Typography variant="h6" component="h2">
+                      <Typography
+                        variant="subtitle1"
+                        component="h2"
+                        sx={{ fontWeight: 600, lineHeight: 1.5 }}
+                      >
                         Notes
                       </Typography>
                       <TextField

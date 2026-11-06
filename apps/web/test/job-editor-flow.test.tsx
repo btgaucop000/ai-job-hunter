@@ -2,7 +2,7 @@ import { ThemeProvider } from '@mui/material';
 import { theme } from '../src/app/theme';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from './render';
+import { fireEvent, render, screen, waitFor, within } from './render';
 import {
   createMemoryRouter,
   RouterProvider,
@@ -511,7 +511,7 @@ test('narrow tab strip supports all five tabs and keyboard selection without los
   ).toContainElement(screen.getByRole('button', { name: 'Save changes' }));
 });
 
-test('Overview external job navigation stays an inline MUI link while Back is an outlined task action', async () => {
+test('Overview keeps inline external navigation and an accessible Jobs breadcrumb', async () => {
   const fetch = mockApi();
   fetch.mockResolvedValueOnce(
     Response.json({
@@ -527,8 +527,15 @@ test('Overview external job navigation stays an inline MUI link while Back is an
   expect(original).not.toHaveClass('MuiButton-root');
   expect(original).toHaveAttribute('href', 'https://example.com/synthetic-job');
   expect(original).toHaveAttribute('rel', 'noopener noreferrer');
-  expect(screen.getByRole('link', { name: 'Back to Jobs' })).toHaveClass(
-    'MuiButton-outlined',
+  const breadcrumb = screen.getByRole('navigation', { name: 'Job breadcrumb' });
+  const jobs = within(breadcrumb).getByRole('link', { name: 'Back to Jobs' });
+  expect(jobs).toHaveTextContent('Jobs');
+  expect(jobs).toHaveAttribute('href', '/jobs');
+  expect(jobs).not.toHaveClass('MuiButton-root');
+  expect(jobs.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  expect(within(breadcrumb).getByText('Job details')).toHaveAttribute(
+    'aria-current',
+    'page',
   );
 });
 

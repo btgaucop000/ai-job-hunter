@@ -259,3 +259,40 @@ test('Discover Jobs supports direct links, navigation, retained results and hist
   expect(router.state.location.pathname).toBe('/discover');
   expect(screen.getByRole('heading', { name: 'Discover Jobs' })).toBeVisible();
 });
+
+test('mobile drawer restores focus on Escape and closes after route selection', async () => {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+  show('/dashboard');
+  const user = userEvent.setup();
+  const trigger = screen.getByRole('button', { name: 'Open navigation' });
+  expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+  await user.click(trigger);
+  const drawer = screen.getByRole('dialog', { name: 'Workspace navigation' });
+  expect(
+    within(drawer).getByRole('link', { name: 'Dashboard' }),
+  ).toHaveAttribute('aria-current', 'page');
+  await user.keyboard('{Escape}');
+  await vi.waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  );
+  expect(trigger).toHaveFocus();
+  await user.click(trigger);
+  await user.click(
+    within(screen.getByRole('dialog')).getByRole('link', {
+      name: /^Jobs$/,
+    }),
+  );
+  expect(screen.getByLabelText('Current route')).toHaveTextContent('/jobs');
+  await vi.waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  );
+});

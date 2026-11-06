@@ -293,9 +293,8 @@ test('compact rows omit missing follow-ups and discovery detail controls', async
   mount([job]);
   const title = await screen.findByRole('link', { name: 'Compact job' });
   const row = title.closest('tr')!;
-  expect(
-    within(row).getByText('Synthetic company · Synthetic feed'),
-  ).toBeVisible();
+  expect(within(row).getByText('Synthetic company')).toBeVisible();
+  expect(within(row).getByText('Synthetic feed')).toBeVisible();
   expect(
     within(row).queryByText(
       /Follow-up|Source details|Synthetic technology|Discovered/,
